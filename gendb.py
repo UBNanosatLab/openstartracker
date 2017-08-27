@@ -4,7 +4,6 @@ import math
 import sys
 import heapq
 import itertools, operator
-import config
 
 #this python file generates constelations based on what stars might be within a simulated field of view
 #the purpose of this is to make the database robust against cases where part of a constelation is cut off, but we still have enough stars to form another constelation

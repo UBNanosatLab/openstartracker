@@ -2,7 +2,8 @@
 awk -F '|' '
 BEGIN {
 	deg2rad = atan2(0, -1)/180;
-	yeardiff=strftime("%Y")+(strftime("%m")-1)/12-1991.25
+	#yeardiff=strftime("%Y")+(strftime("%m")-1)/12-1991.25
+	yeardiff=0
 }
 {
 	HIP_ID=$2;
