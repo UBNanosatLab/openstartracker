@@ -1,0 +1,18 @@
+import numpy as np
+import math
+
+IMG_X=1920
+IMG_Y=1440
+DEG_DIAG=10
+PIXSCALE=3600*DEG_DIAG/np.sqrt(IMG_X**2+IMG_Y**2)
+POS_ERR_SIGMA_RAD = 20e-6 # rad
+POS_ERR_SIGMA=POS_ERR_SIGMA_RAD*180*3600/(np.pi*PIXSCALE) #px
+MAX_FALSE_STARS=10
+
+print "IMG_X="+str(IMG_X)
+print "IMG_Y="+str(IMG_Y)
+print "DEG_DIAG="+str(DEG_DIAG)
+print "PIXSCALE="+str(PIXSCALE)
+print "POS_ERR_SIGMA_RAD="+str(POS_ERR_SIGMA_RAD)
+print "POS_ERR_SIGMA="+str(POS_ERR_SIGMA)
+print "MAX_FALSE_STARS="+str(MAX_FALSE_STARS)
