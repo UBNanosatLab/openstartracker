@@ -9,16 +9,16 @@ import itertools, operator
 #the purpose of this is to make the database robust against cases where part of a constelation is cut off, but we still have enough stars to form another constelation
 #takes in 1 commandline argument. this is our minimum fov/2
 
-execfile(config.PROJECT_ROOT+"catalog_gen/calibration/calibration.txt")
+execfile("calibration/calibration.txt")
 
 def minfovradius():
-	if DEG_X<DEG_Y:
-		return DEG_X/2.0
+	if IMG_X<IMG_Y:
+		return IMG_X*PIXSCALE/7200
 	else:
-		return DEG_Y/2.0
+		return IMG_Y*PIXSCALE/7200
 
 def maxfovradius():
-	return math.sqrt(DEG_X**2+DEG_Y**2)
+	return DEG_DIAG
 
 def rotation_matrix(axis, theta):
     """
@@ -37,7 +37,7 @@ def rotation_matrix(axis, theta):
 
 
 #load our star catalog, converting from id,ra,dec to x,y,z,id
-def getstardb(filename=config.PROJECT_ROOT+"catalog_gen/catalog.dat"):
+def getstardb(filename="calibration/catalog.dat"):
 	stardb={}
 	starfile = open(filename)
 	for line in starfile.readlines():
