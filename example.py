@@ -1,14 +1,10 @@
 from simulator import *
-#%matplotlib inline
-plt.rcParams['image.cmap'] = 'gray'
-sns.set_style('white')
-# resolution
-res_x = 1920 # pixels
-res_y = 1440 # pixels
+#from example.py
+res_x = 1392 # pixels
+res_y = 1080 # pixels
 
 # normalized focal length
-f = 0.5 / np.tan(np.deg2rad(10) / 2)
-
+f = 0.5 / np.tan(np.deg2rad(6) / 2)
 # pixel aspect ratio
 pixel_ar = 1
 
@@ -25,18 +21,20 @@ A_pixel = 525 # photonelectrons/s mm
 sigma_pixel = 525 # photonelectrons/s mm
 
 sigma_psf = 0.5 # pixel
-t_exp = 0.2 # s
-aperture = 15 # mm
+t_exp = 0.015 # s
+aperture = 60.7 # mm
 
 base_photons = 19100 # photoelectrons per mm^2 and second of a magnitude 0 G2 star
 
 magnitude_gaussian = 0.01 # mag
 # star count
 
-min_true = 3
+min_true = 0
 max_true = 100
 min_false = 0
-max_false = 10
+max_false = 5
+
+
 catalog = StarCatalog()
 cameras = [
     RectilinearCamera,
@@ -48,7 +46,7 @@ cameras = [
 
 camera = cameras[cam](f, (res_x, res_y), pixel_ar, (ppx, ppy))
 detector = StarDetector(A_pixel, sigma_pixel, sigma_psf, t_exp, aperture, base_photons)
-num_scenes = 100
+num_scenes = 300
 inputs = []
 outputs = []
 
@@ -63,7 +61,7 @@ def write_csv(filename, lines):
         for line in lines:
             f.write(','.join(str(value) for value in line) + '\n')
 
-write_csv('input_sample.csv', inputs)
-write_csv('result_sample.csv', outputs)
+write_csv('input.csv', inputs)
+write_csv('result.csv', outputs)
 
 #_ = scene.render(False)

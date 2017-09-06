@@ -1,13 +1,9 @@
-#include <iostream>	 // cout
-#include <string>
-#include <fstream>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
 #include <fcntl.h>	/* For O_RDWR */
 #include <sys/mman.h>
-#include "configuration.h"
 #include <stdint.h>
 
 struct constellation {
@@ -32,22 +28,39 @@ void  add_entry(int mapidx,int curr_const) {
 int main (int argc, char** argv) {
 	std::cout.precision(12);
 	//load config
-	configuration::data config1;
-	std::ifstream cfgfile1("calibration/dbsize.txt");
-	cfgfile1 >> config1;
-	cfgfile1.close();
+	//load config
+	FILE *stream;
+	char *line = NULL;
+	winner_scores=NULL;
+	winner_id_map=NULL;
+	c_scores_size=0;
 	
-	configuration::data config2;
-	std::ifstream cfgfile2("calibration/calibration.txt");
-	cfgfile2 >> config2;
-	cfgfile2.close();
+	size_t len = 0;
+	ssize_t read;
+
+	stream = fopen("calibration/calibration.txt", "r");
+	if (stream == NULL) exit(EXIT_FAILURE);
+	while ((read = getline(&line, &len, stream)) != -1) {
+		//Don't listen to valgrind. This is fine. Everything is fine.
+		putenv(strcpy((char *)malloc(sizeof(char) * len),line));
+	}
+	fclose(stream);
 	
-	std::ifstream constline("calibration/constellations.txt");
+	stream = fopen("calibration/dbsize.txt", "r");
+	if (stream == NULL) exit(EXIT_FAILURE);
+	while ((read = getline(&line, &len, stream)) != -1) {
+		//Don't listen to valgrind. This is fine. Everything is fine.
+		putenv(strcpy((char *)malloc(sizeof(char) * len),line));
+	}
+	fclose(stream);
 	
-	int PARAM=atoi(config1["PARAM"].c_str());
-	int NUMCONST=atoi(config1["NUMCONST"].c_str());
-	int STARTABLE=atoi(config1["STARTABLE"].c_str());
-	float ARC_ERR=atof(config2["ARC_ERR"].c_str());
+	//constline
+	stream=fopen("calibration/constellations.txt");
+	
+	int PARAM=atoi(getenv("PARAM"));
+	int NUMCONST=atoi(getenv("NUMCONST"));
+	int STARTABLE=atoi(getenv("STARTABLE"));
+	float ARC_ERR=atof(getenv("ARC_ERR"));
 	int mapsize=PARAM;
 	int s_offset=mapsize*sizeof(int)+ NUMCONST*sizeof(struct constellation);
 	size_t dbsize = s_offset + STARTABLE*sizeof(int);
@@ -95,26 +108,30 @@ int main (int argc, char** argv) {
 	int mmi_l,mmi_m,mmi_h;
 	int curr_star=0;
 	for (int curr_const=0;curr_const<NUMCONST;curr_const++){
-		constline>>constptr[curr_const].p;
-		constline>>constptr[curr_const].s1;
-		constline>>constptr[curr_const].s2;
-		constline>>constptr[curr_const].numstars;
-		constptr[curr_const].staridx=curr_star;
-		for (int i=0;i<constptr[curr_const].numstars;i++) {
-			constline>>star_ids[curr_star];
-			curr_star++;
+		if ((read = getline(&line, &len, stream)) != -1) {
+			constptr[curr_const].p=atof(strtok(line," "));
+			constptr[curr_const].s1=atoi(strtok(NULL," "));
+			constptr[curr_const].s2=atoi(strtok(NULL," "));
+			constptr[curr_const].numstars=atoi(strtok(NULL," "));
+			constptr[curr_const].staridx=curr_star;
+			if ((read = getline(&line, &len, stream)) != -1) {
+				for (int i=0;i<constptr[curr_const].numstars;i++) {
+					star_ids[curr_star]=atoi(strtok(NULL," "));
+					curr_star++;
+				}
+				//add entry to constellation table
+				mmi_l=(int)(constptr[curr_const].p/ARC_ERR-1)%mapsize;
+				mmi_m=(int)(constptr[curr_const].p/ARC_ERR)%mapsize;
+				mmi_h=(int)(constptr[curr_const].p/ARC_ERR+1)%mapsize;
+				if (mmi_l<0) mmi_l+=mapsize;
+				if (mmi_m<0) mmi_m+=mapsize;
+				if (mmi_h<0) mmi_h+=mapsize;
+				
+				add_entry(mmi_l,curr_const);
+				add_entry(mmi_m,curr_const);
+				add_entry(mmi_h,curr_const);
+			}
 		}
-		//add entry to constellation table
-		mmi_l=(int)(constptr[curr_const].p/ARC_ERR-1)%mapsize;
-		mmi_m=(int)(constptr[curr_const].p/ARC_ERR)%mapsize;
-		mmi_h=(int)(constptr[curr_const].p/ARC_ERR+1)%mapsize;
-		if (mmi_l<0) mmi_l+=mapsize;
-		if (mmi_m<0) mmi_m+=mapsize;
-		if (mmi_h<0) mmi_h+=mapsize;
-		
-		add_entry(mmi_l,curr_const);
-		add_entry(mmi_m,curr_const);
-		add_entry(mmi_h,curr_const);
 	}
 	
 	// Write it now to disk
@@ -130,6 +147,6 @@ int main (int argc, char** argv) {
 	}
 	// Un-mmaping doesn't close the file, so we still need to do that.
 	close(fd);
-	constline.close();
+	close(stream);
 }
 

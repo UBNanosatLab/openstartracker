@@ -12,14 +12,15 @@ import itertools, operator
 execfile("calibration/calibration.txt")
 
 def minfovradius():
-	if IMG_X<IMG_Y:
-		return IMG_X*PIXSCALE/7200
+	if DEG_X<DEG_Y:
+		return DEG_X/2.0
 	else:
-		return IMG_Y*PIXSCALE/7200
+		return DEG_Y/2.0
+
 
 def maxfovradius():
-	return DEG_DIAG
-
+	return math.sqrt(DEG_X**2+DEG_Y**2)
+	
 def rotation_matrix(axis, theta):
     """
     Return the rotation matrix associated with counterclockwise rotation about
@@ -146,8 +147,9 @@ def xyz_dist(xyz1,xyz2):
 #only do this part if we were run as a python script
 if __name__ == '__main__':
 	filterbrightness()
-	filterdoublestars()
-	filterunreliable()
+	#TODO: commented out for contest
+	#filterdoublestars()
+	#filterunreliable()
 
 	#print stars
 	if (len(sys.argv)>1):
@@ -174,9 +176,9 @@ if __name__ == '__main__':
 	xyz=np.array(sd[:,4:7].tolist(),dtype=float)
 	uni_xyz=np.array(uni_sd[:,4:7].tolist(),dtype=float)
 	#for each star in the uniform starlist, get all nearby stars in the database
-	ns=searchxyz(xyz,uni_xyz,maxfovradius()/2)
+	ns=searchxyz(xyz,uni_xyz,maxfovradius())
 	#get nearby stars uniform star database
-	uni_ns=searchxyz(uni_xyz,uni_xyz,maxfovradius()/2)
+	uni_ns=searchxyz(uni_xyz,uni_xyz,maxfovradius())
 	
 	STARTABLE=0
 	NUMCONST=0
