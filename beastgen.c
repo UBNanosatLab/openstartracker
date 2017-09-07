@@ -12,43 +12,20 @@ struct constellation {
 	int32_t s2;
 	int32_t numstars;
 	int32_t staridx;
-	int32_t last_l;
-	int32_t last_m;
-	int32_t last_h;
-	int32_t mmi_l;
-	int32_t mmi_h;
+	int32_t idx;
 };
 
-int *map;
-struct constellation *constptr;
+struct constellation *map;
 int *star_ids;
-
-void  add_entry(int mapidx,int curr_const) {
-	int *staridx;
-	for (staridx=&map[mapidx];*staridx!=-1;){
-		if (mapidx==constptr[*staridx].mmi_l) {
-			if (staridx==&(constptr[curr_const].last_l)) return; /* constelation has already been added */
-			staridx=&(constptr[*staridx].last_l);
-		} else if (mapidx==constptr[*staridx].mmi_h) {
-			if (staridx==&(constptr[curr_const].last_h)) return; /* constelation has already been added */
-			staridx=&(constptr[*staridx].last_h);
-		}else {
-			if (staridx==&(constptr[curr_const].last_m)) return; /* constelation has already been added */
-			staridx=&(constptr[*staridx].last_m);
-		}
-	}
-	*staridx=curr_const;
-}
 
 int main (int argc, char** argv) {
 	//load config
 	FILE *stream;
 	char *line = NULL;
 	size_t len = 0;
-	ssize_t read;
 	stream = fopen("calibration/calibration.txt", "r");
 	if (stream == NULL) exit(EXIT_FAILURE);
-	while ((read = getline(&line, &len, stream)) != -1) {
+	while (getline(&line, &len, stream) != -1) {
 		//Don't listen to valgrind. This is fine. Everything is fine.
 		putenv(strcpy((char *)malloc(sizeof(char) * len),line));
 	}
@@ -56,7 +33,7 @@ int main (int argc, char** argv) {
 	
 	stream = fopen("calibration/dbsize.txt", "r");
 	if (stream == NULL) exit(EXIT_FAILURE);
-	while ((read = getline(&line, &len, stream)) != -1) {
+	while (getline(&line, &len, stream) != -1) {
 		//Don't listen to valgrind. This is fine. Everything is fine.
 		putenv(strcpy((char *)malloc(sizeof(char) * len),line));
 	}
@@ -65,12 +42,9 @@ int main (int argc, char** argv) {
 	//constline
 	stream=fopen("calibration/constellations.txt", "r");
 	
-	int PARAM=atoi(getenv("PARAM"));
 	int NUMCONST=atoi(getenv("NUMCONST"));
 	int STARTABLE=atoi(getenv("STARTABLE"));
-	float ARC_ERR=atof(getenv("ARC_ERR"));
-	int mapsize=PARAM;
-	int s_offset=mapsize*sizeof(int)+ NUMCONST*sizeof(struct constellation);
+	int s_offset=NUMCONST*sizeof(struct constellation);
 	size_t dbsize = s_offset + STARTABLE*sizeof(int);
 	
 	/* Open a file for writing.
@@ -103,44 +77,27 @@ int main (int argc, char** argv) {
 	}
 	// Now the file is ready to be mmapped.
 
-	map = (int*)mmap(0, dbsize, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+	map = (struct constellation*)mmap(0, dbsize, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
 	if (map == MAP_FAILED)
 	{
 		close(fd);
 		perror("Error mmapping the file");
 		exit(EXIT_FAILURE);
 	}
-	constptr=(struct constellation*)(&map[mapsize]);
-	star_ids=(int*)(&map[s_offset/sizeof(int)]);
+	star_ids=(int*)(&map[s_offset/sizeof(struct constellation)]);
 	memset(map, -1, dbsize);
-	int mmi_l,mmi_m,mmi_h;
 	int curr_star=0;
-	for (int curr_const=0;curr_const<NUMCONST;curr_const++){
-		if ((read = getline(&line, &len, stream)) != -1) {
-			constptr[curr_const].p=atof(strtok(line," "));
-			constptr[curr_const].s1=atoi(strtok(NULL," "));
-			constptr[curr_const].s2=atoi(strtok(NULL," "));
-			constptr[curr_const].numstars=atoi(strtok(NULL," "));
-			constptr[curr_const].staridx=curr_star;
-			mmi_l=(int)(constptr[curr_const].p/ARC_ERR-1)%mapsize;
-			mmi_m=(int)(constptr[curr_const].p/ARC_ERR)%mapsize;
-			mmi_h=(int)(constptr[curr_const].p/ARC_ERR+1)%mapsize;
-			if (mmi_l<0) mmi_l+=mapsize;
-			if (mmi_m<0) mmi_m+=mapsize;
-			if (mmi_h<0) mmi_h+=mapsize;
-			constptr[curr_const].mmi_l=mmi_l;
-			constptr[curr_const].mmi_h=mmi_h;
-				
-			if ((read = getline(&line, &len, stream)) != -1) {
-				for (int i=0;i<constptr[curr_const].numstars;i++) {
-					if (i==0) star_ids[curr_star]=atoi(strtok(line," "));
-					else star_ids[curr_star]=atoi(strtok(NULL," "));
-					curr_star++;
-				}
-				//add entry to constellation table
-				add_entry(mmi_l,curr_const);
-				add_entry(mmi_m,curr_const);
-				add_entry(mmi_h,curr_const);
+	for (uint32_t idx=0;idx<NUMCONST;idx++){
+		if (getline(&line, &len, stream) != -1) {
+			map[idx].p=atof(strtok(line," "));
+			map[idx].s1=atoi(strtok(NULL," "));
+			map[idx].s2=atoi(strtok(NULL," "));
+			map[idx].numstars=atoi(strtok(NULL," "));
+			map[idx].staridx=curr_star;
+			map[idx].idx=idx;
+			for (int i=0;i<map[idx].numstars;i++) {
+				star_ids[curr_star]=atoi(strtok(NULL," "));
+				curr_star++;
 			}
 		}
 	}

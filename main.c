@@ -88,7 +88,6 @@ int main(int argc, char* argv[])
 	int* results = (int*)malloc(sizeof(int) * MAX_STARS);
 
 	clock_t best = 0;
-
 	for(int run_time = 0; run_time < run_times; run_time++)
 	{
 		clock_t time_sum = 0;
@@ -109,7 +108,6 @@ int main(int argc, char* argv[])
 				int length = i / VECTOR_LENGTH;
 
 				clock_t start = clock();
-
 				star_id(data, results, length, prepared_data);
 
 				clock_t end = clock();

@@ -21,7 +21,7 @@ A_pixel = 525 # photonelectrons/s mm
 sigma_pixel = 525 # photonelectrons/s mm
 
 sigma_psf = 0.5 # pixel
-t_exp = 0.015 # s
+t_exp = 0.05 # s
 aperture = 60.7 # mm
 
 base_photons = 19100 # photoelectrons per mm^2 and second of a magnitude 0 G2 star

@@ -18,11 +18,7 @@ struct constellation {
 	int32_t s2;
 	int32_t numstars;
 	int32_t staridx;
-	int32_t last_l;
-	int32_t last_m;
-	int32_t last_h;
-	int32_t mmi_l;
-	int32_t mmi_h;
+	int32_t idx;
 };
 
 struct star {
@@ -52,8 +48,7 @@ struct  constellation_score {
 };
 
 //SWIG complains about these pointers. They're fine.
-int *map;
-struct constellation *constptr;
+struct constellation* map;
 int *db_starids;
 struct star *starptr;
 
@@ -61,8 +56,7 @@ int fd;
 size_t dbsize;
 int mapsize;
 
-
-int PARAM,NUMCONST,NUMSTARS,STARTABLE;
+int NUMCONST,NUMSTARS,STARTABLE;
 
 int IMG_X,IMG_Y,MAX_FALSE_STARS;
 float DEG_X,DEG_Y,PIXX_TANGENT,PIXY_TANGENT;
@@ -90,6 +84,7 @@ float R21,R22,R23;
 float R31,R32,R33;
 
 void load_db() {
+	
 	//load config
 	FILE *stream;
 	char *line = NULL;
@@ -127,19 +122,17 @@ void load_db() {
 	EXPECTED_FALSE_STARS=atof(getenv("EXPECTED_FALSE_STARS"));//pfalse
 	//need to do something with this for lost in space
 	MAX_FALSE_STARS=atoi(getenv("MAX_FALSE_STARS"));//>10 is slow
-	PHOTONS=atoi(getenv("PHOTONS"));//>10 is slow
+	PHOTONS=atoi(getenv("PHOTONS"));
 	MATCH_VALUE=4*log(EXPECTED_FALSE_STARS/(IMG_X*IMG_Y))+log(2*PI);//base
 	
 	PIXX_TANGENT=2*tan(DEG_X*PI/(180*2))/IMG_X;
 	PIXY_TANGENT=2*tan(DEG_Y*PI/(180*2))/IMG_Y;
 	
-	PARAM=atoi(getenv("PARAM"));
 	NUMCONST=atoi(getenv("NUMCONST"));
 	NUMSTARS=atoi(getenv("NUMSTARS"));
 	STARTABLE=atoi(getenv("STARTABLE"));
 	
-	mapsize=PARAM;
-	int s_offset=mapsize*sizeof(int)+ NUMCONST*sizeof(struct constellation);
+	int s_offset=NUMCONST*sizeof(struct constellation);
 	dbsize = s_offset + STARTABLE*sizeof(int);
 	
 	/* Open a file for writing.
@@ -158,21 +151,20 @@ void load_db() {
 
 	// Now the file is ready to be mmapped.
 
-	map = (int*)mmap(NULL, dbsize, PROT_READ, MAP_SHARED | MAP_POPULATE, fd, 0);
+	map = (struct constellation*)mmap(NULL, dbsize, PROT_READ, MAP_SHARED | MAP_POPULATE, fd, 0);
 	if (map == MAP_FAILED)
 	{
 		close(fd);
 		perror("Error mmapping the file");
 		exit(EXIT_FAILURE);
 	}
-	constptr=(struct constellation*)(&map[mapsize]);
-	db_starids=(int*)(&map[s_offset/sizeof(int)]);
+	db_starids=(int*)(&map[s_offset/sizeof(struct constellation)]);
 	
 	stream = fopen("calibration/stars.txt", "r");
 	if (stream == NULL) exit(EXIT_FAILURE);
 	starptr = (struct star*)malloc(NUMSTARS*sizeof(struct star));
 	for(int i=0;i<NUMSTARS;i++){
-		if ((read = getline(&line, &len, stream)) != -1) {
+		if (getline(&line, &len, stream) != -1) {
 			starptr[i].id=atoi(strtok(line," "));
 			starptr[i].starnum=i;
 			starptr[i].mag=atof(strtok(NULL," "));
@@ -206,20 +198,40 @@ void c_scores_clear() {
 	c_scores=NULL;
 	c_scores_size=0;
 }
-int compare_mag (const void *a, const void *b) {
+int cmp_mag (const void *a, const void *b) {
 	struct star *s1 =(struct star *)a;
 	struct star *s2 =(struct star *)b;
 	if (s1->mag > s2->mag) return 1;
 	else if (s1->mag < s2->mag) return -1;
 	else return 0;
 }
-int compare_totalscore (const void *a, const void *b) {
+int cmp_totalscore (const void *a, const void *b) {
 	struct constellation_score *cs1 =(struct constellation_score *)a;
 	struct constellation_score *cs2 =(struct constellation_score *)b;
 	if (cs1->totalscore > cs2->totalscore) return -1;
 	else if (cs1->totalscore < cs2->totalscore) return 1;
 	else return 0;
 }
+/* use with bsearch to get upper bound in sorted list of constellations */
+int cmp_constellation_upper (const void *a, const void *b) {
+	float p =((struct constellation *)a)->p+ARC_ERR;
+	struct constellation *c2 =(struct constellation *)b;
+	if (c2->idx+1==NUMSTARS) return 0;//maximum
+	if (p < c2->p) return -1;//too high
+	if (p >= c2->p && p >= map[c2->idx+1].p) return 1;//too low
+	return 0;//just right
+}
+/* use with bsearch to get lower bound in sorted list of constellations */
+int cmp_constellation_lower (const void *a, const void *b) {
+	float p =((struct constellation *)a)->p-ARC_ERR;
+	struct constellation *c2 =(struct constellation *)b;
+	if (c2->idx==0) return 0;//minimum
+	if (p <= c2->p && p <= map[c2->idx-1].p) return -1;//too high
+	if (p > c2->p) return 1;//too low
+	return 0;//just right
+}
+
+
 
 void add_star(float px, float py, float mag) {
 	struct star s;
@@ -241,12 +253,13 @@ void add_star(float px, float py, float mag) {
 	if (s.magnum==0) addednewstars=0;
 	s.starnum=addednewstars;
 	addednewstars++;
-	while (s.magnum>0&&compare_mag(&s,&newstars[s.magnum-1])>0){
+	while (s.magnum>0&&cmp_mag(&s,&newstars[s.magnum-1])>0){
 		memcpy(&newstars[s.magnum],&newstars[s.magnum-1],sizeof(struct star));
 		newstars[s.magnum].magnum++;
 		s.magnum--;
 	}
 	memcpy(&newstars[s.magnum],&s,sizeof(struct star));
+	
 	if(numnewstars==255) numnewstars=254;
 }
 /* return sin(theta) where theta is the angle between vectors */
@@ -386,22 +399,27 @@ void weighted_triad(struct star old_s1,struct star old_s2,struct star new_s1,str
 	R33=cx*cy;
 }
 void set_mask(int x,int y, int id, float score, float variance){
+	if(x>=IMG_X) x=IMG_X-1;
+	else if(x<0) x=0;
+	if(y>=IMG_Y) y=IMG_Y-1;
+	else if(y<0) y=0;
+	
 	if (score>0) {
 		//has this pixel already been assigned to a different star?
-		unsigned char id2=img_mask[(x+IMG_X/2)+(y+IMG_Y/2)*IMG_X];
+		unsigned char id2=img_mask[x+y*IMG_X];
 		if (id2!=255){
 			float sigma_sq2=newstars[id2].sigma_sq+variance;
 			float maxdist_sq2=-sigma_sq2*(log(sigma_sq2)+MATCH_VALUE);
 			float px2=newstars[id2].px;
 			float py2=newstars[id2].py;
-			float a2=(x+.5-px2);
-			float b2=(y+.5-py2);
+			float a2=(x+.5-px2-IMG_X/2);
+			float b2=(y+.5-py2-IMG_Y/2);
 			float score2 = (maxdist_sq2-(a2*a2+b2*b2))/(2*sigma_sq2);
 			if (score>score2){
-				img_mask[(x+IMG_X/2)+(y+IMG_Y/2)*IMG_X]=id;
+				img_mask[x+y*IMG_X]=id;
 			}
 		} else {
-			img_mask[(x+IMG_X/2)+(y+IMG_Y/2)*IMG_X]=id;
+			img_mask[x+y*IMG_X]=id;
 		}
 	}
 }
@@ -428,9 +446,11 @@ void add_score(struct constellation db_const,unsigned char newid1,unsigned char 
 		float z=starptr[o].x*R31+starptr[o].y*R32+starptr[o].z*R33;
 		float px=y/(x*PIXX_TANGENT);
 		float py=z/(x*PIXY_TANGENT);
+		int nx,ny;
+		nx=(int)(px+IMG_X/2.0f);
+		ny=(int)(py+IMG_Y/2.0f);
 		unsigned char n=255;
-		if (fabs(2*px)<IMG_X && fabs(2*py)<IMG_Y)
-			n=img_mask[(int)(px+IMG_X/2.0f)+(int)(py+IMG_Y/2.0f)*IMG_X];
+		if (nx>=0&&nx<IMG_X&&ny>=0&&ny<IMG_Y) n=img_mask[nx+ny*IMG_X];
 		if (n!=255) {
 			float sigma_sq=newstars[n].sigma_sq+POS_VARIANCE;
 			float maxdist_sq=-sigma_sq*(log(sigma_sq)+MATCH_VALUE);
@@ -445,7 +465,7 @@ void add_score(struct constellation db_const,unsigned char newid1,unsigned char 
 		}
 	}
 	for(int n=0;n<numnewstars;n++) cs.totalscore+=cs.scores[n];
-	c_scores=(struct constellation_score*)realloc(c_scores,sizeof(struct constellation_score)*(c_scores_size+1));
+	
 	c_scores[c_scores_size].totalscore=cs.totalscore;
 	c_scores[c_scores_size].oldid1=cs.oldid1;
 	c_scores[c_scores_size].oldid2=cs.oldid2;
@@ -479,37 +499,35 @@ float search() {
 		float sigma_sq=newstars[id].sigma_sq+POS_VARIANCE;
 		float maxdist_sq=-sigma_sq*(log(sigma_sq)+MATCH_VALUE);
 		float maxdist=sqrt(maxdist_sq);
-		int xmin=fmaxf(-IMG_X/2.0f,(newstars[id].px-maxdist));
-		int xmax=fminf(IMG_X/2.0f,newstars[id].px+maxdist+1);
-		int ymin=fmaxf(-IMG_Y/2.0f,(newstars[id].py-maxdist));
-		int ymax=fminf(IMG_Y/2.0f,(newstars[id].py+maxdist+1));
-		for(int x=xmin;x<xmax;x++) for (int y=ymin;y<ymax;y++) {
+		int xmin=newstars[id].px-maxdist;
+		int xmax=newstars[id].px+maxdist;
+		int ymin=newstars[id].py-maxdist;
+		int ymax=newstars[id].py+maxdist;
+		for(int x=xmin;x<=xmax;x++) for (int y=ymin;y<=ymax;y++) {
 			float a=(x+.5-newstars[id].px);
 			float b=(y+.5-newstars[id].py);
-			set_mask(x,y,id,(maxdist_sq-(a*a+b*b))/(2*sigma_sq),POS_VARIANCE);
+			set_mask(x+IMG_X/2,y+IMG_Y/2,id,(maxdist_sq-(a*a+b*b))/(2*sigma_sq),POS_VARIANCE);
 		}
 	}
 	//use weighted triad
 	c_scores_clear();
-	for (int i=1;i<numnewstars&&i<MAX_FALSE_STARS+2;i++) {
+	struct constellation c;
+	struct constellation *cl, *cu;
+	for (int i=1;i<numnewstars&&i<MAX_FALSE_STARS+3;i++) {
 		for (int j=0;j<i;j++) {
-			float p=(3600*180.0/PI)*asin(dist3(newstars[i].x,newstars[j].x,newstars[i].y,newstars[j].y,newstars[i].z,newstars[j].z));
-			int mmi=(int)(p/ARC_ERR)%mapsize;
-			if (mmi<0) mmi+=mapsize;
-			for (int constidx=map[mmi];constidx!=-1;) {
-				if (fabs(constptr[constidx].p-p)<ARC_ERR){
-					weighted_triad(starptr[constptr[constidx].s1],starptr[constptr[constidx].s2],newstars[j],newstars[i],POS_VARIANCE);
-					add_score(constptr[constidx],j,i);
-					weighted_triad(starptr[constptr[constidx].s1],starptr[constptr[constidx].s2],newstars[i],newstars[j],POS_VARIANCE);
-					add_score(constptr[constidx],i,j);
-				}
-				if (mmi==constptr[constidx].mmi_l) constidx=constptr[constidx].last_l;
-				else if (mmi==constptr[constidx].mmi_h) constidx=constptr[constidx].last_h;
-				else constidx=constptr[constidx].last_m;
+			c.p=(3600*180.0/PI)*asin(dist3(newstars[i].x,newstars[j].x,newstars[i].y,newstars[j].y,newstars[i].z,newstars[j].z));
+			if ((cl=(struct constellation *)bsearch(&c,map,NUMCONST,sizeof(struct constellation),cmp_constellation_lower))==NULL) continue;
+			if ((cu=(struct constellation *)bsearch(&c,map,NUMCONST,sizeof(struct constellation),cmp_constellation_upper))==NULL) continue;
+			c_scores=(struct constellation_score*)realloc(c_scores,sizeof(struct constellation_score)*(c_scores_size+cu->idx-cl->idx+1)*2);
+			for (int idx=cl->idx;idx<=cu->idx;idx++) {
+				weighted_triad(starptr[map[idx].s1],starptr[map[idx].s2],newstars[j],newstars[i],POS_VARIANCE);
+				add_score(map[idx],j,i);
+				weighted_triad(starptr[map[idx].s1],starptr[map[idx].s2],newstars[i],newstars[j],POS_VARIANCE);
+				add_score(map[idx],i,j);
 			}
 		}
 	}
-	qsort(c_scores, c_scores_size, sizeof(struct constellation_score), compare_totalscore);
+	qsort(c_scores, c_scores_size, sizeof(struct constellation_score), cmp_totalscore);
 	//add up probabilities of all matches, excluding those which
 	//are equivalent to the best match (S1==s1,S2=s2)
 	float p_match=1.0;

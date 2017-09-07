@@ -23,17 +23,18 @@ BEGIN {
 #this also copies the image for use by astrometry
 python image_stats.py > calibration/calibration.txt
 python gendb.py calibration/stars.txt calibration/constellations.txt calibration/dbsize.txt
+sort -n calibration/constellations.txt > calibration/constellations2.txt
+mv calibration/constellations2.txt calibration/constellations.txt
 
 source calibration/calibration.txt
 source calibration/dbsize.txt
 cat calibration/dbsize.txt
 
-LUTSIZE=$[$PARAM*4]
-PARAMSIZE=$[$NUMCONST*(4*10)]
+PARAMSIZE=$[$NUMCONST*(4*6)]
 STARTABLESIZE=$[$STARTABLE*4]
 #4 integers to hold the star ids, and 1 pointer ofset from the base to the next location
 echo -n "calulated size:  "
-echo "$[($LUTSIZE+$PARAMSIZE+$STARTABLESIZE)] beastdb.bin"
+echo "$[($PARAMSIZE+$STARTABLESIZE)] beastdb.bin"
 
 ./beastgen
 echo -n "actual size:     "

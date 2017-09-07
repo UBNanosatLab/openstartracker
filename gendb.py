@@ -187,8 +187,7 @@ if __name__ == '__main__':
 		for j in uni_ns[i]:
 			if (j>i):
 				temp=list(set(ns[i])&set(ns[j]))
-				print >>f, 3600*xyz_dist(uni_xyz[i],uni_xyz[j]),uni_sd[i,0],uni_sd[j,0],len(temp)
-				print >>f, " ".join([str(s) for s in temp])
+				print >>f, str(3600*xyz_dist(uni_xyz[i],uni_xyz[j]))+" "+str(uni_sd[i,0])+" "+str(uni_sd[j,0])+" "+str(len(temp))+" "+" ".join([str(s) for s in temp])
 				STARTABLE+=len(temp)
 				NUMCONST+=1
 	f.close()
@@ -200,5 +199,4 @@ if __name__ == '__main__':
 	print >>f, "STARTABLE="+str(STARTABLE)
 	print >>f, "NUMCONST="+str(NUMCONST)
 	print >>f, "NUMSTARS="+str(NUMSTARS)
-	print >>f, "PARAM="+str(int(2+3600*maxfovradius()/(2*ARC_ERR)))
 	
