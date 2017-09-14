@@ -31,7 +31,7 @@ base_photons = 19100 # photoelectrons per mm^2 and second of a magnitude 0 G2 st
 magnitude_gaussian = 0.01 # mag
 # star count
 
-min_true = 3
+min_true = 0
 max_true = 100
 min_false = 0
 max_false = 80

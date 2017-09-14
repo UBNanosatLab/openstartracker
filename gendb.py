@@ -147,9 +147,6 @@ def xyz_dist(xyz1,xyz2):
 #only do this part if we were run as a python script
 if __name__ == '__main__':
 	filterbrightness()
-	#TODO: commented out for contest
-	#filterdoublestars()
-	#filterunreliable()
 
 	#print stars
 	if (len(sys.argv)>1):
@@ -174,6 +171,9 @@ if __name__ == '__main__':
 	sd[:,0]=np.array(range(0,len(sd)))
 	uni_sd=sd[starlist]
 	xyz=np.array(sd[:,4:7].tolist(),dtype=float)
+	#TODO: commented out for contest
+	#filterdoublestars()
+	#filterunreliable()
 	uni_xyz=np.array(uni_sd[:,4:7].tolist(),dtype=float)
 	#for each star in the uniform starlist, get all nearby stars in the database
 	ns=searchxyz(xyz,uni_xyz,maxfovradius())

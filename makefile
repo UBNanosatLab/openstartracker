@@ -1,9 +1,9 @@
-CC = gcc
+CC = g++
 
 all: $(OBJ)
-	$(CC) beastgen.c -o beastgen -lm
+	$(CC) beastgen.cpp -o beastgen -lm
 	$(CC) -Ofast -fPIC main.c -o main -lm
 	
 debug:
-	$(CC) -Wall -O0 -pg -g beastgen.c -o beastgen -lm
-	$(CC) -Wall -O0 -pg -g main.c -o main -lm
+	$(CC) -Wall -Og -pg -g beastgen.cpp -o beastgen -lm
+	$(CC) -Wall -Og -pg -g main.c -o main -lm

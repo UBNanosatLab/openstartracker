@@ -35,7 +35,7 @@
 #define MAX_STARS 200
 #define VECTOR_LENGTH 3
 
-#include "identification.c"
+#include "beast.cpp"
 
 int main(int argc, char* argv[])
 {
@@ -54,31 +54,11 @@ int main(int argc, char* argv[])
 			run_times = atoi(argv[2]);
 	}
 
-	// read data file
-
-	FILE* file = fopen("data", "rb");
-
-	long user_size = 0;
-	void* user_data = NULL;
-	void* prepared_data = NULL;
-
-	if(file)
-	{
-		fseek(file, 0, SEEK_END);
-		user_size = ftell(file);
-		rewind(file);
-
-		user_data = malloc(user_size);
-		user_size = fread(user_data, user_size, 1, file);
-
-		prepared_data = prepare(user_data, user_size);
-
-		fclose(file);
-	}
+	beast::load_db();
 
 	// read scenes and run star identification
 
-	file = fopen("input.csv", "r");
+	FILE* file = fopen("input.csv", "r");
 
 	char *line = NULL;
 	size_t len = 0;
@@ -108,7 +88,7 @@ int main(int argc, char* argv[])
 				int length = i / VECTOR_LENGTH;
 
 				clock_t start = clock();
-				star_id(data, results, length, prepared_data);
+				star_id(data, results, length);
 
 				clock_t end = clock();
 
@@ -137,7 +117,6 @@ int main(int argc, char* argv[])
 	if(measure_time)
 		printf("Time elapsed: %f\n", ((float)best) / CLOCKS_PER_SEC);
 
-	free(user_data);
 	free(line);
 	free(results);
 	free(data);
