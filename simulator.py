@@ -34,6 +34,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+import math
 from mpl_toolkits.mplot3d import Axes3D
 
 # Geometric Transformations
@@ -446,10 +447,11 @@ class StarDetector:
 
     @staticmethod
     def norm_gaussian(sigma, n=100):
-        area = 1 / n ** 2
-        from_to = np.linspace(0, 1, n)
-        y, x = np.meshgrid(from_to, from_to)
-        return area / (2 * np.pi * sigma) * np.sum(np.exp(-(x ** 2 + y ** 2) / (2 * sigma)))
+        #area = 1 / n ** 2
+        #from_to = np.linspace(0, 1, n)
+        #y, x = np.meshgrid(from_to, from_to)
+        #return area / (2 * np.pi * sigma) * np.sum(np.exp(-(x ** 2 + y ** 2) / (2 * sigma)))
+        return math.erf((2*sigma)**-0.5)**2/4
 
     def compute_photons(self, magnitude, add_noise=True):
         photons = self.base_photons * (10 ** (-magnitude / 2.5)) * self.t_exp * self.aperture ** 2 * np.pi
@@ -465,7 +467,6 @@ class StarDetector:
 
     def compute_magnitude_threshold(self):
         threshold = self.A_pixel + 5 * self.sigma_pixel / StarDetector.norm_gaussian(self.sigma_psf)
-
         return self.compute_magnitude(threshold)
 
     def add_noise(self, magnitude):
@@ -486,7 +487,7 @@ class Scene:
         self.pos = None
         self.ids = None
         self.magnitude_threshold = detector.compute_magnitude_threshold()
-
+        print(self.magnitude_threshold)
     def compute(self, orientation=None):
         """Generates a scene for the star tracker.
         If not orientation is given a random one is generated.

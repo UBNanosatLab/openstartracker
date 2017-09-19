@@ -6,18 +6,8 @@
 #include <sys/mman.h>
 #include <stdint.h>
 
-struct constellation {
-	float p;
-	int32_t s1;
-	int32_t s2;
-	int32_t numstars;
-	int32_t staridx;
-	int32_t idx;
-};
-
-struct constellation *map;
-int *star_ids;
-
+#include "beast.h"
+//TODO: merge into "write" function 
 int main (int argc, char** argv) {
 	//load config
 	FILE *stream;
@@ -42,10 +32,9 @@ int main (int argc, char** argv) {
 	//constline
 	stream=fopen("calibration/constellations.txt", "r");
 	
-	int NUMCONST=atoi(getenv("NUMCONST"));
-	int STARTABLE=atoi(getenv("STARTABLE"));
-	int s_offset=NUMCONST*sizeof(struct constellation);
-	size_t dbsize = s_offset + STARTABLE*sizeof(int);
+	NUMCONST=atoi(getenv("NUMCONST"));
+	STARTABLE=atoi(getenv("STARTABLE"));
+	size_t dbsize = NUMCONST*sizeof(struct constellation) + STARTABLE*sizeof(int);
 	
 	/* Open a file for writing.
 	 *  - Creating the file if it doesn't exist.
@@ -77,38 +66,38 @@ int main (int argc, char** argv) {
 	}
 	// Now the file is ready to be mmapped.
 
-	map = (struct constellation*)mmap(0, dbsize, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-	if (map == MAP_FAILED)
+	struct constellation *db_map = (struct constellation*)mmap(0, dbsize, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+	if (db_map == MAP_FAILED)
 	{
 		close(fd);
 		perror("Error mmapping the file");
 		exit(EXIT_FAILURE);
 	}
-	star_ids=(int*)(&map[s_offset/sizeof(struct constellation)]);
-	memset(map, -1, dbsize);
+	int *db_stars=(int*)(&db_map[NUMCONST]);
+	memset(db_map, -1, dbsize);
 	int curr_star=0;
 	for (uint32_t idx=0;idx<NUMCONST;idx++){
 		if (getline(&line, &len, stream) != -1) {
-			map[idx].p=atof(strtok(line," "));
-			map[idx].s1=atoi(strtok(NULL," "));
-			map[idx].s2=atoi(strtok(NULL," "));
-			map[idx].numstars=atoi(strtok(NULL," "));
-			map[idx].staridx=curr_star;
-			map[idx].idx=idx;
-			for (int i=0;i<map[idx].numstars;i++) {
-				star_ids[curr_star]=atoi(strtok(NULL," "));
+			db_map[idx].p=atof(strtok(line," "));
+			db_map[idx].s1=atoi(strtok(NULL," "));
+			db_map[idx].s2=atoi(strtok(NULL," "));
+			db_map[idx].numstars=atoi(strtok(NULL," "));
+			db_map[idx].firststar=curr_star;
+			db_map[idx].idx=idx;
+			for (int i=0;i<db_map[idx].numstars;i++) {
+				db_stars[curr_star]=atoi(strtok(NULL," "));
 				curr_star++;
 			}
 		}
 	}
 	
 	// Write it now to disk
-	if (msync(map, dbsize, MS_SYNC) == -1) {
+	if (msync(db_map, dbsize, MS_SYNC) == -1) {
 		perror("Could not sync the file to disk");
 	}
 	
 	// Don't forget to free the mmapped memory
-	if (munmap(map, dbsize) == -1) {
+	if (munmap(db_map, dbsize) == -1) {
 		close(fd);
 		perror("Error un-mmapping the file");
 		exit(EXIT_FAILURE);

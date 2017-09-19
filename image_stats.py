@@ -1,6 +1,8 @@
 import numpy as np
 import math
 #from example.py
+
+# resolution
 res_x = 1920 # pixels
 res_y = 1440 # pixels
 
@@ -43,32 +45,36 @@ PIXSCALE=3600*np.rad2deg(2*np.arctan(1/(2*f)))/IMG_X
 DEG_X=IMG_X*PIXSCALE/3600
 DEG_Y=IMG_Y*PIXSCALE/3600
 
-ARC_ERR=2.2*gaussian_noise_sigma*180*3600/np.pi #arc seconds
-POS_VARIANCE=(ARC_ERR/PIXSCALE)**2
-#divide by sqrt(2) to correct for a mistake in the code
-ARC_ERR=ARC_ERR/np.sqrt(2)
 MAX_FALSE_STARS=max_false
 EXPECTED_FALSE_STARS=(min_false+max_false)/2.0 # assume uniform distribution
-MIN_MAG=-2.5*math.log10((A_pixel+20*sigma_pixel)/(math.pi*base_photons*t_exp*(aperture*math.erf(2**.5*sigma_pixel**.5))**2))
-PSF_RADIUS=sigma_psf
 
+PSF_RADIUS=sigma_psf
+PHOTONS=base_photons * t_exp * np.pi * aperture ** 2  #photons recieved from a mag 0 star
+BRIGHT_THRESH=A_pixel+5*sigma_pixel/(math.erf((2*PSF_RADIUS)**-0.5)**2/4)
+MIN_MAG=-2.5*math.log10(BRIGHT_THRESH/PHOTONS)+.6
+
+
+#IMAGE_VARIANCE=sigma_pixel
+IMAGE_VARIANCE=0
+POS_ERR_SIGMA=2
+POS_VARIANCE=(gaussian_noise_sigma*180*3600/(np.pi*PIXSCALE))**2
 #TODO: image variance set to zero for contest
 #Don't factor image variance into estimate of star position error
-IMAGE_VARIANCE=0
 
 
 print "IMG_X="+str(IMG_X)
 print "IMG_Y="+str(IMG_Y)
+print "PIXSCALE="+str(PIXSCALE)
 print "DEG_X="+str(DEG_X)
 print "DEG_Y="+str(DEG_Y)
-print "PIXSCALE="+str(PIXSCALE)
-print "ARC_ERR="+str(ARC_ERR)
 print "MAX_FALSE_STARS="+str(MAX_FALSE_STARS)
 print "EXPECTED_FALSE_STARS="+str(EXPECTED_FALSE_STARS)
-print "MIN_MAG="+str(MIN_MAG)
 print "PSF_RADIUS="+str(PSF_RADIUS)
-print "POS_VARIANCE="+str(POS_VARIANCE)
+print "PHOTONS="+str(PHOTONS)
+print "BRIGHT_THRESH="+str(BRIGHT_THRESH)
+print "MIN_MAG="+str(MIN_MAG)
 print "IMAGE_VARIANCE="+str(IMAGE_VARIANCE)
-print "PHOTONS="+str(base_photons * t_exp * aperture ** 2 * np.pi)
+print "POS_ERR_SIGMA="+str(POS_ERR_SIGMA)
+print "POS_VARIANCE="+str(POS_VARIANCE)
 
 #_ = scene.render(False)

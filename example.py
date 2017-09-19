@@ -32,7 +32,7 @@ magnitude_gaussian = 0.01 # mag
 min_true = 0
 max_true = 100
 min_false = 0
-max_false = 5
+max_false = 10
 
 
 catalog = StarCatalog()

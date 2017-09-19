@@ -76,10 +76,8 @@ def getglobe():
 
 
 def checkcoverage(starlist):
-	global ARC_ERR
 	global stardb
 	sd=np.array(stardb.values(),dtype=object)
-	err=ARC_ERR*2./3600.
 	xyz=np.array(sd[starlist,4:7].tolist(),dtype=float)
 	fovxyz=getglobe()
 	result=searchxyz(xyz,fovxyz,minfovradius())
