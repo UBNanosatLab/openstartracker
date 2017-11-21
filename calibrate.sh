@@ -17,29 +17,28 @@ BEGIN {
 	MAX_90P=$50;
 	MIN_90P=$51;
 	UNRELIABLE=($30==0||$30==1)&&$7!=3?0:1;
-	printf("%d %.12g %.12g %.12g %.12g %.12g %.12g %.12g %.12g %d\n",HIP_ID,MAG,RA,DEC,X,Y,Z,MAX_90P,MIN_90P,UNRELIABLE)
-}' hip_main.dat >calibration/catalog.dat
+	printf("%d %.12g %.12g %.12g %.12g %d\n",HIP_ID,MAG,X,Y,Z,UNRELIABLE)
+}' hip_main.dat >catalog.dat
 
 #this also copies the image for use by astrometry
 python image_stats.py > calibration/calibration.txt
-python gendb.py calibration/stars.txt calibration/constellations.txt calibration/dbsize.txt
-sort -n calibration/constellations.txt > calibration/constellations2.txt
-mv calibration/constellations2.txt calibration/constellations.txt
-
-source calibration/calibration.txt
-source calibration/dbsize.txt
-cat calibration/dbsize.txt
-
-PARAMSIZE=$[$NUMCONST*(4*6)]
-STARTABLESIZE=$[$STARTABLE*4]
-#4 integers to hold the star ids, and 1 pointer ofset from the base to the next location
-echo -n "calulated size:  "
-echo "$[($PARAMSIZE+$STARTABLESIZE)] beastdb.bin"
-
-./beastgen
-echo -n "actual size:     "
-wc -c beastdb.bin
-
+#python gendb.py calibration/stars.txt calibration/constellations.txt calibration/dbsize.txt
+#sort -n calibration/constellations.txt > calibration/constellations2.txt
+#mv calibration/constellations2.txt calibration/constellations.txt
+#
+#source calibration/calibration.txt
+#source calibration/dbsize.txt
+#cat calibration/dbsize.txt
+#
+#PARAMSIZE=$[$NUMCONST*(4*4)]
+##4 integers to hold the star ids, and 1 pointer ofset from the base to the next location
+#echo -n "calulated size:  "
+#echo "$PARAMSIZE beastdb.bin"
+#
+#./beastgen
+#echo -n "actual size:     "
+#wc -c beastdb.bin
+#
 #gzip -f beastdb.bin
 #echo -n "conpressed size: "
 #wc -c beastdb.bin.gz

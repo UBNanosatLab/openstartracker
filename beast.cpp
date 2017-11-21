@@ -1,67 +1,9 @@
-#include <math.h>       /* sqrt */
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <unistd.h>
-#include <fcntl.h>	/* For O_RDWR */
-#include <sys/mman.h>
-#include <assert.h>
-#include <stdint.h>
-
-#include <algorithm>
+;//#include <math.h>	   /* sqrt */
+//#include <stdlib.h>
+//
+#include "beast.h"
 
 namespace beast {
-	#include "beast.h"
-	void imgdb::add_star(float x, float y, float z, float mag) {
-		
-		int n=star_map_size++;
-		float photons=PHOTONS*powf(10.0,-mag/2.5);
-		star_map=(star*)realloc(star_map,star_map_size*sizeof(star));
-		/* insert into list sorted by magnitude */
-		for (;n>0&&photons>star_map[n-1].photons;n--){
-			star_map[n]=star_map[n-1];
-			star_map[n].photon_idx++;
-		}
-		star_map[n].x=x;
-		star_map[n].y=y;
-		star_map[n].z=z;
-		star_map[n].photons=photons;/* TODO: change this to pixel value */
-		star_map[n].id=-1;
-		star_map[n].sigma_sq=IMAGE_VARIANCE/photons;
-		if (max_variance<star_map[n].sigma_sq) max_variance=star_map[n].sigma_sq;
-		star_map[n].px=y/(x*PIXX_TANGENT);
-		star_map[n].py=z/(x*PIXY_TANGENT);
-		star_map[n].photon_idx=n;
-		star_map[n].star_idx=star_map_size-1;
-	}
-	void imgdb::add_star(float px, float py, float mag) {
-		float j=PIXX_TANGENT*px; /* j=(y/x) */
-		float k=PIXY_TANGENT*py; /* k=z/x */
-		float x=1./sqrt(j*j+k*k+1);
-		float y=j*x;
-		float z=k*x;
-		add_star(x,y,z,mag);
-	}
-	/* generate db_map & db_stars */
-	void imgdb::gendb() {
-		db_map_size=(star_map_size*(star_map_size-1))/2;
-		db_map=(constellation*)malloc(db_map_size*sizeof(constellation));
-
-		db_stars=(int*)malloc(star_map_size*sizeof(int));
-		for (int i=0;i<star_map_size;i++) {
-			db_stars[i]=i;
-		}
-		int n=0;
-		for (int i=1;i<star_map_size;i++) for (int j=0;j<i;j++,n++) {
-			db_map[n].p=star_map[i].dist_arcsec(star_map[j]);
-			db_map[n].s1=j;
-			db_map[n].s2=i;
-			db_map[n].numstars=db_map_size;
-			db_map[n].firststar=0;
-			db_map[n].idx=n;
-		}
-		std::sort(db_map, db_map+db_map_size); /* C version: db_map+sizeof(*db_map)*db_map_size */
-	}
 	int* imgdb::get_mask(float db_max_variance) {
 		int *img_mask=(int*)malloc(IMG_X*IMG_Y*sizeof(img_mask[0]));
 		memset(img_mask, -1, IMG_X*IMG_Y*sizeof(img_mask[0]));
@@ -121,7 +63,7 @@ namespace beast {
 	//winner_id_map[new]=old
 	int32_t *winner_id_map;
 	float p_match;
-	void add_score(constellation *db_const, constellation_score *cs, int32_t *img_mask, stardb *db, stardb *img,float db_max_variance){
+	void add_score(constellation *db_const, constellation_score *cs, int32_t *img_mask, stardb *db, stardb *img){
 		cs->db_id1=db_const->s1;
 		cs->db_id2=db_const->s2;
 		cs->id_map=(int32_t *)malloc(sizeof(int32_t)*img->star_map_size);
@@ -130,9 +72,11 @@ namespace beast {
 		for (int i=0;i<img->star_map_size;i++) cs->scores[i]=0.0;
 	
 		cs->totalscore=log(EXPECTED_FALSE_STARS/(IMG_X*IMG_Y))*(2*img->star_map_size);
-		int smax=db_const->firststar+db_const->numstars;
-		for(int32_t i=db_const->firststar;i<smax;i++){
-			int32_t o=db->db_stars[i];
+		//for(int32_t i=db_const->firststar;i<smax;i++){
+		//	int32_t o=db->db_stars[i];
+		db->kdsearch(R11,R12,R13,TODO_MAXFOV_D2,BRIGHT_THRESH);
+		for(int32_t i=0;i<db->kdresults_size;i++){//
+			int32_t o=db->kdresults[i];
 			star s=db->star_map[o];
 			float x=s.x*R11+s.y*R12+s.z*R13;
 			float y=s.x*R21+s.y*R22+s.z*R23;
@@ -146,10 +90,10 @@ namespace beast {
 			if (nx==-1) nx++;
 			else if (nx==IMG_X) nx--;
 			if (ny==-1) ny++;
-			else if (ny==IMG_Y) nx--;
+			else if (ny==IMG_Y) ny--;
 			if (nx>=0&&nx<IMG_X&&ny>=0&&ny<IMG_Y) n=img_mask[nx+ny*IMG_X];
 			if (n!=-1) {
-				float sigma_sq=img->star_map[n].sigma_sq+db_max_variance;
+				float sigma_sq=img->star_map[n].sigma_sq+db->max_variance;
 				float maxdist_sq=-sigma_sq*(log(sigma_sq)+MATCH_VALUE);
 				float a=(px-img->star_map[n].px);
 				float b=(py-img->star_map[n].py);
@@ -161,6 +105,7 @@ namespace beast {
 				}
 			}
 		}
+		DB->undo_kdsearch();
 		for(int n=0;n<img->star_map_size;n++) {
 			cs->totalscore+=cs->scores[n];
 		}
@@ -170,57 +115,50 @@ namespace beast {
 		c_scores=NULL;
 		c_scores_size=0;
 		/* Do we have enough stars? */
-		if (NUMSTARS<2||img->star_map_size<2) return;
+		if (db->star_map_size<2||img->star_map_size<2) return;
 
 		winner_id_map=(int *)malloc(sizeof(int)*img->star_map_size);
 		winner_scores=(float *)malloc(sizeof(float)*img->star_map_size);
 		
 		/* allocate space for image mask */
 		int32_t *img_mask = img->get_mask(db->max_variance);
-		
-		int max=MAX_FALSE_STARS+3;/* 3 true stars is minimum needed in practice */
-		if (max>img->star_map_size) max=img->star_map_size;
-		int cutoff=(max*(max-1))/2;
-		//keep bsearch till you get the rest working - eventually, completely eliminate it (c++ lower_bound), as well as cscores array and the constellation_score class 
 		for (int n=0;n<img->db_map_size;n++) {
-			if (img->db_map[n].idx<cutoff) {
-
-				constellation lb=img->db_map[n];
-				constellation ub=img->db_map[n];
-				lb.p-=POS_ERR_SIGMA*PIXSCALE*sqrt(img->star_map[lb.s1].sigma_sq+img->star_map[lb.s2].sigma_sq+2*db->max_variance);
-				ub.p+=POS_ERR_SIGMA*PIXSCALE*sqrt(img->star_map[ub.s1].sigma_sq+img->star_map[ub.s2].sigma_sq+2*db->max_variance);
+			constellation lb=img->db_map[n];
+			constellation ub=img->db_map[n];
+			lb.p-=POS_ERR_SIGMA*PIXSCALE*sqrt(img->star_map[lb.s1].sigma_sq+img->star_map[lb.s2].sigma_sq+2*db->max_variance);
+			ub.p+=POS_ERR_SIGMA*PIXSCALE*sqrt(img->star_map[ub.s1].sigma_sq+img->star_map[ub.s2].sigma_sq+2*db->max_variance);
+			
+			constellation *lower=std::lower_bound (db->db_map, db->db_map+db->db_map_size, lb,constellation_lt_p);	
+			constellation *upper=std::upper_bound (db->db_map, db->db_map+db->db_map_size, ub,constellation_lt_p); 
+			//if (lower->p<lb.p) lower++;
+			upper--;
+			//if (upper->idx==db->db_map_size) 
+			int lower_idx=lower->idx;
+			int upper_idx=upper->idx;
+			if (lower_idx<=upper_idx) c_scores=(struct constellation_score*)realloc(c_scores,sizeof(struct constellation_score)*(c_scores_size+(upper_idx-lower_idx+1)*2));
+			for (int o=lower_idx;o<=upper_idx;o++) {
+				int32_t db_idx1=db->db_map[o].s1;
+				int32_t db_idx2=db->db_map[o].s2;
+				int32_t img_idx1=img->db_map[n].s1;
+				int32_t img_idx2=img->db_map[n].s2;
 				
-				constellation *lower=std::lower_bound (db->db_map, db->db_map+db->db_map_size-1, &lb);    
-				constellation *upper=std::lower_bound (db->db_map, db->db_map+db->db_map_size-1, &ub);    
-				int lower_idx=lower->idx;
-				int upper_idx=upper->idx;
-				if (lower->p<lb.p) lower_idx++;
-				if (upper->p>ub.p) upper_idx--;
-				if (lower_idx<=upper_idx) c_scores=(struct constellation_score*)realloc(c_scores,sizeof(struct constellation_score)*(c_scores_size+(upper_idx-lower_idx+1)*2));
-				for (int o=lower_idx;o<=upper_idx;o++) {
-					int32_t db_idx1=db->db_map[o].s1;
-					int32_t db_idx2=db->db_map[o].s2;
-					int32_t img_idx1=img->db_map[n].s1;
-					int32_t img_idx2=img->db_map[n].s2;
-					
-					star db_s1=db->star_map[db_idx1];
-					star db_s2=db->star_map[db_idx2];
-					star img_s1=img->star_map[img_idx1];
-					star img_s2=img->star_map[img_idx2];
-					
-					/* try both orderings of stars */
-					weighted_triad(db_s1,db_s2,img_s1,img_s2);
-					c_scores[c_scores_size].img_id1=img_idx1;
-					c_scores[c_scores_size].img_id2=img_idx2;
-					add_score(&(db->db_map[o]),&c_scores[c_scores_size],img_mask,db,img,db->max_variance);
-					c_scores_size++;
-					
-					weighted_triad(db_s1,db_s2,img_s2,img_s1);
-					c_scores[c_scores_size].img_id1=img_idx2;
-					c_scores[c_scores_size].img_id2=img_idx1;
-					add_score(&(db->db_map[o]),&c_scores[c_scores_size],img_mask,db,img,db->max_variance);
-					c_scores_size++;
-				}
+				star db_s1=db->star_map[db_idx1];
+				star db_s2=db->star_map[db_idx2];
+				star img_s1=img->star_map[img_idx1];
+				star img_s2=img->star_map[img_idx2];
+				
+				/* try both orderings of stars */
+				weighted_triad(db_s1,db_s2,img_s1,img_s2);
+				c_scores[c_scores_size].img_id1=img_idx1;
+				c_scores[c_scores_size].img_id2=img_idx2;
+				add_score(&(db->db_map[o]),&c_scores[c_scores_size],img_mask,db,img);
+				c_scores_size++;
+				
+				weighted_triad(db_s1,db_s2,img_s2,img_s1);
+				c_scores[c_scores_size].img_id1=img_idx2;
+				c_scores[c_scores_size].img_id2=img_idx1;
+				add_score(&(db->db_map[o]),&c_scores[c_scores_size],img_mask,db,img);
+				c_scores_size++;
 			}
 		}
 		std::sort(c_scores, c_scores+c_scores_size);
@@ -260,6 +198,7 @@ namespace beast {
 		free(img_mask);
 
 	}
+	//TODO: get rid of this
 	void del_scores() {
 		for (int i=0;i<c_scores_size; i++) {
 			free(c_scores[i].scores);
@@ -285,7 +224,8 @@ void star_id(double spikes[], int result[], size_t length)
 		img->add_star(spikes[3*i]-beast::IMG_X/2.0,-(spikes[3*i+1]-beast::IMG_Y/2.0),spikes[3*i+2]);
 		result[i] = -1;
 	}
-	img->gendb();
+	
+	img->gendb_img();
 	find(beast::DB,img);
 	float p_match = beast::p_match;
 	if (p_match>0.66) {

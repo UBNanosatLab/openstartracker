@@ -51,7 +51,8 @@ EXPECTED_FALSE_STARS=(min_false+max_false)/2.0 # assume uniform distribution
 PSF_RADIUS=sigma_psf
 PHOTONS=base_photons * t_exp * np.pi * aperture ** 2  #photons recieved from a mag 0 star
 BRIGHT_THRESH=A_pixel+5*sigma_pixel/(math.erf((2*PSF_RADIUS)**-0.5)**2/4)
-MIN_MAG=-2.5*math.log10(BRIGHT_THRESH/PHOTONS)+.6
+MIN_MAG=-2.5*math.log10(BRIGHT_THRESH/PHOTONS)+.6 #fudge it
+BRIGHT_THRESH=PHOTONS*10**(MIN_MAG/-2.5)
 
 
 #IMAGE_VARIANCE=sigma_pixel
@@ -67,6 +68,7 @@ print "IMG_Y="+str(IMG_Y)
 print "PIXSCALE="+str(PIXSCALE)
 print "DEG_X="+str(DEG_X)
 print "DEG_Y="+str(DEG_Y)
+print "REQUIRED_STARS=4"
 print "MAX_FALSE_STARS="+str(MAX_FALSE_STARS)
 print "EXPECTED_FALSE_STARS="+str(EXPECTED_FALSE_STARS)
 print "PSF_RADIUS="+str(PSF_RADIUS)
