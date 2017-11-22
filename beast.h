@@ -12,60 +12,7 @@
 namespace beast {
 	#define PI		   3.14159265358979323846  /* pi */
 	#define TWOPI		6.28318530717958647693
-	struct constellation {
-		float p;
-		int32_t s1;
-		int32_t s2;
-		int32_t idx;
-		bool operator<(const constellation &c) const {
-			if (p!=c.p) return p<c.p;
-			else if (s1!=c.s1) return s1<c.s1;
-			else return s2<c.s2;
-		}
-	};
-	bool constellation_lt_s1(const constellation &c1, const constellation &c2) {return c1.s1 < c2.s1;}
-	bool constellation_lt_s2(const constellation &c1, const constellation &c2) {return c1.s2 < c2.s2;}
-	bool constellation_lt_p(const constellation &c1, const constellation &c2) {return c1.p < c2.p;}
 
-	struct star {
-		float x;
-		float y;
-		float z;
-		float photons;
-		int32_t star_idx;
-		int32_t id;
-		int32_t unreliable;
-
-		float sigma_sq;
-		float px;
-		float py;
-		/* numerically stable method to calculate distance between stars */
-		float dist_arcsec(const star& s) const {
-			float a=x*s.y - s.x*y;
-			float b=x*s.z - s.x*z;
-			float c=y*s.z - s.y*z;
-			return (3600*180.0/PI)*asin(sqrt(a*a+b*b+c*c));
-		}
-	};
-	bool star_gt_x(const star &s1, const star &s2) {return s1.x > s2.x;}
-	bool star_gt_y(const star &s1, const star &s2) {return s1.y > s2.y;}
-	bool star_gt_z(const star &s1, const star &s2) {return s1.z > s2.z;}
-	bool star_gt_photons(const star &s1, const star &s2) {return s1.photons > s2.photons;}
-	bool star_lt_x(const star &s1, const star &s2) {return s1.x < s2.x;}
-	bool star_lt_y(const star &s1, const star &s2) {return s1.y < s2.y;}
-	bool star_lt_z(const star &s1, const star &s2) {return s1.z < s2.z;}
-	bool star_lt_photons(const star &s1, const star &s2) {return s1.photons < s2.photons;}
-
-	struct  constellation_score {
-		float totalscore;
-		int32_t db_id1,db_id2;
-		int32_t img_id1,img_id2;
-		int *id_map; /* Usage: id_map[newstar]=oldstar */
-		float *scores;
-		/* backwards to sort in decending order */
-		bool operator< (const constellation_score* c) { return totalscore > c->totalscore; }
-		bool operator< (const constellation_score c) { return totalscore > c.totalscore; }
-	};
 	int IMG_X,IMG_Y,MAX_FALSE_STARS,REQUIRED_STARS;
 	float DEG_X,DEG_Y,PIXX_TANGENT,PIXY_TANGENT;
 	float PIXSCALE,POS_ERR_SIGMA,POS_VARIANCE;
@@ -77,7 +24,7 @@ namespace beast {
 	void load_config() {
 		
 		//TODO: use an array of strings for environment variables
-		//move calibration.txt to imgdb
+		//move calibration.txt to constellation_db
 		//move dbstats.txt to beastdb
 		/* load config */
 		
@@ -118,39 +65,68 @@ namespace beast {
 		PIXY_TANGENT=2*tan(DEG_Y*PI/(180*2))/IMG_Y;
 	}
 
-	struct stardb {
-		constellation* db_map;
-		int db_map_size;
-		star *star_map;
-		int star_map_size;
-		
-		int *kdresults;
+	struct star {
+		float x;
+		float y;
+		float z;
+		float photons;
+		int32_t star_idx;
+		int32_t id;
+		int32_t unreliable;
+
+		float sigma_sq;
+		float px;
+		float py;
+		/* numerically stable method to calculate distance between stars */
+		float dist_arcsec(const star& s) const {
+			float a=x*s.y - s.x*y;
+			float b=x*s.z - s.x*z;
+			float c=y*s.z - s.y*z;
+			return (3600*180.0/PI)*asin(sqrt(a*a+b*b+c*c));
+		}
+	};
+	
+	bool star_gt_x(const star &s1, const star &s2) {return s1.x > s2.x;}
+	bool star_gt_y(const star &s1, const star &s2) {return s1.y > s2.y;}
+	bool star_gt_z(const star &s1, const star &s2) {return s1.z > s2.z;}
+	bool star_gt_photons(const star &s1, const star &s2) {return s1.photons > s2.photons;}
+	bool star_lt_x(const star &s1, const star &s2) {return s1.x < s2.x;}
+	bool star_lt_y(const star &s1, const star &s2) {return s1.y < s2.y;}
+	bool star_lt_z(const star &s1, const star &s2) {return s1.z < s2.z;}
+	bool star_lt_photons(const star &s1, const star &s2) {return s1.photons < s2.photons;}
+	
+	struct star_db {
+		star *map;
+		int map_size;
 		int8_t *kdmask;
+
+		int *kdresults;
 		int kdresults_size;
 		int kdresults_maxsize;
-
+		
+		int kdbucket_size;
+		
 		float max_variance;
-
-		stardb() {
-			db_map=NULL;
-			star_map=NULL;
-			db_map_size=0;
-			star_map_size=0;
+		
+		star_db() {
+			map=NULL;
+			map_size=0;
 
 			kdmask=NULL;
 			kdresults=NULL;
 			kdresults_size=0;
 			kdresults_maxsize=INT_MAX;
+			//TODO: put this in config file, come up with a way
+			//to automatically figure out the optimal value
+			kdbucket_size=(DEG_X*DEG_Y*3.5);
 			
 			max_variance=0.0;
 		}
-		~stardb() {
-			free(db_map);
-			free(star_map);
+		~star_db() {
+			free(map);
 			free(kdresults);
 			free(kdmask);
 		}
-
 		/* You may be looking at the most compact kd-tree in existence
 		 * It does not use pointers or indexes or leaf nodes or any extra memory
 		 * Instead the list is kdsorted in place using std::nth_element()
@@ -160,19 +136,23 @@ namespace beast {
 		 * Numerical Recipies (ISBN: 9780521884075)
 		 * https://en.wikipedia.org/wiki/Quickselect
 		 * https://stackoverflow.com/questions/17021379/balancing-kd-tree-which-approach-is-more-efficient
-		 */	
-			
+		 * 
+		 */
+
 		#define KDSORT_NEXT(A,B)\
 			int mid=(min+max)/2;\
 			if (min+1<max) {\
-				std::nth_element(star_map+min,star_map+mid,star_map+max,A);\
-				B(min,mid);B(mid+1,max);\
+				std::nth_element(map+min,map+mid,map+max,A);\
+				if (mid-min>kdbucket_size) B(min,mid);\
+				else std::sort(map+min, map+mid,star_gt_photons);\
+				if (max-(mid+1)>kdbucket_size) B(mid+1,max);\
+				else std::sort(map+(mid+1), map+max,star_gt_photons);\
 			}
-		void kdsort() {kdsort_x(0,star_map_size);}
+
+		void kdsort() {kdsort_x(0,map_size);}
 		void kdsort_x(int min, int max) {KDSORT_NEXT(star_lt_x,kdsort_y)}
 		void kdsort_y(int min, int max) {KDSORT_NEXT(star_lt_y,kdsort_z)}
-		void kdsort_z(int min, int max) {KDSORT_NEXT(star_lt_z,kdsort_photons)}
-		void kdsort_photons(int min, int max) {KDSORT_NEXT(star_gt_photons,kdsort_x)}
+		void kdsort_z(int min, int max) {KDSORT_NEXT(star_lt_z,kdsort_x)}
 		#undef KDSORT_NEXT
 		 
 		/* Reset kdresults without clearing kdmask
@@ -181,7 +161,7 @@ namespace beast {
 		void reset_kdresults() {kdresults_size=0;}
 		
 		/* Clears kdmask, but does not reset kdresults. Slow.*/
-		void reset_kdmask() {memset(kdmask,0,sizeof(kdmask[0])*star_map_size);}
+		void reset_kdmask() {memset(kdmask,0,sizeof(kdmask[0])*map_size);}
 		
 		/* Undoes the effects of all kdsearches since the last time
 		 * reset_kdresults() was called. Much faster than reset_kdmask()*/
@@ -194,19 +174,17 @@ namespace beast {
 		}
 		 
 		void kdcheck(int idx, float x, float y, float z, float r, float min_photons){
-			x-=star_map[idx].x;
-			y-=star_map[idx].y;
-			z-=star_map[idx].z;
+			x-=map[idx].x;
+			y-=map[idx].y;
+			z-=map[idx].z;
 			if (x-r <= 0 && 0 <= x+r)
 			if (y-r <= 0 && 0 <= y+r)
 			if (z-r <= 0 && 0 <= z+r)
-			if (min_photons <= star_map[idx].photons)
+			if (min_photons <= map[idx].photons)
 			if (kdmask[idx] <= 0)
 			if (x*x+y*y+z*z<=r*r) {
 				kdmask[idx]=1;
 				/* Insertion sort into list from brightest to dimmest.
-				 * Results come out of the kdtree partially sorted, 
-				 * so this is guaranteed to be fast 
 				 * 
 				 * Note: Different sorting algorithms can result in different
 				 * stars being selected in the case where there are two candidates of
@@ -215,7 +193,7 @@ namespace beast {
 				 */
 				 
 				int n=kdresults_size++;
-				for (;n>0&&star_map[idx].photons>star_map[kdresults[n-1]].photons;n--) kdresults[n]=kdresults[n-1];
+				for (;n>0&&map[idx].photons>map[kdresults[n-1]].photons;n--) kdresults[n]=kdresults[n-1];
 				kdresults[n]=idx;
 				//if we go over the maximum, bump the dimmest star from the results
 				if (kdresults_size>kdresults_maxsize) {
@@ -224,50 +202,60 @@ namespace beast {
 				}
 			}
 		}
-		#define KDSEARCH_NEXT(A,B,C,D)\
-			int mid=(min+max)/2;\
-			if (min<mid &&A <= star_map[mid].B) D(min,mid,x,y,z,r,min_photons);\
-			if (mid<max) kdcheck(mid,x,y,z,r,min_photons);\
-			if (kdresults_size==kdresults_maxsize) min_photons=star_map[kdresults[kdresults_size-1]].photons;\
-			if (mid+1<max &&star_map[mid].B <= C) D(mid+1,max,x,y,z,r,min_photons);
 		/**
 		 * @fn		kdsearch(float x, float y, float z, float r, float min_photons)
 		 * @param	x	cos(deg2rad*RA)*cos(deg2rad*DEC)
 		 * @param	y	sin(deg2rad*RA)*cos(deg2rad*DEC)
 		 * @param	z	sin(deg2rad*DEC)
 		 * @param	r	search distance (pixels)
-		 * @brief	search star_map for points within r pixels of x,y,z 
+		 * @param	min	start of bounding box
+		 * @param	max	end of bounding box
+		 * @param	dim	start dimension
+		 * @brief	search map for points within r pixels of x,y,z 
 		 * @details put all results found into kdresults (sorted by brightness), mask via kdmask
 		 */
-		void kdsearch(float x, float y, float z, float r, float min_photons) {
+		void kdsearch(float x, float y, float z, float r, float min_photons, int min, int max, int dim) {
 			float r_deg=r*PIXSCALE/3600.0;
 			float r_rad=r_deg*PI/180.0;
-			kdsearch_x(0,star_map_size,x, y, z, 2*fabs(sin(r_rad/2.0)), min_photons);
+			if (dim==0) kdsearch_x(x, y, z, 2*fabs(sin(r_rad/2.0)), min_photons,min,max);
+			else if (dim==1) kdsearch_y(x, y, z, 2*fabs(sin(r_rad/2.0)), min_photons,min,max);
+			else if (dim==2) kdsearch_z(x, y, z, 2*fabs(sin(r_rad/2.0)), min_photons,min,max);
 		}
-		void kdsearch_x(int min, int max, const float x, const float y, const float z, const float r, float min_photons) {KDSEARCH_NEXT(x-r,x,x+r,kdsearch_y)}
-		void kdsearch_y(int min, int max, const float x, const float y, const float z, const float r, float min_photons) {KDSEARCH_NEXT(y-r,y,y+r,kdsearch_z)}
-		void kdsearch_z(int min, int max, const float x, const float y, const float z, const float r, float min_photons) {KDSEARCH_NEXT(z-r,z,z+r,kdsearch_photons)}
-		void kdsearch_photons(int min, int max, const float x, const float y, const float z, const float r, float min_photons) {KDSEARCH_NEXT(FLT_MAX*-1,photons*-1,min_photons*-1,kdsearch_x)}
+		void kdsearch(float x, float y, float z, float r, float min_photons) {kdsearch(x, y, z, r, min_photons,0,map_size,0);}
+		
+		//use seperate functions for each diminsion so that the compiler can unroll the recursion
+		#define KDSEARCH_NEXT(A,B,C,D)\
+			int mid=(min+max)/2;\
+			if (min<mid &&A <= map[mid].B) {\
+				if (mid-min>kdbucket_size) D(x,y,z,r,min_photons,min,mid);\
+				else for (int i=min;i<mid&&min_photons<=map[i].photons;i++)kdcheck(i,x,y,z,r,min_photons);\
+			}\
+			if (mid<max) kdcheck(mid,x,y,z,r,min_photons);\
+			if (kdresults_size==kdresults_maxsize) min_photons=map[kdresults[kdresults_size-1]].photons;\
+			if (mid+1<max &&map[mid].B <= C) {\
+				if (max-(mid+1)>kdbucket_size) D(x,y,z,r,min_photons,mid+1,max);\
+				else for (int i=mid+1;i<max&&min_photons<=map[i].photons;i++)kdcheck(i,x,y,z,r,min_photons);\
+			}
+		void kdsearch_x(const float x, const float y, const float z, const float r, float min_photons, int min, int max) {KDSEARCH_NEXT(x-r,x,x+r,kdsearch_y)}
+		void kdsearch_y(const float x, const float y, const float z, const float r, float min_photons, int min, int max) {KDSEARCH_NEXT(y-r,y,y+r,kdsearch_z)}
+		void kdsearch_z(const float x, const float y, const float z, const float r, float min_photons, int min, int max) {KDSEARCH_NEXT(z-r,z,z+r,kdsearch_x)}
 		#undef KDSEARCH_NEXT
-	};
 
-
-	struct imgdb: public stardb {
 		//TODO: is it actually necessary to have two versions of add_star()?
 		void add_star(float x, float y, float z, float mag, int id) {
-			int n=star_map_size++;
-			if (n%16==0) star_map=(star*)realloc(star_map,(star_map_size+16)*sizeof(star_map[0]));
+			int n=map_size++;
+			if (n%16==0) map=(star*)realloc(map,(map_size+16)*sizeof(map[0]));
 
-			star_map[n].x=x;
-			star_map[n].y=y;
-			star_map[n].z=z;
-			star_map[n].id=id;
-			star_map[n].unreliable=0;
-			star_map[n].photons=PHOTONS*powf(10.0,-mag/2.5);/* TODO: change this to pixel value */
-			star_map[n].px=y/(x*PIXX_TANGENT);
-			star_map[n].py=z/(x*PIXY_TANGENT);
-			star_map[n].sigma_sq=POS_VARIANCE;
-			star_map[n].star_idx=n;
+			map[n].x=x;
+			map[n].y=y;
+			map[n].z=z;
+			map[n].id=id;
+			map[n].unreliable=0;
+			map[n].photons=PHOTONS*powf(10.0,-mag/2.5);/* TODO: change this to pixel value */
+			map[n].px=y/(x*PIXX_TANGENT);
+			map[n].py=z/(x*PIXY_TANGENT);
+			map[n].sigma_sq=POS_VARIANCE;
+			map[n].star_idx=n;
 		}
 		void add_star(float px, float py, float mag) {
 			float j=PIXX_TANGENT*px; /* j=(y/x) */
@@ -275,51 +263,20 @@ namespace beast {
 			float x=1./sqrt(j*j+k*k+1);
 			float y=j*x;
 			float z=k*x;
-			int n=star_map_size;
+			int n=map_size;
 			add_star(x,y,z,mag,-1);
-			star_map[n].sigma_sq=IMAGE_VARIANCE/star_map[n].photons;
-			if (max_variance<star_map[n].sigma_sq) max_variance=star_map[n].sigma_sq;
-		}
-		
-		void load_catalog() {
-			FILE *stream = fopen("catalog.dat", "r");
-			if (stream == NULL) exit(EXIT_FAILURE);
-			star_map_size=0;
-			while(!feof(stream)) if(fgetc(stream) == '\n') star_map_size++;
-			rewind(stream);
-			max_variance=POS_VARIANCE;
-			
-			star_map = (star*)realloc(star_map,star_map_size*sizeof(star_map[0]));
-			ssize_t read;
-			char *line = NULL;
-			size_t len = 0;
-			
-			for(int i=0;i<star_map_size;i++){
-				if ((read = getline(&line, &len, stream)) != -1) {
-					star_map[i].id=atoi(strtok(line," "));
-					star_map[i].star_idx=i;
-					float mag=atof(strtok(NULL," "));
-					star_map[i].photons=PHOTONS*powf(10.0,-mag/2.5);
-					
-					star_map[i].x=atof(strtok(NULL," "));
-					star_map[i].y=atof(strtok(NULL," "));
-					star_map[i].z=atof(strtok(NULL," "));
-					star_map[i].unreliable=atoi(strtok(NULL," "));
-					
-					star_map[i].sigma_sq=POS_VARIANCE;
-				}
-			}
-			fclose(stream);
+			map[n].sigma_sq=IMAGE_VARIANCE/map[n].photons;
+			if (max_variance<map[n].sigma_sq) max_variance=map[n].sigma_sq;
 		}
 		void kdmask_filter_catalog() {
-			for (int i=0;i<star_map_size;i++) {
+			for (int i=0;i<map_size;i++) {
 				//set mask for stars that are too bright,too close, highly variable, or unreliable
 				int8_t lastmask=kdmask[i];
 				//TODO: uncomment these two lines once secondary star matching is working
 				
-				/* kdsearch(star_map[i].x,star_map[i].y,star_map[i].z,3.5,BRIGHT_THRESH);
-				 * if (kdresults_size>1||lastmask || star_map[i].unreliable>0)*/
-				if (star_map[i].photons<BRIGHT_THRESH) {
+				/* kdsearch(map[i].x,map[i].y,map[i].z,3.5,BRIGHT_THRESH);
+				 * if (kdresults_size>1||lastmask || map[i].unreliable>0)*/
+				if (map[i].photons<BRIGHT_THRESH) {
 					kdmask[i]=1;
 					reset_kdresults();
 					continue;
@@ -331,69 +288,195 @@ namespace beast {
 		//or add flag + assert() to kdsearch
 		
 		/* Masks the dimmest stars in each area to produce a 
-		 * star_map with uniform density */
+		 * map with uniform density */
 		void kdmask_uniform_density(int min_stars_per_fov) {
 			std::set<int> uniform_set;
 			int kdresults_maxsize_old=kdresults_maxsize;//TODO: eliminate this variable once restructured?
 			kdresults_maxsize=min_stars_per_fov;
-			for (int i=0;i<star_map_size;i++) if (kdmask[i]==0) {
-				kdsearch(star_map[i].x,star_map[i].y,star_map[i].z,TODO_MINFOV_D2,BRIGHT_THRESH);
+			for (int i=0;i<map_size;i++) if (kdmask[i]==0) {
+				kdsearch(map[i].x,map[i].y,map[i].z,TODO_MINFOV_D2,BRIGHT_THRESH);
 				for (int j=0;j<kdresults_size;j++) uniform_set.insert(kdresults[j]);
 				undo_kdsearch();
 			}
-			for (int i=0;i<star_map_size;i++) kdmask[i]=1;
+			for (int i=0;i<map_size;i++) kdmask[i]=1;
 			std::set<int>::iterator it = uniform_set.begin();
 			for (int i=0; i<uniform_set.size();i++,it++) kdmask[*it]=0;
 			kdresults_maxsize=kdresults_maxsize_old;
 		}
-		
-		void gendb_catalog() {
+		void load_catalog() {
+			FILE *stream = fopen("catalog.dat", "r");
+			if (stream == NULL) exit(EXIT_FAILURE);
+			map_size=0;
+			while(!feof(stream)) if(fgetc(stream) == '\n') map_size++;
+			rewind(stream);
+			max_variance=POS_VARIANCE;
+			
+			map = (star*)realloc(map,map_size*sizeof(map[0]));
+			kdresults=(int*)realloc(kdresults,map_size*sizeof(kdresults[0]));
+			kdmask=(int8_t*)realloc(kdmask,map_size*sizeof(kdmask[0]));
+			ssize_t read;
+			char *line = NULL;
+			size_t len = 0;
+			
+			for(int i=0;i<map_size;i++){
+				if ((read = getline(&line, &len, stream)) != -1) {
+					map[i].id=atoi(strtok(line," "));
+					map[i].star_idx=i;
+					float mag=atof(strtok(NULL," "));
+					map[i].photons=PHOTONS*powf(10.0,-mag/2.5);
+					
+					map[i].x=atof(strtok(NULL," "));
+					map[i].y=atof(strtok(NULL," "));
+					map[i].z=atof(strtok(NULL," "));
+					map[i].unreliable=atoi(strtok(NULL," "));
+					
+					map[i].sigma_sq=POS_VARIANCE;
+				}
+			}
+			fclose(stream);
 			kdsort();
-			kdresults=(int*)realloc(kdresults,star_map_size*sizeof(kdresults[0]));
-			kdmask=(int8_t*)realloc(kdmask,star_map_size*sizeof(kdmask[0]));
+			
 			reset_kdresults();
 			reset_kdmask();
-
 			kdmask_filter_catalog();
-			int ct=0;
 			kdmask_uniform_density(REQUIRED_STARS);
-			for (int i=0; i<star_map_size;i++) if (kdmask[i]==0) ct++;
+			
+		}
+		int* get_img_mask(float db_max_variance) {
+			
+			int *img_mask=(int*)malloc(IMG_X*IMG_Y*sizeof(img_mask[0]));
+			memset(img_mask, -1, IMG_X*IMG_Y*sizeof(img_mask[0]));
+			/* generate image mask */
+			for (int id=0;id<map_size;id++){
+				/* assume the dimmest possible star since we dont know the brightness of the other image */
+				float sigma_sq=map[id].sigma_sq+db_max_variance;
+				float maxdist_sq=-sigma_sq*(log(sigma_sq)+MATCH_VALUE);
+				float maxdist=sqrt(maxdist_sq);
+				int xmin=map[id].px-maxdist-1;
+				int xmax=map[id].px+maxdist+1;
+				int ymin=map[id].py-maxdist-1;
+				int ymax=map[id].py+maxdist+1;
+				
+				if(xmax>IMG_X/2) xmax=IMG_X/2;
+				if(xmin<-IMG_X/2)xmin=-IMG_X/2;
+				if(ymax>IMG_Y/2) ymax=IMG_Y/2;
+				if(ymin<-IMG_Y/2)ymin=-IMG_Y/2;
+				for(int i=xmin;i<xmax;i++) for (int j=ymin;j<ymax;j++) {
+					float a=((float)i-map[id].px);
+					if (a<-0.5) a+=1.0;/* use whichever corner of the pixel gives the best score */
+					float b=((float)j-map[id].py);
+					if (b<-0.5) b+=1.0;
+					
+					int x=i+IMG_X/2;
+					int y=j+IMG_Y/2;
+					float score=(maxdist_sq-(a*a+b*b))/(2*sigma_sq);
+				
+					if (score>0) {
+						/* has this pixel already been assigned to a different star? */
+						int id2=img_mask[x+y*IMG_X];
+						if (id2!=-1){
+							float sigma_sq2=map[id2].sigma_sq+db_max_variance;
+							float maxdist_sq2=-sigma_sq2*(log(sigma_sq2)+MATCH_VALUE);
+							float px2=map[id2].px;
+							float py2=map[id2].py;
+							float a2=((float)x-px2-IMG_X/2);
+							if (a2<-0.5) a2+=1.0;/* use whichever corner of the pixel gives the best score */
+							float b2=((float)y-py2-IMG_Y/2);
+							if (b2<-0.5) b2+=1.0;
+							float score2 = (maxdist_sq2-(a2*a2+b2*b2))/(2*sigma_sq2);
+							if (score>score2){
+								img_mask[x+y*IMG_X]=id;
+							}
+						} else {
+							img_mask[x+y*IMG_X]=id;
+						}
+					}
+				}
+			}
+			return img_mask;
+		}
+	};
+	struct constellation {
+		float p;
+		int32_t s1;
+		int32_t s2;
+		int32_t idx;
+
+		bool operator<(const constellation &c) const {
+			if (p!=c.p) return p<c.p;
+			else if (s1!=c.s1) return s1<c.s1;
+			else return s2<c.s2;
+		}
+	};
+	bool constellation_lt_s1(const constellation &c1, const constellation &c2) {return c1.s1 < c2.s1;}
+	bool constellation_lt_s2(const constellation &c1, const constellation &c2) {return c1.s2 < c2.s2;}
+	bool constellation_lt_p(const constellation &c1, const constellation &c2) {return c1.p < c2.p;}
+
+	struct  constellation_score {
+		float totalscore;
+		int32_t db_id1,db_id2;
+		int32_t img_id1,img_id2;
+		int *id_map; /* Usage: id_map[newstar]=oldstar */
+		float *scores;
+		/* backwards to sort in decending order */
+		bool operator< (const constellation_score* c) { return totalscore > c->totalscore; }
+		bool operator< (const constellation_score c) { return totalscore > c.totalscore; }
+	};
+	
+	struct constellation_db {
+		star_db* stars;
+		constellation* map;
+		int map_size;
+
+		constellation_db() {
+			map=NULL;
+			map_size=0;
+			stars = new star_db;
+			
+		}
+		~constellation_db() {
+			free(map);
+			delete stars;
+		}
+
+
+		void gendb_catalog() {
 			std::set<constellation> c_set;
-			for (int i=0;i<star_map_size;i++) if (kdmask[i]==0) {
-				kdsearch(star_map[i].x,star_map[i].y,star_map[i].z,TODO_MAXFOV_D2*2,BRIGHT_THRESH);
+			for (int i=0;i<stars->map_size;i++) if (stars->kdmask[i]==0) {
+				stars->kdsearch(stars->map[i].x,stars->map[i].y,stars->map[i].z,TODO_MAXFOV_D2*2,BRIGHT_THRESH);
 				constellation c;
-				for (int j=0;j<kdresults_size;j++) if (i!=kdresults[j] && star_map[i].photons>=star_map[kdresults[j]].photons){
-					c.p=star_map[i].dist_arcsec(star_map[kdresults[j]]);
+				for (int j=0;j<stars->kdresults_size;j++) if (i!=stars->kdresults[j] && stars->map[i].photons>=stars->map[stars->kdresults[j]].photons){
+					c.p=stars->map[i].dist_arcsec(stars->map[stars->kdresults[j]]);
 					c.s1=i;
-					c.s2=kdresults[j];
+					c.s2=stars->kdresults[j];
 					c_set.insert(c);
 				}
-				undo_kdsearch();
+				stars->undo_kdsearch();
 			}
-			db_map_size=c_set.size();
-			db_map=(constellation*)realloc(db_map,db_map_size*sizeof(db_map[0]));
+			map_size=c_set.size();
+			map=(constellation*)realloc(map,map_size*sizeof(map[0]));
 			std::set<constellation>::iterator it = c_set.begin();
-			for (int idx=0; idx<db_map_size;idx++,it++) {
-				db_map[idx]=*it;
-				db_map[idx].idx=idx;
+			for (int idx=0; idx<map_size;idx++,it++) {
+				map[idx]=*it;
+				map[idx].idx=idx;
 			}
 		}
 		
 		void gendb_img() {
-			std::sort(star_map, star_map+star_map_size,star_gt_photons);
-			int ns=star_map_size;/* number of stars to check */
+			std::sort(stars->map, stars->map+stars->map_size,star_gt_photons);
+			int ns=stars->map_size;/* number of stars to check */
 			if (ns>REQUIRED_STARS+MAX_FALSE_STARS) ns=REQUIRED_STARS+MAX_FALSE_STARS;
-			db_map_size=ns*(ns-1)/2;
-			db_map=(constellation*)realloc(db_map,db_map_size*sizeof(db_map[0]));
+			map_size=ns*(ns-1)/2;
+			map=(constellation*)realloc(map,map_size*sizeof(map[0]));
 			int idx=0;
 			for (int j=1;j<ns;j++) for (int i=0;i<j;i++,idx++) {
-				db_map[idx].p=star_map[i].dist_arcsec(star_map[j]);
-				db_map[idx].s1=i;
-				db_map[idx].s2=j;
-				db_map[idx].idx=idx;
+				map[idx].p=stars->map[i].dist_arcsec(stars->map[j]);
+				map[idx].s1=i;
+				map[idx].s2=j;
+				map[idx].idx=idx;
 			}
 
-			std::sort(db_map, db_map+db_map_size,constellation_lt_p);
+			std::sort(map, map+map_size,constellation_lt_p);
 
 		}
 		//TODO: save and load
@@ -403,23 +486,23 @@ namespace beast {
 		//	if (result != next_id) perror ("Error writing kdtree\n");
 		//}
 		
-		int* get_mask(float db_max_variance);
+
 	};
 
-	imgdb* DB;
+	constellation_db* DB;
 	void load_db() {
 		load_config();
-		DB=new imgdb;
-		DB->load_catalog();
+		DB=new constellation_db;
+		DB->stars->load_catalog();
 		DB->gendb_catalog();
 		//TODO: comment this out - instead use a seperate list once match has been confirmed
-		DB->reset_kdmask();
-		DB->reset_kdresults();
+		DB->stars->reset_kdmask();
+		DB->stars->reset_kdresults();
 	}
 
 
-	void add_score(constellation *db_const, constellation_score *cs, int32_t *img_mask, stardb *db, stardb *img,float db_max_variance);
-	void find(stardb *db, imgdb *img);
+	void add_score(constellation *db_const, constellation_score *cs, int32_t *img_mask, constellation_db *db, constellation_db *img,float db_max_variance);
+	void find(constellation_db *db, constellation_db *img);
 
 
 	/* weighted_triad results */
