@@ -1,5 +1,5 @@
 import sys
-stars=open("calibration/stars.txt","r").readlines()
+stars=open("catalog.dat","r").readlines()
 result=open(sys.argv[1],"r").readlines()
 result_real=open(sys.argv[2],"r").readlines()
 assert len(result)==len(result_real)

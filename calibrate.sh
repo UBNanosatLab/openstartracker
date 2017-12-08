@@ -21,7 +21,7 @@ BEGIN {
 }' hip_main.dat >catalog.dat
 
 #this also copies the image for use by astrometry
-python image_stats.py > calibration/calibration.txt
+python image_stats.py > calibration.txt
 #python gendb.py calibration/stars.txt calibration/constellations.txt calibration/dbsize.txt
 #sort -n calibration/constellations.txt > calibration/constellations2.txt
 #mv calibration/constellations2.txt calibration/constellations.txt
