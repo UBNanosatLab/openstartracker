@@ -26,6 +26,8 @@
  * authorization.                                                           *
  ****************************************************************************/
 
+#include "beast.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -35,7 +37,8 @@
 #define MAX_STARS 200
 #define VECTOR_LENGTH 3
 
-#include "beast.h"
+
+beast_db *DB;
 
 /***
  * Determines the HIP numbers of stars in a scene.
@@ -64,9 +67,11 @@ void star_id(double spikes[], int result[], size_t length)
 	delete img;
 }
 
+
 int main(int argc, char* argv[])
 {
 	load_config();
+	DB=new beast_db;
 	char measure_time = 0;
 	
 	int repetitions = 1;
