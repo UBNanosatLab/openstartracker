@@ -271,7 +271,9 @@ struct star_query {
 			 */
 			 
 			int n=kdresults_size++;
-			for (;n>0&&stars->map[idx].photons>stars->map[kdresults[n-1]].photons;n--) kdresults[n]=kdresults[n-1];
+			
+			float sm_photons=stars->map[idx].photons;
+			for (;n>0&&sm_photons>stars->map[kdresults[n-1]].photons;n--) kdresults[n]=kdresults[n-1];
 			kdresults[n]=idx;
 			//if we go over the maximum, bump the dimmest star from the results
 			if (kdresults_size>kdresults_maxsize) {

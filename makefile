@@ -6,4 +6,4 @@ all: $(OBJ)
 	
 debug:
 	#$(CC) -Wall -Og -pg -g beastgen.cpp -o beastgen -lm
-	$(CC) -Wall  -Og -g test.c -o test -lm
+	$(CC) -Wall  -Ofast -g test.c -o test -lm

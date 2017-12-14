@@ -119,48 +119,60 @@ struct  match_score {
 		if (totalscore==-FLT_MAX || better->totalscore==-FLT_MAX) return 0;
 		return (better->map[img_const.s1]==db_const.s1 && better->map[img_const.s2]==db_const.s2)?1:0;
 	}
+	#define COMPUTE_SCORE\
+		star *s=&(db->stars->map[o]);\
+		float x=s->x*R11+s->y*R12+s->z*R13;\
+		float y=s->x*R21+s->y*R22+s->z*R23;\
+		float z=s->x*R31+s->y*R32+s->z*R33;\
+		float px=y/(x*PIXX_TANGENT);\
+		float py=z/(x*PIXY_TANGENT);\
+		int nx,ny;\
+		nx=(int)(px+IMG_X/2.0f);\
+		ny=(int)(py+IMG_Y/2.0f);\
+		int32_t n=-1;\
+		if (nx==-1) nx++;\
+		else if (nx==IMG_X) nx--;\
+		if (ny==-1) ny++;\
+		else if (ny==IMG_Y) ny--;\
+		if (nx>=0&&nx<IMG_X&&ny>=0&&ny<IMG_Y) {\
+			n=img_mask[nx+ny*IMG_X];\
+		}\
+		if (n!=-1) {\
+			float sigma_sq=img->stars->map[n].sigma_sq+db->stars->max_variance;\
+			float maxdist_sq=-sigma_sq*(log(sigma_sq)+MATCH_VALUE);\
+			float a=(px-img->stars->map[n].px);\
+			float b=(py-img->stars->map[n].py);\
+			float score = (maxdist_sq-(a*a+b*b))/(2*sigma_sq);\
+			if (score>scores[n]){/* only match the closest star */\
+				map[n]=o;\
+				scores[n]=score;\
+			}\
+		}
 	
 	void compute_score() {
 		//TODO: figure out where 2*img->stars->map_size came from
 		totalscore=log(EXPECTED_FALSE_STARS/(IMG_X*IMG_Y))*(2*img->stars->map_size);
 		
-		for (int i=0;i<img->stars->map_size;i++) map[i]=-1;
-		
 		float* scores=(float *)malloc(sizeof(float)*img->stars->map_size);
-		for (int i=0;i<img->stars->map_size;i++) scores[i]=0.0;
-
-		db->results->kdsearch(R11,R12,R13,TODO_MAXFOV_D2,BRIGHT_THRESH);
-		for(int32_t i=0;i<db->results->kdresults_size;i++){
-			int32_t o=db->results->kdresults[i];
-			star s=db->stars->map[o];
-			float x=s.x*R11+s.y*R12+s.z*R13;
-			float y=s.x*R21+s.y*R22+s.z*R23;
-			float z=s.x*R31+s.y*R32+s.z*R33;
-			float px=y/(x*PIXX_TANGENT);
-			float py=z/(x*PIXY_TANGENT);
-			int nx,ny;
-			nx=(int)(px+IMG_X/2.0f);
-			ny=(int)(py+IMG_Y/2.0f);
-			int32_t n=-1;
-			if (nx==-1) nx++;
-			else if (nx==IMG_X) nx--;
-			if (ny==-1) ny++;
-			else if (ny==IMG_Y) ny--;
-			if (nx>=0&&nx<IMG_X&&ny>=0&&ny<IMG_Y) n=img_mask[nx+ny*IMG_X];
-			if (n!=-1) {
-				float sigma_sq=img->stars->map[n].sigma_sq+db->stars->max_variance;
-				float maxdist_sq=-sigma_sq*(log(sigma_sq)+MATCH_VALUE);
-				float a=(px-img->stars->map[n].px);
-				float b=(py-img->stars->map[n].py);
-				float score = (maxdist_sq-(a*a+b*b))/(2*sigma_sq);
-				/* only match the closest star */
-				if (score>scores[n]){
-					map[n]=o;
-					scores[n]=score;
-				}
-			}
+		int img_map_sz=img->stars->map_size;
+		for (int i=0;i<img_map_sz;i++) {
+			map[i]=-1;
+			scores[i]=0.0;
 		}
-		db->results->undo_kdsearch();
+		if (db->results==NULL) {//relative matching
+			int sz=db->stars->map_size;
+			for(int32_t o=0;o<sz;o++) {
+				COMPUTE_SCORE
+			}
+		} else {//catalog matching
+			db->results->kdsearch(R11,R12,R13,TODO_MAXFOV_D2,BRIGHT_THRESH);
+			int sz=db->results->kdresults_size;
+			for(int32_t i=0;i<sz;i++) {
+				int32_t o=db->results->kdresults[i];
+				COMPUTE_SCORE
+			}
+			db->results->undo_kdsearch();
+		}
 		for(int n=0;n<img->stars->map_size;n++) {
 			totalscore+=scores[n];
 		}
@@ -333,6 +345,7 @@ struct db_match {
 		
 		/* Do we have enough stars? */
 		if (db->stars->map_size<2||img->stars->map_size<2) return;
+		
 		int32_t *img_mask = img->stars->get_img_mask(db->stars->max_variance);
 		
 		match_score *m=new match_score(db, img, img_mask);
@@ -366,7 +379,12 @@ struct db_match {
 		//calculate map
 		map=(int32_t *)malloc(sizeof(int32_t)*img->stars->map_size);
 		for (int i=0;i<img->stars->map_size;i++) map[i]=-1;
-		for(int n=0;n<img->stars->map_size;n++) {
+		if (db->results==NULL) for(int n=0;n<img->stars->map_size;n++) {
+			//relative matching
+			int o=winner->map[n];
+			if (o!=-1) map[img->stars->map[n].star_idx]=db->stars->map[o].star_idx;
+		} else for(int n=0;n<img->stars->map_size;n++) {
+			//catalog matching
 			int o=winner->map[n];
 			if (o!=-1) map[img->stars->map[n].star_idx]=db->stars->map[o].id;
 		}
