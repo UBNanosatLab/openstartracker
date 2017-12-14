@@ -309,21 +309,20 @@ struct db_match {
 	
 	match_result *winner;
 	
-	//c_scores will never die
-	constellation_pair *c_scores;
-	int c_scores_size;
+	constellation_pair *c_pairs;
+	int c_pairs_size;
 	
 	#define ADD_SCORE\
 		m->weighted_triad();\
 		m->compute_score();\
 		if (m->match.totalscore>winner->match.totalscore) {\
-			if (winner->match.totalscore!=-FLT_MAX) c_scores[c_scores_size++]=winner->match;\
+			if (winner->match.totalscore!=-FLT_MAX) c_pairs[c_pairs_size++]=winner->match;\
 			m->copy_over(winner);\
-		} else c_scores[c_scores_size++]=m->match;
+		} else c_pairs[c_pairs_size++]=m->match;
 		
 	db_match(beast_db *db, beast_db *img) {
-		c_scores=NULL;
-		c_scores_size=0;
+		c_pairs=NULL;
+		c_pairs_size=0;
 
 		/* Do we have enough stars? */
 		if (db->stars->map_size<2||img->stars->map_size<2) return;
@@ -341,7 +340,9 @@ struct db_match {
 			constellation *upper=std::upper_bound (db->constellations->map, db->constellations->map+db->constellations->map_size, ub,constellation_lt_p);
 			//rewind by one
 			upper--;
-			if (lower->idx<=upper->idx) c_scores=(struct constellation_pair*)realloc(c_scores,sizeof(struct constellation_pair)*(c_scores_size+(upper->idx-lower->idx+1)*2));
+			if (lower->idx<=upper->idx) {
+				c_pairs=(struct constellation_pair*)realloc(c_pairs,sizeof(struct constellation_pair)*(c_pairs_size+(upper->idx-lower->idx+1)*2));
+			}
 			for (int o=lower->idx;o<=upper->idx;o++) {
 				m->init(db->constellations->map[o],img->constellations->map[n]);
 				ADD_SCORE
@@ -354,9 +355,9 @@ struct db_match {
 		
 		//calculate p_match
 		p_match=1.0;
-		for (int idx=0; idx<c_scores_size;idx++) {
-			if (!winner->related(c_scores[idx]))
-				p_match+=exp(c_scores[idx].totalscore-winner->match.totalscore);
+		for (int idx=0; idx<c_pairs_size;idx++) {
+			if (!winner->related(c_pairs[idx]))
+				p_match+=exp(c_pairs[idx].totalscore-winner->match.totalscore);
 		}
 		p_match=1.0/p_match;
 
@@ -373,7 +374,7 @@ struct db_match {
 	
 	~db_match() {
 		delete winner;
-		free(c_scores);
+		free(c_pairs);
 		free(map);
 	}
 };
