@@ -119,7 +119,7 @@ struct star_db {
 		fclose(stream);
 		
 	}
-	
+	//TODO: move to beast_db
 	int* get_img_mask(float db_max_variance) {
 		int *img_mask=(int*)malloc(IMG_X*IMG_Y*sizeof(img_mask[0]));
 		memset(img_mask, -1, IMG_X*IMG_Y*sizeof(img_mask[0]));

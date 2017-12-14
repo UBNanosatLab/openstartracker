@@ -57,10 +57,11 @@ void star_id(double spikes[], int result[], size_t length)
 	}
 	
 	beast_db * img=new beast_db(s);
-	constellation_match* lis = new constellation_match(DB,img);
+	db_match* lis = new db_match(DB,img);
 	if (lis->p_match>0.66) {
 		for(size_t i = 0; i < length; i++) {
-			result[i] = lis->winner_id_map[i];
+			
+			result[i] = lis->map[i];
 		}
 	}
 	delete lis;

@@ -8,6 +8,11 @@ struct constellation {
 	int32_t s1;
 	int32_t s2;
 	int32_t idx;
+	void swap_stars() {
+		int32_t t=s1;
+		s1=s2;
+		s2=t;
+	}
 };
 
 struct constellation_lt {

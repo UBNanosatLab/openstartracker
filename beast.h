@@ -1,8 +1,9 @@
 #ifndef BEAST_H
 #define BEAST_H
-#include "config.h"
-#include "stars.h"
+
 #include "constellations.h"
+#include <list>
+#include <float.h>
 
 struct beast_db {
 	star_db* stars;
@@ -73,29 +74,98 @@ struct beast_db {
 	}
 };
 
-
-struct  constellation_score {
+struct  match_score {
+	beast_db *db,*img;
+	int32_t *img_mask;
+	constellation db_const,img_const;
 	float totalscore;
-	int32_t db_id1,db_id2;
-	int32_t img_id1,img_id2;
-	int *id_map; /* Usage: id_map[newstar]=oldstar */
-	float *scores;
+	int32_t *map; /* Usage: map[imgstar]=dbstar */
 	
-};
-bool constellation_score_gt(const constellation_score &c1, const constellation_score &c2) { return c1.totalscore > c2.totalscore; }
-
-struct constellation_match {
+	//body to eci
 	float R11,R12,R13;
 	float R21,R22,R23;
 	float R31,R32,R33;
+
+	match_score(beast_db *db_, beast_db *img_, int32_t *img_mask_) {
+		db=db_;
+		img=img_;
+		img_mask=img_mask_;
+		map=(int32_t *)malloc(sizeof(int32_t)*img->stars->map_size);
+		totalscore=-FLT_MAX;
+	}
+	~match_score() {free(map);}
+	void init(constellation &db_const_, constellation &img_const_) {
+		db_const=db_const_;
+		img_const=img_const_;
+	}
 	
-	struct constellation_score *c_scores;
+	match_score *copy() {
+		match_score *c = new match_score(db,img,img_mask);
+		c->db_const=db_const;
+		c->img_const=img_const;
+		
+		if (totalscore!=-FLT_MAX) {
+			c->totalscore=totalscore;
+			memcpy(c->map, map, sizeof(int32_t)*img->stars->map_size);
+		}
+		c->R11=R11,c->R12=R12,c->R13=R13;
+		c->R21=R21,c->R22=R22,c->R23=R23;
+		c->R31=R31,c->R32=R32,c->R33=R33;
+		
+		return c;
+	}
+	int related(match_score *better) {
+		
+		if (totalscore==-FLT_MAX || better->totalscore==-FLT_MAX) return 0;
+		return (better->map[img_const.s1]==db_const.s1 && better->map[img_const.s2]==db_const.s2)?1:0;
+	}
 	
-	int c_scores_size;
-	float *winner_scores;
-	//winner_id_map[new]=old
-	int32_t *winner_id_map;
-	float p_match;
+	void compute_score() {
+		//TODO: figure out where 2*img->stars->map_size came from
+		totalscore=log(EXPECTED_FALSE_STARS/(IMG_X*IMG_Y))*(2*img->stars->map_size);
+		
+		for (int i=0;i<img->stars->map_size;i++) map[i]=-1;
+		
+		float* scores=(float *)malloc(sizeof(float)*img->stars->map_size);
+		for (int i=0;i<img->stars->map_size;i++) scores[i]=0.0;
+
+		db->results->kdsearch(R11,R12,R13,TODO_MAXFOV_D2,BRIGHT_THRESH);
+		for(int32_t i=0;i<db->results->kdresults_size;i++){
+			int32_t o=db->results->kdresults[i];
+			star s=db->stars->map[o];
+			float x=s.x*R11+s.y*R12+s.z*R13;
+			float y=s.x*R21+s.y*R22+s.z*R23;
+			float z=s.x*R31+s.y*R32+s.z*R33;
+			float px=y/(x*PIXX_TANGENT);
+			float py=z/(x*PIXY_TANGENT);
+			int nx,ny;
+			nx=(int)(px+IMG_X/2.0f);
+			ny=(int)(py+IMG_Y/2.0f);
+			int32_t n=-1;
+			if (nx==-1) nx++;
+			else if (nx==IMG_X) nx--;
+			if (ny==-1) ny++;
+			else if (ny==IMG_Y) ny--;
+			if (nx>=0&&nx<IMG_X&&ny>=0&&ny<IMG_Y) n=img_mask[nx+ny*IMG_X];
+			if (n!=-1) {
+				float sigma_sq=img->stars->map[n].sigma_sq+db->stars->max_variance;
+				float maxdist_sq=-sigma_sq*(log(sigma_sq)+MATCH_VALUE);
+				float a=(px-img->stars->map[n].px);
+				float b=(py-img->stars->map[n].py);
+				float score = (maxdist_sq-(a*a+b*b))/(2*sigma_sq);
+				/* only match the closest star */
+				if (score>scores[n]){
+					map[n]=o;
+					scores[n]=score;
+				}
+			}
+		}
+		db->results->undo_kdsearch();
+		for(int n=0;n<img->stars->map_size;n++) {
+			totalscore+=scores[n];
+		}
+		free(scores);
+	}
 	/* weighted_triad results */
 
 	/* see https://en.wikipedia.org/wiki/Triad_method */
@@ -105,9 +175,13 @@ struct constellation_match {
 	/* when compiled, this section contains roughly 430 floating point operations */
 	/* according to https://www.karlrupp.net/2016/02/gemm-and-stream-results-on-intel-edison/ */
 	/* we can perform >250 MFLOPS with doubles, and >500 MFLOPS with floats */
-
-
-	void weighted_triad(star db_s1,star db_s2,star img_s1,star img_s2){
+	
+	void weighted_triad() {
+		star db_s1=db->stars->map[db_const.s1];
+		star db_s2=db->stars->map[db_const.s2];
+		star img_s1=img->stars->map[img_const.s1];
+		star img_s2=img->stars->map[img_const.s2];
+		
 		/* v=A*w */
 		float wa1=db_s1.x,wa2=db_s1.y,wa3=db_s1.z;
 		float wb1=db_s2.x,wb2=db_s2.y,wb3=db_s2.z;
@@ -217,64 +291,52 @@ struct constellation_match {
 		R32=cy*sx;
 		R33=cx*cy;
 	}
-	void add_score(constellation *db_const, constellation_score *cs, int32_t *img_mask, beast_db *db, beast_db *img){
-		cs->db_id1=db_const->s1;
-		cs->db_id2=db_const->s2;
-		cs->id_map=(int32_t *)malloc(sizeof(int32_t)*img->stars->map_size);
-		cs->scores=(float *)malloc(sizeof(float)*img->stars->map_size);
-		for (int i=0;i<img->stars->map_size;i++) cs->id_map[i]=-1;
-		for (int i=0;i<img->stars->map_size;i++) cs->scores[i]=0.0;
-		
-		
-		cs->totalscore=log(EXPECTED_FALSE_STARS/(IMG_X*IMG_Y))*(2*img->stars->map_size);
-		db->results->kdsearch(R11,R12,R13,TODO_MAXFOV_D2,BRIGHT_THRESH);
-		for(int32_t i=0;i<db->results->kdresults_size;i++){
-			int32_t o=db->results->kdresults[i];
-			star s=db->stars->map[o];
-			float x=s.x*R11+s.y*R12+s.z*R13;
-			float y=s.x*R21+s.y*R22+s.z*R23;
-			float z=s.x*R31+s.y*R32+s.z*R33;
-			float px=y/(x*PIXX_TANGENT);
-			float py=z/(x*PIXY_TANGENT);
-			int nx,ny;
-			nx=(int)(px+IMG_X/2.0f);
-			ny=(int)(py+IMG_Y/2.0f);
-			int32_t n=-1;
-			if (nx==-1) nx++;
-			else if (nx==IMG_X) nx--;
-			if (ny==-1) ny++;
-			else if (ny==IMG_Y) ny--;
-			if (nx>=0&&nx<IMG_X&&ny>=0&&ny<IMG_Y) n=img_mask[nx+ny*IMG_X];
-			if (n!=-1) {
-				float sigma_sq=img->stars->map[n].sigma_sq+db->stars->max_variance;
-				float maxdist_sq=-sigma_sq*(log(sigma_sq)+MATCH_VALUE);
-				float a=(px-img->stars->map[n].px);
-				float b=(py-img->stars->map[n].py);
-				float score = (maxdist_sq-(a*a+b*b))/(2*sigma_sq);
-				/* only match the closest star */
-				if (score>cs->scores[n]){
-					cs->id_map[n]=o;
-					cs->scores[n]=score;
-				}
-			}
+};
+
+struct db_match {
+	float p_match;
+	int32_t *map; /* Usage: map[imgstar.staridx]=dbstar.id */
+	
+	
+	match_score *winner;
+	std::list<float> *related_scores; //Matches which agree w/ winner
+	std::list<float> *unrelated_scores; //Matches which don't agree w/ winner
+
+	/* More efficient "online" algorithm for keeping track of probability of matches.
+	 * 
+	 * Note: if one of the unrelated_scores is higher than one of the
+	 * related_scores, it could result in some of the related scores being
+	 * falsely counted as unrelated. In practice this has the effect of
+	 * very slightly underestimating the probability of a match.
+	 * 
+	 * The worst I have seen is ~20%, but typically it is <0.1% 
+	 * In practice, it does not effect the results
+	 */
+	
+	void add_score(match_score *m){
+		m->weighted_triad();
+		m->compute_score();
+		/* try both orderings of stars */
+		if (m->totalscore>winner->totalscore) {
+			related_scores->push_back(winner->totalscore);
+			if (!winner->related(m)) unrelated_scores->splice(unrelated_scores->end(),*related_scores);
+			delete winner;
+			winner = m->copy();
+		} else if (winner->totalscore!=-FLT_MAX) {
+			if (m->related(winner)) related_scores->push_back(m->totalscore);
+			else unrelated_scores->push_back(m->totalscore);
 		}
-		db->results->undo_kdsearch();
-		for(int n=0;n<img->stars->map_size;n++) {
-			cs->totalscore+=cs->scores[n];
-		}
-		
 	}
-	constellation_match(beast_db *db, beast_db *img) {
-		c_scores=NULL;
-		c_scores_size=0;
+	db_match(beast_db *db, beast_db *img) {
+		related_scores=new std::list<float>;
+		unrelated_scores=new std::list<float>;
+		
 		/* Do we have enough stars? */
 		if (db->stars->map_size<2||img->stars->map_size<2) return;
-
-		winner_id_map=(int *)malloc(sizeof(int)*img->stars->map_size);
-		winner_scores=(float *)malloc(sizeof(float)*img->stars->map_size);
-		
 		int32_t *img_mask = img->stars->get_img_mask(db->stars->max_variance);
 		
+		match_score *m=new match_score(db, img, img_mask);
+		winner=m->copy();
 		for (int n=0;n<img->constellations->map_size;n++) {
 			constellation lb=img->constellations->map[n];
 			constellation ub=img->constellations->map[n];
@@ -285,79 +347,37 @@ struct constellation_match {
 			//rewind by one
 			upper--;
 			
-			//TODO: get rid of cscores 
-			if (lower->idx<=upper->idx) c_scores=(struct constellation_score*)realloc(c_scores,sizeof(struct constellation_score)*(c_scores_size+(upper->idx-lower->idx+1)*2));
 			for (int o=lower->idx;o<=upper->idx;o++) {
-				int32_t db_idx1=db->constellations->map[o].s1;
-				int32_t db_idx2=db->constellations->map[o].s2;
-				int32_t img_idx1=img->constellations->map[n].s1;
-				int32_t img_idx2=img->constellations->map[n].s2;
-				
-				star db_s1=db->stars->map[db_idx1];
-				star db_s2=db->stars->map[db_idx2];
-				star img_s1=img->stars->map[img_idx1];
-				star img_s2=img->stars->map[img_idx2];
-				
-				/* try both orderings of stars */
-				weighted_triad(db_s1,db_s2,img_s1,img_s2);
-				c_scores[c_scores_size].img_id1=img_idx1;
-				c_scores[c_scores_size].img_id2=img_idx2;
-				add_score(&(db->constellations->map[o]),&c_scores[c_scores_size],img_mask,db,img);
-				c_scores_size++;
-				
-				weighted_triad(db_s1,db_s2,img_s2,img_s1);
-				c_scores[c_scores_size].img_id1=img_idx2;
-				c_scores[c_scores_size].img_id2=img_idx1;
-				add_score(&(db->constellations->map[o]),&c_scores[c_scores_size],img_mask,db,img);
-				c_scores_size++;
+				m->init(db->constellations->map[o],img->constellations->map[n]);
+				add_score(m);
+				//add score both ways
+				m->img_const.swap_stars();
+				add_score(m);
 			}
 		}
-		std::sort(c_scores, c_scores+c_scores_size,constellation_score_gt);
-		for (int i=0;i<img->stars->map_size;i++) {winner_id_map[i]=-1;winner_scores[i]=0.0f;}
-		if (c_scores_size>0) {
-			for(int n=0;n<img->stars->map_size;n++) {
-				int o=c_scores[0].id_map[n];
-				if (o!=-1){
-					winner_scores[img->stars->map[n].star_idx]=c_scores[0].scores[n];
-					winner_id_map[img->stars->map[n].star_idx]=db->stars->map[o].id;
-				}
-			}
-			
-		}
-		//TODO: move to add_score
-		/* add up probabilities of all matches, excluding those which */
-		/* are equivalent to the best match (S1==s1,S2=s2) */
+		delete m;
+		
+		//calculate p_match
 		p_match=1.0;
-		//printf("size %lu\n",c_scores_size*sizeof(c_scores[0]));
-		if (c_scores_size>0) {
-			float bestscore=c_scores[0].totalscore;
-			int db_id1=c_scores[0].db_id1;
-			int db_id2=c_scores[0].db_id2;
-			int img_id1=c_scores[0].img_id1;
-			int img_id2=c_scores[0].img_id2;
-			/* set attitude matrix to best match */
-			weighted_triad(db->stars->map[db_id1],db->stars->map[db_id2],img->stars->map[img_id1],img->stars->map[img_id2]);
-			for(int i=1;i<c_scores_size;i++) {
-				if (c_scores[i].id_map[img_id1]!=db_id1&&c_scores[i].id_map[img_id2]!=db_id2){
-					p_match+=exp(c_scores[i].totalscore-bestscore);
-				}
-			}
-			//Turns out baysian hypothesis testing was the best way
-			//after all. Who would've guessed?
-			p_match=1.0/p_match;
-		} else {
-			p_match=0.0;
+		std::list<float>::iterator it = unrelated_scores->begin();
+		for (int idx=0; idx<unrelated_scores->size();idx++,it++) p_match+=exp(*it-winner->totalscore);
+		p_match=1.0/p_match;
+
+		//calculate map
+		map=(int32_t *)malloc(sizeof(int32_t)*img->stars->map_size);
+		for (int i=0;i<img->stars->map_size;i++) map[i]=-1;
+		for(int n=0;n<img->stars->map_size;n++) {
+			int o=winner->map[n];
+			if (o!=-1) map[img->stars->map[n].star_idx]=db->stars->map[o].id;
 		}
 		free(img_mask);
 	}
-	~constellation_match() {
-		for (int i=0;i<c_scores_size; i++) {
-			free(c_scores[i].scores);
-			free(c_scores[i].id_map);
-		}
-		free(c_scores);
-		free(winner_id_map);
-		free(winner_scores);
+	
+	~db_match() {
+		delete winner;
+		delete related_scores;
+		delete unrelated_scores;
+		free(map);
 	}
 };
 #endif
