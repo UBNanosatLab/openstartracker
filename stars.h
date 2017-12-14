@@ -12,8 +12,8 @@ struct star {
 	float y;
 	float z;
 	float photons;
-	int32_t star_idx;
-	int32_t id;
+	int32_t star_idx;//how many stars were inserted before this one?
+	int32_t id;//user defined id (ie hipparcos id, -1)
 	int32_t unreliable;
 
 	float sigma_sq;
@@ -73,7 +73,7 @@ struct star_db {
 		map[n].sigma_sq=POS_VARIANCE;
 		map[n].star_idx=n;
 	}
-	void add_star(float px, float py, float mag) {
+	void add_star(float px, float py, float mag, int id) {
 		assert(kdsorted==0);
 		float j=PIXX_TANGENT*px; /* j=(y/x) */
 		float k=PIXY_TANGENT*py; /* k=z/x */
@@ -81,7 +81,7 @@ struct star_db {
 		float y=j*x;
 		float z=k*x;
 		int n=map_size;
-		add_star(x,y,z,mag,-1);
+		add_star(x,y,z,mag,id);
 		map[n].sigma_sq=IMAGE_VARIANCE/map[n].photons;
 		if (max_variance<map[n].sigma_sq) max_variance=map[n].sigma_sq;
 	}

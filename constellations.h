@@ -8,10 +8,18 @@ struct constellation {
 	int32_t s1;
 	int32_t s2;
 	int32_t idx;
-	void swap_stars() {
-		int32_t t=s1;
-		s1=s2;
-		s2=t;
+
+};
+
+struct  constellation_pair {
+	float totalscore;
+	int32_t db_s1,db_s2;
+	int32_t img_s1,img_s2;
+	
+	void flip() {
+		int32_t t=img_s1;
+		img_s1=img_s2;
+		img_s2=t;
 	}
 };
 

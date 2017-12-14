@@ -52,7 +52,7 @@ void star_id(double spikes[], int result[], size_t length)
 	star_db* s=new star_db;
 	for(size_t i = 0; i < length; i++)
 	{
-		s->add_star(spikes[3*i]-IMG_X/2.0,-(spikes[3*i+1]-IMG_Y/2.0),spikes[3*i+2]);
+		s->add_star(spikes[3*i]-IMG_X/2.0,-(spikes[3*i+1]-IMG_Y/2.0),spikes[3*i+2],-1);
 		result[i] = -1;
 	}
 	
