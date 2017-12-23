@@ -10,6 +10,9 @@
 #define PI		   3.14159265358979323846  /* pi */
 #define TWOPI		6.28318530717958647693
 
+int DEBUG_ENABLE;
+#define DBG_PRINT(format,args...) if (DEBUG_ENABLE==1) fprintf(stderr,format, ## args);
+
 int IMG_X,IMG_Y,MAX_FALSE_STARS,DB_REDUNDANCY,REQUIRED_STARS;
 float DEG_X,DEG_Y,PIXX_TANGENT,PIXY_TANGENT,DOUBLE_STAR_PX;
 float PIXSCALE,POS_ERR_SIGMA,POS_VARIANCE;
@@ -22,6 +25,7 @@ int ENV_VARS_SIZE;
 char** ENV_VARS; //keep track of these so that valgrind is happy
 
 void load_config(const char *filename) {
+	DEBUG_ENABLE=0;
 	ENV_VARS_SIZE=0;
 	ENV_VARS=NULL;
 	//move calibration.txt to constellation_db

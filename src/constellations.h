@@ -8,6 +8,13 @@ struct constellation {
 	int32_t s1;
 	int32_t s2;
 	int32_t idx;
+	void _print(const char *s) {
+		DBG_PRINT("%s\t",s);
+		DBG_PRINT("p=%f ",p);
+		DBG_PRINT("s1=%d ",s1);
+		DBG_PRINT("s2=%d ",s2);
+		DBG_PRINT("idx=%d\n",idx);
+	}
 };
 
 struct  constellation_pair {
@@ -19,6 +26,14 @@ struct  constellation_pair {
 		int32_t t=img_s1;
 		img_s1=img_s2;
 		img_s2=t;
+	}
+	void _print(const char *s) {
+		DBG_PRINT("%s\t",s);
+		DBG_PRINT("totalscore=%f ",totalscore);
+		DBG_PRINT("db_s1=%d ",db_s1);
+		DBG_PRINT("db_s2=%d ",db_s2);
+		DBG_PRINT("img_s1=%d ",img_s1);
+		DBG_PRINT("img_s2=%d\n",img_s2);
 	}
 };
 
@@ -52,11 +67,11 @@ struct constellation_db {
 		orig_results=new star_query(orig_stars);
 		orig_results->kdmask_filter_catalog();
 		orig_results->kdmask_uniform_density(REQUIRED_STARS);
-		results=orig_results->reduce_stars();
+		stars=orig_results->from_kdmask();
+		results=new star_query(stars);
 		orig_results->reset_kdmask();
 		
 		results->kdmask_uniform_density(2+DB_REDUNDANCY);
-		stars=results->stars;
 		int nmask=0;
 		for (int i=0;i<stars->map_size;i++) if (results->kdmask[i]==0) nmask++;
 		std::set<constellation,constellation_lt> c_set;
@@ -69,9 +84,8 @@ struct constellation_db {
 				c.s2=results->kdresults[j];
 				c_set.insert(c);
 			}
-			results->undo_kdsearch();
+			results->clear_kdresults();
 		}
-		//TODO: comment these out, and add second starid stage
 		results->reset_kdmask();
 		//preallocate map
 		map_size=c_set.size();
@@ -83,19 +97,18 @@ struct constellation_db {
 		}
 		
 	}
-	
+	constellation_db(star_db *s) {constellation_img_init(s,MAX_FALSE_STARS+2);}
+	constellation_db(star_db *s, int n_brightest) {constellation_img_init(s,n_brightest);}
 	//Otherwise, this is an image
-	constellation_db(star_db *s) {
+	void constellation_img_init(star_db *s,int n_brightest) {
 		stars=s;
-		orig_stars=s;
-		//TODO: change this to results = sq
-		results=NULL;
+		results=new star_query(s);
+		orig_stars=NULL;
 		orig_results=NULL;
 		
 		std::sort(stars->map, stars->map+stars->map_size,star_gt_photons);
 		int ns=stars->map_size;/* number of stars to check */
-		//if (ns>REQUIRED_STARS+MAX_FALSE_STARS) ns=REQUIRED_STARS+MAX_FALSE_STARS;
-		if (ns>MAX_FALSE_STARS+2) ns=MAX_FALSE_STARS+2;
+		if (ns>n_brightest) ns=n_brightest;
 		
 		stars=stars;
 		map_size=ns*(ns-1)/2;
@@ -106,17 +119,28 @@ struct constellation_db {
 			map[idx].p=stars->map[i].dist_arcsec(stars->map[j]);
 			map[idx].s1=i;
 			map[idx].s2=j;
-			map[idx].idx=idx;
 		}
 		std::sort(map, map+map_size,constellation_lt_p);
+		while (--idx>=0) map[idx].idx=idx;
 	}
 	~constellation_db() {
 		free(map);
 		delete results;
 		delete stars;
 		delete orig_results;
-		orig_stars=NULL;
+		delete orig_stars;
 	}
+	void _print(const char *s) {
+		DBG_PRINT("%s\n",s);
+		results->_print("RESULTS");
+		if (orig_results!=NULL) {
+			orig_results->_print("ORIG_RESULTS");
+		}
+		map[0]._print("CONSTELLATION");
+		DBG_PRINT(".\n%d total\n.\n",map_size);
+		map[map_size-1]._print("CONSTELLATION");
+	}
+
 };
 
 #endif

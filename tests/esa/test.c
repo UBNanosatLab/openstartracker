@@ -48,6 +48,7 @@ constellation_db *DB;
  * @param result The output array that should be filled with the HIP numbers.
  * @param length The number of spikes in the scene.
  */
+ int IDNUM;
 void star_id(double spikes[], int result[], size_t length)
 {	
 	star_db* s=new star_db;
@@ -59,12 +60,12 @@ void star_id(double spikes[], int result[], size_t length)
 	
 	constellation_db * img=new constellation_db(s);
 	db_match* lis = new db_match(DB,img);
-	if (lis->p_match>0.75) {
+	DBG_PRINT("%d\tlis->p_match=%f,lis->p_match_rel=%f\n",IDNUM,lis->p_match,lis->p_match_rel);
+	if (lis->p_match>0.99) {
 		for(size_t i = 0; i < length; i++) {
 			
 			result[i] = lis->map[i];
 		}
-		fprintf(stderr,"p_match %f\n",lis->p_match);
 	}
 	delete lis;
 	delete img;
@@ -96,7 +97,7 @@ int main(int argc, char* argv[])
 
 	clock_t time_sum = 0;
 	int run_times = 0;
-	for(;(read = getline(&line, &len, file)) != -1;run_times++) {
+	for(IDNUM=0;(read = getline(&line, &len, file)) != -1;IDNUM++) {
 		size_t i = 0;
 		for(char* result = strtok(line, ","); result != NULL; i++) {
 			data[i] = atof(result);
@@ -108,6 +109,7 @@ int main(int argc, char* argv[])
 		clock_t end = clock();
 		time_sum += end - start;
 		for(i = 0; i < length; i++) printf("%d%c", results[i], i == length - 1 ? '\n' : ',');
+		run_times++;
 		fprintf(stderr,"Time on edison: %f\n", ((float)time_sum*EDISON_SPEED_FACTOR) / (CLOCKS_PER_SEC*run_times));
 	}
 

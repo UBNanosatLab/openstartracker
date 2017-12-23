@@ -27,6 +27,19 @@ struct star {
 		float c=y*s.z - s.y*z;
 		return (3600*180.0/PI)*asin(sqrt(a*a+b*b+c*c));
 	}
+	void _print(const char *s) {
+		DBG_PRINT("%s\t",s);
+		DBG_PRINT("x=%f ", x);
+		DBG_PRINT("y=%f ", y);
+		DBG_PRINT("z=%f ", z);
+		DBG_PRINT("photons=%f ", photons);
+		DBG_PRINT("star_idx=%d ", star_idx);
+		DBG_PRINT("id=%d ", id);
+		DBG_PRINT("unreliable=%d ", unreliable);
+		DBG_PRINT("sigma_sq=%f ", sigma_sq);
+		DBG_PRINT("px=%f ", px);
+		DBG_PRINT("py=%f\n", py);
+	}
 };
 
 bool star_gt_x(const star &s1, const star &s2) {return s1.x > s2.x;}
@@ -50,8 +63,6 @@ struct star_db {
 		map=NULL;
 		map_size=0;
 		kdsorted=0;
-
-		
 		max_variance=0.0;
 	}
 	~star_db() {
@@ -112,7 +123,8 @@ struct star_db {
 				map[i].y=atof(strtok(NULL," "));
 				map[i].z=atof(strtok(NULL," "));
 				map[i].unreliable=atoi(strtok(NULL," "));
-				
+				map[i].px=map[i].y/(map[i].x*PIXX_TANGENT);
+				map[i].py=map[i].z/(map[i].x*PIXY_TANGENT);
 				map[i].sigma_sq=POS_VARIANCE;
 			}
 		}
@@ -173,6 +185,17 @@ struct star_db {
 		}
 		return img_mask;
 	}
+	void _print(const char *s) {
+		DBG_PRINT("%s\n",s);
+		DBG_PRINT("star_db at %lu contains %d elements\n",(unsigned long)this,map_size);
+		DBG_PRINT("stars at %lu\n",(unsigned long)map);
+		DBG_PRINT("max_variance=%f\n",max_variance);
+		DBG_PRINT("kdsorted=%d\n",kdsorted);
+		for (int i=0; i<map_size; i++) {
+			DBG_PRINT("%d:\t",i);
+			map[i]._print("star");
+		}
+	}
 };
 
 struct star_query {
@@ -188,20 +211,18 @@ struct star_query {
 	star_query(star_db *s) {
 		stars=s;
 		
-		kdresults=(int*)malloc(stars->map_size*sizeof(kdresults[0]));
-		for (int i=0;i<stars->map_size;i++) kdresults[i]=i;
-		kdmask=(int8_t*)malloc(stars->map_size*sizeof(kdmask[0]));
-		kdresults_size=0;
+		kdresults_size=stars->map_size;
 		kdresults_maxsize=INT_MAX;
+		
+		kdmask=(int8_t*)malloc(kdresults_size*sizeof(kdmask[0]));
+		kdresults=(int*)malloc(kdresults_size*sizeof(kdresults[0]));
+		for (int i=0;i<stars->map_size;i++) kdresults[i]=i;
 		
 		//TODO: put this in config file, come up with a way
 		//to automatically figure out the optimal value
 		//(3.5 was determined experemently to be a good choice)
 		kdbucket_size=(DEG_X*DEG_Y*3.5);
 		
-		if (stars->kdsorted==0) kdsort();
-		
-		reset_kdresults();
 		reset_kdmask();
 	}
 	~star_query() {
@@ -232,27 +253,20 @@ struct star_query {
 
 	void kdsort() {
 		kdsort_x(0,stars->map_size);
+		kdresults_size=0;
 		stars->kdsorted=1;
 	}
 	void kdsort_x(int min, int max) {KDSORT_NEXT(star_lt_x,kdsort_y)}
 	void kdsort_y(int min, int max) {KDSORT_NEXT(star_lt_y,kdsort_z)}
 	void kdsort_z(int min, int max) {KDSORT_NEXT(star_lt_z,kdsort_x)}
 	#undef KDSORT_NEXT
-	 
-	/* Reset kdresults without clearing kdmask
-	 * Can be used to do clever things like reusing a mask generated
-	 * by a previous search */
-	void reset_kdresults() {kdresults_size=0;}
 	
 	/* Clears kdmask, but does not reset kdresults. Slow.*/
 	void reset_kdmask() {
 		memset(kdmask,0,sizeof(kdmask[0])*stars->map_size);
 	}
 	
-	/* Undoes the effects of all kdsearches since the last time
-	 * reset_kdresults() was called. Much faster than reset_kdmask()*/
-	 
-	void undo_kdsearch() {
+	void clear_kdresults() {
 		while (kdresults_size>0) {
 			kdresults_size--;
 			kdmask[kdresults[kdresults_size]]=0;
@@ -305,6 +319,7 @@ struct star_query {
 	 * @details put all results found into kdresults (sorted by brightness), mask via kdmask
 	 */
 	void kdsearch(float x, float y, float z, float r, float min_photons, int min, int max, int dim) {
+		if (stars->kdsorted==0) kdsort();
 		float r_deg=r/3600.0;
 		float r_rad=r_deg*PI/180.0;
 		if (dim==0) kdsearch_x(x, y, z, 2*fabs(sin(r_rad/2.0)), min_photons,min,max);
@@ -312,7 +327,6 @@ struct star_query {
 		else if (dim==2) kdsearch_z(x, y, z, 2*fabs(sin(r_rad/2.0)), min_photons,min,max);
 	}
 	void kdsearch(float x, float y, float z, float r, float min_photons) {kdsearch(x, y, z, r, min_photons,0,stars->map_size,0);}
-	
 	//use seperate functions for each diminsion so that the compiler can unroll the recursion
 	#define KDSEARCH_NEXT(A,B,C,D)\
 		int mid=(min+max)/2;\
@@ -339,9 +353,9 @@ struct star_query {
 			//if (kdresults_size>1||lastmask || stars->map[i].unreliable>0||stars->map[i].photons<BRIGHT_THRESH) {
 			if (kdresults_size>1||lastmask || stars->map[i].photons<BRIGHT_THRESH) {
 				kdmask[i]=1;
-				reset_kdresults();
+				kdresults_size=0;
 			} else {
-				undo_kdsearch();
+				clear_kdresults();
 			}
 		}
 	}
@@ -354,24 +368,63 @@ struct star_query {
 		for (int i=0;i<stars->map_size;i++) if (kdmask[i]==0) {
 			kdsearch(stars->map[i].x,stars->map[i].y,stars->map[i].z,MINFOV_D2,BRIGHT_THRESH);
 			for (int j=0;j<kdresults_size;j++) uniform_set.insert(kdresults[j]);
-			undo_kdsearch();
+			clear_kdresults();
 		}
 		for (int i=0;i<stars->map_size;i++) kdmask[i]=1;
 		std::set<int>::iterator it = uniform_set.begin();
 		for (int i=0; i<uniform_set.size();i++,it++) kdmask[*it]=0;
 		kdresults_maxsize=kdresults_maxsize_old;
 	}
-	star_query* reduce_stars() {
+	star_db* from_kdmask() {
 		star_db* rd=new star_db;
 		rd->max_variance=stars->max_variance;
 		for (int i=0;i<stars->map_size;i++){
 			if (kdmask[i]==0) {
 				int j=rd->map_size;
-				rd->add_star(stars->map[i].x, stars->map[i].y, stars->map[i].z, 0, i);
+				rd->add_star(stars->map[i].x, stars->map[i].y, stars->map[i].z, 0, stars->map[i].id);
 				rd->map[j].photons=stars->map[i].photons;
+				rd->map[j].unreliable = stars->map[i].unreliable;
+				rd->map[j].sigma_sq = stars->map[i].sigma_sq;
+				rd->map[j].px = stars->map[i].px;
+				rd->map[j].py = stars->map[i].py;
 			}
 		}
-		return new star_query(rd);
+		return rd;
+	}
+	star_db* from_kdresults() {
+		star_db* rd=new star_db;
+		rd->max_variance=stars->max_variance;
+		for (int i=0;i<kdresults_size;i++){
+			int j=rd->map_size;
+			int k=kdresults[i];
+			rd->add_star(stars->map[k].x, stars->map[k].y, stars->map[k].z, 0, stars->map[k].id);
+			rd->map[j].photons = stars->map[k].photons;
+			rd->map[j].unreliable = stars->map[k].unreliable;
+			rd->map[j].sigma_sq = stars->map[k].sigma_sq;
+			rd->map[j].px = stars->map[k].px;
+			rd->map[j].py = stars->map[k].py;
+		}
+		return rd;
+	}
+	
+	void _print(const char *s) {
+		DBG_PRINT("%s\n",s);
+		DBG_PRINT("kdmask at %lu\n",(unsigned long)kdmask);
+		DBG_PRINT("kdresults at %lu\n",(unsigned long)kdresults);
+		DBG_PRINT("kdresults_size=%d\n",kdresults_size);
+		DBG_PRINT("kdresults_maxsize=%d\n",kdresults_maxsize);
+		DBG_PRINT("kdbucket_size=%d\n",kdbucket_size);
+		if (kdresults_size>0){
+			int i=0;
+			DBG_PRINT("kdmask[%d]=%d\n",i,kdmask[i]);
+			DBG_PRINT("kdresults[%d]=%d\n",i,kdresults[i]);
+			stars->map[kdresults[i]]._print("STARS");
+			DBG_PRINT(".\n.\n");
+			i=kdresults_size-1;
+			DBG_PRINT("kdmask[%d]=%d\n",i,kdmask[i]);
+			DBG_PRINT("kdresults[%d]=%d\n",i,kdresults[i]);
+			stars->map[kdresults[i]]._print("STARS");
+		}
 	}
 };
 #endif

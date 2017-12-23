@@ -150,6 +150,9 @@ class star(_object):
     def dist_arcsec(self, s):
         return _beast.star_dist_arcsec(self, s)
 
+    def _print(self, s):
+        return _beast.star__print(self, s)
+
     def __init__(self):
         this = _beast.new_star()
         try:
@@ -234,6 +237,9 @@ class star_db(_object):
 
     def get_img_mask(self, db_max_variance):
         return _beast.star_db_get_img_mask(self, db_max_variance)
+
+    def _print(self, s):
+        return _beast.star_db__print(self, s)
 star_db_swigregister = _beast.star_db_swigregister
 star_db_swigregister(star_db)
 
@@ -289,14 +295,11 @@ class star_query(_object):
     def kdsort_z(self, min, max):
         return _beast.star_query_kdsort_z(self, min, max)
 
-    def reset_kdresults(self):
-        return _beast.star_query_reset_kdresults(self)
-
     def reset_kdmask(self):
         return _beast.star_query_reset_kdmask(self)
 
-    def undo_kdsearch(self):
-        return _beast.star_query_undo_kdsearch(self)
+    def clear_kdresults(self):
+        return _beast.star_query_clear_kdresults(self)
 
     def kdcheck(self, idx, x, y, z, r, min_photons):
         return _beast.star_query_kdcheck(self, idx, x, y, z, r, min_photons)
@@ -319,8 +322,14 @@ class star_query(_object):
     def kdmask_uniform_density(self, min_stars_per_fov):
         return _beast.star_query_kdmask_uniform_density(self, min_stars_per_fov)
 
-    def reduce_stars(self):
-        return _beast.star_query_reduce_stars(self)
+    def from_kdmask(self):
+        return _beast.star_query_from_kdmask(self)
+
+    def from_kdresults(self):
+        return _beast.star_query_from_kdresults(self)
+
+    def _print(self, s):
+        return _beast.star_query__print(self, s)
 star_query_swigregister = _beast.star_query_swigregister
 star_query_swigregister(star_query)
 
@@ -346,6 +355,9 @@ class constellation(_object):
     __swig_getmethods__["idx"] = _beast.constellation_idx_get
     if _newclass:
         idx = _swig_property(_beast.constellation_idx_get, _beast.constellation_idx_set)
+
+    def _print(self, s):
+        return _beast.constellation__print(self, s)
 
     def __init__(self):
         this = _beast.new_constellation()
@@ -387,6 +399,9 @@ class constellation_pair(_object):
 
     def flip(self):
         return _beast.constellation_pair_flip(self)
+
+    def _print(self, s):
+        return _beast.constellation_pair__print(self, s)
 
     def __init__(self):
         this = _beast.new_constellation_pair()
@@ -469,8 +484,14 @@ class constellation_db(_object):
             self.this.append(this)
         except Exception:
             self.this = this
+
+    def constellation_img_init(self, s, n_brightest):
+        return _beast.constellation_db_constellation_img_init(self, s, n_brightest)
     __swig_destroy__ = _beast.delete_constellation_db
     __del__ = lambda self: None
+
+    def _print(self, s):
+        return _beast.constellation_db__print(self, s)
 constellation_db_swigregister = _beast.constellation_db_swigregister
 constellation_db_swigregister(constellation_db)
 
@@ -540,14 +561,10 @@ class match_result(_object):
     __swig_getmethods__["R33"] = _beast.match_result_R33_get
     if _newclass:
         R33 = _swig_property(_beast.match_result_R33_get, _beast.match_result_R33_set)
-    __swig_setmethods__["db_numstars"] = _beast.match_result_db_numstars_set
-    __swig_getmethods__["db_numstars"] = _beast.match_result_db_numstars_get
+    __swig_setmethods__["db_results_size"] = _beast.match_result_db_results_size_set
+    __swig_getmethods__["db_results_size"] = _beast.match_result_db_results_size_get
     if _newclass:
-        db_numstars = _swig_property(_beast.match_result_db_numstars_get, _beast.match_result_db_numstars_set)
-    __swig_setmethods__["db_nearstars"] = _beast.match_result_db_nearstars_set
-    __swig_getmethods__["db_nearstars"] = _beast.match_result_db_nearstars_get
-    if _newclass:
-        db_nearstars = _swig_property(_beast.match_result_db_nearstars_get, _beast.match_result_db_nearstars_set)
+        db_results_size = _swig_property(_beast.match_result_db_results_size_get, _beast.match_result_db_results_size_set)
 
     def __init__(self, db_, img_, img_mask_):
         this = _beast.new_match_result(db_, img_, img_mask_)
@@ -567,8 +584,11 @@ class match_result(_object):
     def related(self, m):
         return _beast.match_result_related(self, m)
 
-    def search(self, use_orig):
-        return _beast.match_result_search(self, use_orig)
+    def search(self):
+        return _beast.match_result_search(self)
+
+    def clear_search(self):
+        return _beast.match_result_clear_search(self)
 
     def compute_score(self):
         return _beast.match_result_compute_score(self)
@@ -588,6 +608,10 @@ class db_match(_object):
     __swig_getmethods__["p_match"] = _beast.db_match_p_match_get
     if _newclass:
         p_match = _swig_property(_beast.db_match_p_match_get, _beast.db_match_p_match_set)
+    __swig_setmethods__["p_match_rel"] = _beast.db_match_p_match_rel_set
+    __swig_getmethods__["p_match_rel"] = _beast.db_match_p_match_rel_get
+    if _newclass:
+        p_match_rel = _swig_property(_beast.db_match_p_match_rel_get, _beast.db_match_p_match_rel_set)
     __swig_setmethods__["map"] = _beast.db_match_map_set
     __swig_getmethods__["map"] = _beast.db_match_map_get
     if _newclass:
@@ -604,6 +628,9 @@ class db_match(_object):
     __swig_getmethods__["c_pairs_size"] = _beast.db_match_c_pairs_size_get
     if _newclass:
         c_pairs_size = _swig_property(_beast.db_match_c_pairs_size_get, _beast.db_match_c_pairs_size_set)
+
+    def find_winner(self, db, img, img_mask):
+        return _beast.db_match_find_winner(self, db, img, img_mask)
 
     def __init__(self, db, img):
         this = _beast.new_db_match(db, img)

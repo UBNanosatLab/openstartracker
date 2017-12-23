@@ -18,9 +18,7 @@ struct  match_result {
 	float R21,R22,R23;
 	float R31,R32,R33;
 	
-    star_db* db_stars;
-    star_query* db_results;
-	int db_numstars;
+	int db_results_size;
     
 	match_result(constellation_db *db_, constellation_db *img_, int32_t *img_mask_) {
 		db=db_;
@@ -29,7 +27,8 @@ struct  match_result {
 		map=(int32_t *)malloc(sizeof(int32_t)*img->stars->map_size);
 		match.totalscore=-FLT_MAX;
 		
-		set_orig(0);
+		if (db->stars->kdsorted==0) db_results_size = db->stars->map_size;
+		else  db_results_size = db->results->kdresults_size;
 	}
 	~match_result() {free(map);}
 	void init(constellation &db_const_, constellation &img_const_) {
@@ -60,36 +59,27 @@ struct  match_result {
 		if (match.totalscore==-FLT_MAX || m.totalscore==-FLT_MAX) return 0;
 		return (map[m.img_s1]==m.db_s1 && map[m.img_s2]==m.db_s2)?1:0;
 	}
-	void set_orig(int use_orig) {
-		if(use_orig==1) {
-			db_stars = db->orig_stars;
-			db_results = db->orig_results;
-		} else {
-			db_stars = db->stars;
-			db_results = db->results;
-		}
-		if (db_stars->kdsorted==0) db_numstars = db_stars->map_size;
-		else  db_numstars = db_results->kdresults_size;
-	}
 	void search() {
-		if (db_stars->kdsorted==1) {
-			db_results->kdsearch(R11,R12,R13,MAXFOV_D2,BRIGHT_THRESH);
-			db_numstars = db_results->kdresults_size;
+		if (db->stars->kdsorted==1) {
+			db->results->kdsearch(R11,R12,R13,MAXFOV_D2,BRIGHT_THRESH);
+			db_results_size = db->results->kdresults_size;
 		}
+	}
+	void clear_search() {
+		if (db->stars->kdsorted==1) db->results->clear_kdresults();
 	}
 	void compute_score() {
 		//TODO: figure out where 2*img->stars->map_size came from
 		match.totalscore=log(EXPECTED_FALSE_STARS/(IMG_X*IMG_Y))*(2*img->stars->map_size);
-		
 		float* scores=(float *)malloc(sizeof(float)*img->stars->map_size);
 		int img_map_sz=img->stars->map_size;
 		for (int i=0;i<img_map_sz;i++) {
 			map[i]=-1;
 			scores[i]=0.0;
 		}
-		for(int32_t i=0;i<db_numstars;i++) {
-			int32_t o=db_results->kdresults[i];
-			star *s=&(db_stars->map[o]);
+		for(int32_t i=0;i<db_results_size;i++) {
+			int32_t o=db->results->kdresults[i];
+			star *s=&(db->stars->map[o]);
 			float x=s->x*R11+s->y*R12+s->z*R13;
 			float y=s->x*R21+s->y*R22+s->z*R23;
 			float z=s->x*R31+s->y*R32+s->z*R33;
@@ -105,7 +95,7 @@ struct  match_result {
 			else if (ny==IMG_Y) ny--;
 			if (nx>=0&&nx<IMG_X&&ny>=0&&ny<IMG_Y) n=img_mask[nx+ny*IMG_X];
 			if (n!=-1) {
-				float sigma_sq=img->stars->map[n].sigma_sq+db_stars->max_variance;
+				float sigma_sq=img->stars->map[n].sigma_sq+db->stars->max_variance;
 				float maxdist_sq=-sigma_sq*(log(sigma_sq)+MATCH_VALUE);
 				float a=(px-img->stars->map[n].px);
 				float b=(py-img->stars->map[n].py);
@@ -116,7 +106,6 @@ struct  match_result {
 				}
 			}
 		}
-		db_results->undo_kdsearch();
 		for(int n=0;n<img->stars->map_size;n++) {
 			match.totalscore+=scores[n];
 		}
@@ -133,8 +122,8 @@ struct  match_result {
 	/* we can perform >250 MFLOPS with doubles, and >500 MFLOPS with floats */
 	
 	void weighted_triad() {
-		star db_s1=db_stars->map[match.db_s1];
-		star db_s2=db_stars->map[match.db_s2];
+		star db_s1=db->stars->map[match.db_s1];
+		star db_s2=db->stars->map[match.db_s2];
 		star img_s1=img->stars->map[match.img_s1];
 		star img_s2=img->stars->map[match.img_s2];
 		
@@ -251,10 +240,10 @@ struct  match_result {
 
 struct db_match {
 	float p_match;
+	float p_match_rel;
 	int32_t *map; /* Usage: map[imgstar.staridx]=dbstar.id */
 	
 	match_result *winner;
-	
 	constellation_pair *c_pairs;
 	int c_pairs_size;
 	
@@ -267,19 +256,24 @@ struct db_match {
 		} else c_pairs[c_pairs_size++]=m->match;
 		
 	void find_winner(constellation_db *db, constellation_db *img, int32_t *img_mask) {
+		//TODO: this should be an object? pairs_db?
+		free(c_pairs);
+		c_pairs=NULL;
+		c_pairs_size=0;
 		match_result *m=new match_result(db, img, img_mask);
 		winner=new match_result(db, img, img_mask);
+
 		for (int n=0;n<img->map_size;n++) {
 			constellation lb=img->map[n];
 			constellation ub=img->map[n];
+			
 			lb.p-=POS_ERR_SIGMA*PIXSCALE*sqrt(img->stars->map[lb.s1].sigma_sq+img->stars->map[lb.s2].sigma_sq+2*db->stars->max_variance);
 			ub.p+=POS_ERR_SIGMA*PIXSCALE*sqrt(img->stars->map[ub.s1].sigma_sq+img->stars->map[ub.s2].sigma_sq+2*db->stars->max_variance);
 			constellation *lower=std::lower_bound (db->map, db->map+db->map_size, lb,constellation_lt_p);	
 			constellation *upper=std::upper_bound (db->map, db->map+db->map_size, ub,constellation_lt_p);
-			//nothing found
-			if (upper==db->map) continue;
-			//rewind by one
-			upper--;
+			//rewind upper & do sanity checks
+			if (!(db->map<upper--)) continue;
+			if (!(db->map+db->map_size>lower)) continue;
 			if (lower->idx<=upper->idx) {
 				c_pairs=(struct constellation_pair*)realloc(c_pairs,sizeof(struct constellation_pair)*(c_pairs_size+(upper->idx-lower->idx+1)*2));
 			}
@@ -292,45 +286,81 @@ struct db_match {
 				m->match.flip();
 				m->weighted_triad();
 				ADD_SCORE
+				m->clear_search();
 			}
 		}
 		delete m;
 	}
-	
+
+	#define CHECK_NOMATCH\
+		if (winner->match.totalscore==-FLT_MAX) {\
+			p_match=0.0;\
+			p_match_rel=0.0;\
+			goto NOMATCH;\
+		}
+		
 	db_match(constellation_db *db, constellation_db *img) {
 		c_pairs=NULL;
-		c_pairs_size=0;
-
 		/* Do we have enough stars? */
 		if (db->stars->map_size<2||img->stars->map_size<2) return;
 		int32_t *img_mask = img->stars->get_img_mask(db->stars->max_variance);
-		
 		find_winner(db, img, img_mask);
-		
+		CHECK_NOMATCH
 		//calculate p_match
 		p_match=1.0;
 		for (int idx=0; idx<c_pairs_size;idx++) {
-			if (!winner->related(c_pairs[idx]))
+			if (!winner->related(c_pairs[idx])){
 				p_match+=exp(c_pairs[idx].totalscore-winner->match.totalscore);
+			}
 		}
+		
 		p_match=1.0/p_match;
+		
+		//
+		//create a new db of just the matching stars from the original list
+		//also has the nice effect of testing relative matching
+		star_db* rel_s;
+		constellation_db* rel_c;
+		rel_s=NULL;
+		rel_c=NULL;
+		if (db->stars->kdsorted==1) {
+			db->orig_results->kdsearch(winner->R11,winner->R12,winner->R13,MAXFOV_D2,BRIGHT_THRESH);
+			star_db* rel_s = db->orig_results->from_kdresults();
+			db->orig_results->clear_kdresults();
+			
+			//(ab)use the reduced starlist to figure out a good value for n_brightest
+			db->results->kdsearch(winner->R11,winner->R12,winner->R13,MAXFOV_D2,BRIGHT_THRESH);
+			int n_brightest=db->results->kdresults_size;
+			db->results->clear_kdresults();
+			
+			constellation_db*rel_c = new constellation_db(rel_s,n_brightest);
+			delete winner;
+			find_winner(rel_c,img,img_mask);
+		}
+		//TODO: ew, so much redundant code
+		p_match_rel=1.0;
+		for (int idx=0; idx<c_pairs_size;idx++) {
+			if (!winner->related(c_pairs[idx])){
+				p_match_rel+=exp(c_pairs[idx].totalscore-winner->match.totalscore);
+			}
+		}
+		p_match_rel=1.0/p_match_rel;
+		CHECK_NOMATCH
 
 		//calculate map
 		map=(int32_t *)malloc(sizeof(int32_t)*img->stars->map_size);
 		for (int i=0;i<img->stars->map_size;i++) map[i]=-1;
-		
-		winner->set_orig(1);
-		winner->search();
-		winner->compute_score();
 		for(int n=0;n<img->stars->map_size;n++) {
 			//catalog matching
 			int o=winner->map[n];
 			if (o!=-1) {
 				int img_star_idx=img->stars->map[n].star_idx;
-				int db_star_id=winner->db_stars->map[o].id;
+				int db_star_id=winner->db->stars->map[o].id;
 				map[img_star_idx]=db_star_id;
 			}
 		}
+		NOMATCH:
+		delete rel_c;
 		free(img_mask);
 	}
 	
