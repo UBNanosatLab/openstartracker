@@ -53,94 +53,70 @@ struct constellation_db {
 	int map_size;
 	constellation* map;
 	
-	star_db* orig_stars;
-	star_query* orig_results;
 	star_db* stars;
 	star_query* results;
 		
-	//If no star list is provided, load from catalog
-	constellation_db() {
-
-		orig_stars=new star_db;
-		orig_stars->load_catalog();
-		
-		orig_results=new star_query(orig_stars);
-		orig_results->kdmask_filter_catalog();
-		orig_results->kdmask_uniform_density(REQUIRED_STARS);
-		stars=orig_results->from_kdmask();
-		results=new star_query(stars);
-		orig_results->reset_kdmask();
-		
-		results->kdmask_uniform_density(2+DB_REDUNDANCY);
-		int nmask=0;
-		for (int i=0;i<stars->map_size;i++) if (results->kdmask[i]==0) nmask++;
-		std::set<constellation,constellation_lt> c_set;
-		for (int i=0;i<stars->map_size;i++) if (results->kdmask[i]==0) {
-			results->kdsearch(stars->map[i].x,stars->map[i].y,stars->map[i].z,MAXFOV_D2*2,BRIGHT_THRESH);
-			constellation c;
-			for (int j=0;j<results->kdresults_size;j++) if (i!=results->kdresults[j] && stars->map[i].photons>=stars->map[results->kdresults[j]].photons){
-				c.p=stars->map[i].dist_arcsec(stars->map[results->kdresults[j]]);
-				c.s1=i;
-				c.s2=results->kdresults[j];
-				c_set.insert(c);
-			}
-			results->clear_kdresults();
-		}
-		results->reset_kdmask();
-		//preallocate map
-		map_size=c_set.size();
-		map=(constellation*)malloc(map_size*sizeof(map[0]));
-		std::set<constellation>::iterator it = c_set.begin();
-		for (int idx=0; idx<map_size;idx++,it++) {
-			map[idx]=*it;
-			map[idx].idx=idx;
-		}
-		
-	}
-	constellation_db(star_db *s) {constellation_img_init(s,MAX_FALSE_STARS+2);}
-	constellation_db(star_db *s, int n_brightest) {constellation_img_init(s,n_brightest);}
-	//Otherwise, this is an image
-	void constellation_img_init(star_db *s,int n_brightest) {
+	constellation_db(star_db *s,int stars_per_fov, int from_image) {
 		stars=s;
 		results=new star_query(s);
-		orig_stars=NULL;
-		orig_results=NULL;
-		
-		std::sort(stars->map, stars->map+stars->map_size,star_gt_photons);
-		int ns=stars->map_size;/* number of stars to check */
-		if (ns>n_brightest) ns=n_brightest;
-		
-		stars=stars;
-		map_size=ns*(ns-1)/2;
-		map=(constellation*)malloc(map_size*sizeof(map[0]));
-		
-		int idx=0;
-		for (int j=1;j<ns;j++) for (int i=0;i<j;i++,idx++) {
-			map[idx].p=stars->map[i].dist_arcsec(stars->map[j]);
-			map[idx].s1=i;
-			map[idx].s2=j;
+
+		if (from_image) {
+			map=NULL;
+			std::sort(stars->map, stars->map+stars->map_size,star_gt_photons);
+			int ns=stars->map_size;/* number of stars to check */
+			if (ns>stars_per_fov) ns=stars_per_fov;//MAX_FALSE_STARS+2
+			
+			stars=stars;
+			map_size=ns*(ns-1)/2;
+			map=(constellation*)malloc(map_size*sizeof(map[0]));
+			
+			int idx=0;
+			for (int j=1;j<ns;j++) for (int i=0;i<j;i++,idx++) {
+				map[idx].p=stars->map[i].dist_arcsec(stars->map[j]);
+				map[idx].s1=i;
+				map[idx].s2=j;
+			}
+			std::sort(map, map+map_size,constellation_lt_p);
+			while (--idx>=0) map[idx].idx=idx;
+		} else {
+			results->kdmask_uniform_density(stars_per_fov);//2+DB_REDUNDANCY
+			std::set<constellation,constellation_lt> c_set;
+			for (int i=0;i<stars->map_size;i++) if (results->kdmask[i]==0) {
+				results->kdsearch(stars->map[i].x,stars->map[i].y,stars->map[i].z,MAXFOV,BRIGHT_THRESH);
+				constellation c;
+				for (int j=0;j<results->kdresults_size;j++) if (i!=results->kdresults[j] && stars->map[i].photons>=stars->map[results->kdresults[j]].photons){
+					c.p=stars->map[i].dist_arcsec(stars->map[results->kdresults[j]]);
+					c.s1=i;
+					c.s2=results->kdresults[j];
+					c_set.insert(c);
+				}
+				results->clear_kdresults();
+			}
+			results->reset_kdmask();
+			//preallocate map
+			map_size=c_set.size();
+			map=(constellation*)malloc(map_size*sizeof(map[0]));
+			std::set<constellation>::iterator it = c_set.begin();
+			for (int idx=0; idx<map_size;idx++,it++) {
+				map[idx]=*it;
+				map[idx].idx=idx;
+			}
 		}
-		std::sort(map, map+map_size,constellation_lt_p);
-		while (--idx>=0) map[idx].idx=idx;
 	}
 	~constellation_db() {
 		free(map);
 		delete results;
 		delete stars;
-		delete orig_results;
-		delete orig_stars;
 	}
 	void _print(const char *s) {
 		DBG_PRINT("%s\n",s);
+		stars->_print("STARS");
 		results->_print("RESULTS");
-		if (orig_results!=NULL) {
-			orig_results->_print("ORIG_RESULTS");
+		for (int i=0; i<map_size; i++) {
+			DBG_PRINT("%d:\t",i);
+			map[i]._print("C");
 		}
-		map[0]._print("CONSTELLATION");
-		DBG_PRINT(".\n%d total\n.\n",map_size);
-		map[map_size-1]._print("CONSTELLATION");
 	}
-
 };
 
 #endif

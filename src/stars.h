@@ -366,7 +366,7 @@ struct star_query {
 		int kdresults_maxsize_old=kdresults_maxsize;//TODO: eliminate this variable once restructured?
 		kdresults_maxsize=min_stars_per_fov;
 		for (int i=0;i<stars->map_size;i++) if (kdmask[i]==0) {
-			kdsearch(stars->map[i].x,stars->map[i].y,stars->map[i].z,MINFOV_D2,BRIGHT_THRESH);
+			kdsearch(stars->map[i].x,stars->map[i].y,stars->map[i].z,MINFOV/2,BRIGHT_THRESH);
 			for (int j=0;j<kdresults_size;j++) uniform_set.insert(kdresults[j]);
 			clear_kdresults();
 		}

@@ -10,22 +10,22 @@
 #define PI		   3.14159265358979323846  /* pi */
 #define TWOPI		6.28318530717958647693
 
-int DEBUG_ENABLE;
-#define DBG_PRINT(format,args...) if (DEBUG_ENABLE==1) fprintf(stderr,format, ## args);
+int DBG_ENABLE;
+#define DBG_PRINT(format,args...) if (DBG_ENABLE==1) fprintf(stderr,format, ## args);
 
 int IMG_X,IMG_Y,MAX_FALSE_STARS,DB_REDUNDANCY,REQUIRED_STARS;
 float DEG_X,DEG_Y,PIXX_TANGENT,PIXY_TANGENT,DOUBLE_STAR_PX;
 float PIXSCALE,POS_ERR_SIGMA,POS_VARIANCE;
 float IMAGE_VARIANCE,EXPECTED_FALSE_STARS,MATCH_VALUE;
 float PHOTONS,BRIGHT_THRESH;
-float MAXFOV_D2,MINFOV_D2;
+float MAXFOV,MINFOV;
 
 
 int ENV_VARS_SIZE;
 char** ENV_VARS; //keep track of these so that valgrind is happy
 
 void load_config(const char *filename) {
-	DEBUG_ENABLE=0;
+	DBG_ENABLE=0;
 	ENV_VARS_SIZE=0;
 	ENV_VARS=NULL;
 	//move calibration.txt to constellation_db
@@ -50,8 +50,8 @@ void load_config(const char *filename) {
 	IMG_Y=atoi(getenv("IMG_Y"));
 	DEG_X=atof(getenv("DEG_X"));
 	DEG_Y=atof(getenv("DEG_Y"));
-	MAXFOV_D2=3600*sqrt(DEG_X*DEG_X+DEG_Y*DEG_Y)/2;
-	MINFOV_D2=3600*DEG_Y/2;
+	MAXFOV=3600*sqrt(DEG_X*DEG_X+DEG_Y*DEG_Y);
+	MINFOV=3600*DEG_Y;
 	POS_ERR_SIGMA=atof(getenv("POS_ERR_SIGMA"));
 	PIXSCALE=atof(getenv("PIXSCALE"));
 	POS_VARIANCE=atof(getenv("POS_VARIANCE"));/* sigma_r^2 */

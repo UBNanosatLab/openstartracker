@@ -461,14 +461,6 @@ class constellation_db(_object):
     __swig_getmethods__["map"] = _beast.constellation_db_map_get
     if _newclass:
         map = _swig_property(_beast.constellation_db_map_get, _beast.constellation_db_map_set)
-    __swig_setmethods__["orig_stars"] = _beast.constellation_db_orig_stars_set
-    __swig_getmethods__["orig_stars"] = _beast.constellation_db_orig_stars_get
-    if _newclass:
-        orig_stars = _swig_property(_beast.constellation_db_orig_stars_get, _beast.constellation_db_orig_stars_set)
-    __swig_setmethods__["orig_results"] = _beast.constellation_db_orig_results_set
-    __swig_getmethods__["orig_results"] = _beast.constellation_db_orig_results_get
-    if _newclass:
-        orig_results = _swig_property(_beast.constellation_db_orig_results_get, _beast.constellation_db_orig_results_set)
     __swig_setmethods__["stars"] = _beast.constellation_db_stars_set
     __swig_getmethods__["stars"] = _beast.constellation_db_stars_get
     if _newclass:
@@ -478,15 +470,12 @@ class constellation_db(_object):
     if _newclass:
         results = _swig_property(_beast.constellation_db_results_get, _beast.constellation_db_results_set)
 
-    def __init__(self, *args):
-        this = _beast.new_constellation_db(*args)
+    def __init__(self, s, stars_per_fov, from_image):
+        this = _beast.new_constellation_db(s, stars_per_fov, from_image)
         try:
             self.this.append(this)
         except Exception:
             self.this = this
-
-    def constellation_img_init(self, s, n_brightest):
-        return _beast.constellation_db_constellation_img_init(self, s, n_brightest)
     __swig_destroy__ = _beast.delete_constellation_db
     __del__ = lambda self: None
 
@@ -595,6 +584,9 @@ class match_result(_object):
 
     def weighted_triad(self):
         return _beast.match_result_weighted_triad(self)
+
+    def _print(self, s):
+        return _beast.match_result__print(self, s)
 match_result_swigregister = _beast.match_result_swigregister
 match_result_swigregister(match_result)
 
@@ -608,10 +600,6 @@ class db_match(_object):
     __swig_getmethods__["p_match"] = _beast.db_match_p_match_get
     if _newclass:
         p_match = _swig_property(_beast.db_match_p_match_get, _beast.db_match_p_match_set)
-    __swig_setmethods__["p_match_rel"] = _beast.db_match_p_match_rel_set
-    __swig_getmethods__["p_match_rel"] = _beast.db_match_p_match_rel_get
-    if _newclass:
-        p_match_rel = _swig_property(_beast.db_match_p_match_rel_get, _beast.db_match_p_match_rel_set)
     __swig_setmethods__["map"] = _beast.db_match_map_set
     __swig_getmethods__["map"] = _beast.db_match_map_get
     if _newclass:
@@ -628,9 +616,13 @@ class db_match(_object):
     __swig_getmethods__["c_pairs_size"] = _beast.db_match_c_pairs_size_get
     if _newclass:
         c_pairs_size = _swig_property(_beast.db_match_c_pairs_size_get, _beast.db_match_c_pairs_size_set)
+    __swig_setmethods__["img_mask"] = _beast.db_match_img_mask_set
+    __swig_getmethods__["img_mask"] = _beast.db_match_img_mask_get
+    if _newclass:
+        img_mask = _swig_property(_beast.db_match_img_mask_get, _beast.db_match_img_mask_set)
 
-    def find_winner(self, db, img, img_mask):
-        return _beast.db_match_find_winner(self, db, img, img_mask)
+    def set_map(self, db, img):
+        return _beast.db_match_set_map(self, db, img)
 
     def __init__(self, db, img):
         this = _beast.new_db_match(db, img)

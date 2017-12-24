@@ -8,7 +8,7 @@ res_x = 1392 # pixels
 res_y = 1080 # pixels
 
 # normalized focal length
-f = 0.5 / np.tan(np.deg2rad(6) / 2)
+f = 0.5 / np.tan(np.deg2rad(6*4) / 2)
 # pixel aspect ratio
 pixel_ar = 1
 
@@ -25,18 +25,18 @@ A_pixel = 525 # photonelectrons/s mm
 sigma_pixel = 525 # photonelectrons/s mm
 
 sigma_psf = 0.5 # pixel
-t_exp = 0.05 # s
+t_exp = 0.01 # s
 aperture = 60.7 # mm
 
 base_photons = 19100 # photoelectrons per mm^2 and second of a magnitude 0 G2 star
 
-magnitude_gaussian = 0.01 # mag
+magnitude_gaussian = 0.02 # mag
 # star count
 
 min_true = 0
 max_true = 100
 min_false = 0
-max_false = 10
+max_false = 5
 
 CALIBRATION_FILE=sys.argv[1]
 

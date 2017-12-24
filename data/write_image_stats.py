@@ -13,13 +13,8 @@ EXPECTED_FALSE_STARS=(min_false+max_false)/2.0 # assume uniform distribution
 PSF_RADIUS=sigma_psf
 PHOTONS=base_photons * t_exp * np.pi * aperture ** 2  #photons recieved from a mag 0 star
 BRIGHT_THRESH=A_pixel+5*sigma_pixel/(math.erf((2*PSF_RADIUS)**-0.5)**2/4)
-MIN_MAG=-2.5*math.log10(BRIGHT_THRESH/PHOTONS)+.6 #fudge it
-BRIGHT_THRESH=PHOTONS*10**(MIN_MAG/-2.5)
 
-
-#IMAGE_VARIANCE=sigma_pixel
-IMAGE_VARIANCE=0
-POS_ERR_SIGMA=2
+IMAGE_VARIANCE=BRIGHT_THRESH
 POS_VARIANCE=(gaussian_noise_sigma*180*3600/(np.pi*PIXSCALE))**2
 #TODO: image variance set to zero for contest
 #Don't factor image variance into estimate of star position error
@@ -39,8 +34,7 @@ f_calib.write("EXPECTED_FALSE_STARS="+str(EXPECTED_FALSE_STARS)+"\n")
 f_calib.write("PSF_RADIUS="+str(PSF_RADIUS)+"\n")
 f_calib.write("PHOTONS="+str(PHOTONS)+"\n")
 f_calib.write("BRIGHT_THRESH="+str(BRIGHT_THRESH)+"\n")
-f_calib.write("MIN_MAG="+str(MIN_MAG)+"\n")
 f_calib.write("IMAGE_VARIANCE="+str(IMAGE_VARIANCE)+"\n")
-f_calib.write("POS_ERR_SIGMA="+str(POS_ERR_SIGMA)+"\n")
+f_calib.write("POS_ERR_SIGMA=2\n")
 f_calib.write("POS_VARIANCE="+str(POS_VARIANCE)+"\n")
 f_calib.close()

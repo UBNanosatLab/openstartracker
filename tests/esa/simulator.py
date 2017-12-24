@@ -487,7 +487,6 @@ class Scene:
         self.pos = None
         self.ids = None
         self.magnitude_threshold = detector.compute_magnitude_threshold()
-        print(self.magnitude_threshold)
     def compute(self, orientation=None):
         """Generates a scene for the star tracker.
         If not orientation is given a random one is generated.
