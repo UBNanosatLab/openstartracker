@@ -8,7 +8,7 @@ struct constellation {
 	int32_t s1;
 	int32_t s2;
 	int32_t idx;
-	void _print(const char *s) {
+	void DBG_(const char *s) {
 		DBG_PRINT("%s\t",s);
 		DBG_PRINT("p=%f ",p);
 		DBG_PRINT("s1=%d ",s1);
@@ -27,7 +27,7 @@ struct  constellation_pair {
 		img_s1=img_s2;
 		img_s2=t;
 	}
-	void _print(const char *s) {
+	void DBG_(const char *s) {
 		DBG_PRINT("%s\t",s);
 		DBG_PRINT("totalscore=%f ",totalscore);
 		DBG_PRINT("db_s1=%d ",db_s1);
@@ -108,13 +108,13 @@ struct constellation_db {
 		delete results;
 		delete stars;
 	}
-	void _print(const char *s) {
+	void DBG_(const char *s) {
 		DBG_PRINT("%s\n",s);
-		stars->_print("STARS");
-		results->_print("RESULTS");
+		stars->DBG_("STARS");
+		results->DBG_("RESULTS");
 		for (int i=0; i<map_size; i++) {
 			DBG_PRINT("%d:\t",i);
-			map[i]._print("C");
+			map[i].DBG_("C");
 		}
 	}
 };

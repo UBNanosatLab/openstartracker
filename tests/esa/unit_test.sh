@@ -33,7 +33,7 @@ elif [ "$TESTDIR" == "fixed_glados" ] ; then
 	python score.py $TESTDIR/result.csv $TESTDIR/result_real.csv
 elif [ "$TESTDIR" == "random_glados" ] ; then
 	make &&
-	#time python3 $TESTDIR/image_stats.py $TESTDIR/calibration.txt $TESTDIR/input.csv $TESTDIR/result.csv&&
+	time python3 $TESTDIR/image_stats.py $TESTDIR/calibration.txt $TESTDIR/input.csv $TESTDIR/result.csv&&
 	time $TESTCMD $TESTDIR/input.csv $TESTDIR/calibration.txt | tee $TESTDIR/result_real.csv &&
 	echo "camera coverage simulation percent:" &&
 	echo "100-`diff --suppress-common-lines --speed-large-files -y $TESTDIR/result.csv $TESTDIR/result_real.csv | wc -l`/1" | bc -l &&

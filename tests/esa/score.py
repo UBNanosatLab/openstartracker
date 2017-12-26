@@ -1,12 +1,12 @@
 import sys
-stars=open("catalog.dat","r").readlines()
+stars=open("hip_main.dat","r").readlines()
 result=open(sys.argv[1],"r").readlines()
 result_real=open(sys.argv[2],"r").readlines()
 assert len(result)==len(result_real)
 
 stardict={}
 for i in range(0,len(stars)):
-	stardict[int(stars[i].split()[0])]=i
+	stardict[int(stars[i].split("|")[1])]=i
 
 scores=[]
 for i in range(0,len(result)):

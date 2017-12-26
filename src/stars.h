@@ -27,7 +27,7 @@ struct star {
 		float c=y*s.z - s.y*z;
 		return (3600*180.0/PI)*asin(sqrt(a*a+b*b+c*c));
 	}
-	void _print(const char *s) {
+	void DBG_(const char *s) {
 		DBG_PRINT("%s\t",s);
 		DBG_PRINT("x=%f ", x);
 		DBG_PRINT("y=%f ", y);
@@ -99,8 +99,8 @@ struct star_db {
 	}
 	
 	//TODO: should be part of config struct
-	void load_catalog() {
-		FILE *stream = fopen("catalog.dat", "r");
+	void load_catalog(const char* catalog, float year) {
+		FILE *stream = fopen(catalog, "r");
 		if (stream == NULL) exit(EXIT_FAILURE);
 		map_size=0;
 		while(!feof(stream)) if(fgetc(stream) == '\n') map_size++;
@@ -112,17 +112,25 @@ struct star_db {
 		char *line = NULL;
 		size_t len = 0;
 		
+		char* hip_record[78];
 		for(int i=0;i<map_size;i++){
 			if ((read = getline(&line, &len, stream)) != -1) {
-				map[i].id=atoi(strtok(line," "));
+				float yeardiff=year-1991.25;
+				hip_record[0]=strtok(line,"|");
+				for (int j=1;j<sizeof(hip_record)/sizeof(hip_record[0]);j++) hip_record[j] = strtok(NULL,"|");
+			
+				map[i].id=atoi(hip_record[1]);
 				map[i].star_idx=i;
-				float mag=atof(strtok(NULL," "));
-				map[i].photons=PHOTONS*powf(10.0,-mag/2.5);
+				float MAG=atof(hip_record[5]);
+				map[i].photons=PHOTONS*powf(10.0,-MAG/2.5);
 				
-				map[i].x=atof(strtok(NULL," "));
-				map[i].y=atof(strtok(NULL," "));
-				map[i].z=atof(strtok(NULL," "));
-				map[i].unreliable=atoi(strtok(NULL," "));
+				float DEC=yeardiff*atof(hip_record[13])/3600000.0 + atof(hip_record[9]);
+				float cosdec=cos(PI*DEC/180.0);
+				float RA=yeardiff*atof(hip_record[12])/(cosdec*3600000.0) + atof(hip_record[8]);
+				map[i].x=cos(PI*RA/180.0)*cosdec;
+				map[i].y=sin(PI*RA/180.0)*cosdec;
+				map[i].z=sin(PI*DEC/180.0);
+				map[i].unreliable=(atoi(hip_record[29])==0||atoi(hip_record[29])==1&&atoi(hip_record[6])!=3)?0:1;
 				map[i].px=map[i].y/(map[i].x*PIXX_TANGENT);
 				map[i].py=map[i].z/(map[i].x*PIXY_TANGENT);
 				map[i].sigma_sq=POS_VARIANCE;
@@ -185,7 +193,7 @@ struct star_db {
 		}
 		return img_mask;
 	}
-	void _print(const char *s) {
+	void DBG_(const char *s) {
 		DBG_PRINT("%s\n",s);
 		DBG_PRINT("star_db at %lu contains %d elements\n",(unsigned long)this,map_size);
 		DBG_PRINT("stars at %lu\n",(unsigned long)map);
@@ -193,7 +201,7 @@ struct star_db {
 		DBG_PRINT("kdsorted=%d\n",kdsorted);
 		for (int i=0; i<map_size; i++) {
 			DBG_PRINT("%d:\t",i);
-			map[i]._print("star");
+			map[i].DBG_("star");
 		}
 	}
 };
@@ -407,7 +415,7 @@ struct star_query {
 		return rd;
 	}
 	
-	void _print(const char *s) {
+	void DBG_(const char *s) {
 		DBG_PRINT("%s\n",s);
 		DBG_PRINT("kdmask at %lu\n",(unsigned long)kdmask);
 		DBG_PRINT("kdresults at %lu\n",(unsigned long)kdresults);
@@ -418,12 +426,12 @@ struct star_query {
 			int i=0;
 			DBG_PRINT("kdmask[%d]=%d\n",i,kdmask[i]);
 			DBG_PRINT("kdresults[%d]=%d\n",i,kdresults[i]);
-			stars->map[kdresults[i]]._print("STARS");
+			stars->map[kdresults[i]].DBG_("STARS");
 			DBG_PRINT(".\n.\n");
 			i=kdresults_size-1;
 			DBG_PRINT("kdmask[%d]=%d\n",i,kdmask[i]);
 			DBG_PRINT("kdresults[%d]=%d\n",i,kdresults[i]);
-			stars->map[kdresults[i]]._print("STARS");
+			stars->map[kdresults[i]].DBG_("STARS");
 		}
 	}
 };

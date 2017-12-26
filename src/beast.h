@@ -229,13 +229,13 @@ struct  match_result {
 		R32=cy*sx;
 		R33=cx*cy;
 	}
-	void _print(const char *s) {
+	void DBG_(const char *s) {
 		DBG_PRINT("%s\n",s);
 		DBG_PRINT("%f\t%f\t%f\n", R11,R12,R13);
 		DBG_PRINT("%f\t%f\t%f\n", R21,R22,R23);
 		DBG_PRINT("%f\t%f\t%f\n", R31,R32,R33);
-		db->_print("DB");
-		img->_print("IMG");
+		db->DBG_("DB");
+		img->DBG_("IMG");
 		DBG_PRINT("db_results_size=%d\n", db_results_size);
 		DBG_PRINT("img->stars->map_size=%d\n", img->stars->map_size);
 		for (int i=0; i<img->stars->map_size; i++) {

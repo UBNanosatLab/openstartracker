@@ -95,7 +95,7 @@ int main(int argc, char* argv[])
 	
 	load_config(argv[2]);
 	S_DB=new star_db;
-	S_DB->load_catalog();
+	S_DB->load_catalog("hip_main.dat",1991.25);
 	
 	S_RESULTS=new star_query(S_DB);
 	S_RESULTS->kdmask_filter_catalog();
