@@ -157,71 +157,34 @@ struct star_db {
 struct star_fov {
 	star_db *stars;
 	int *mask;
-	int *collision;
-	int collision_size;
-	
-	float db_max_variance;
-	
-	#define CALC_MAXDIST_SQ(id)\
-		sigma_sq=stars->max_variance+db_max_variance;\
-		maxdist_sq=-sigma_sq*(log(sigma_sq)+MATCH_VALUE);
-
-
-	float get_score(int id,float px,float py) {
-		float sigma_sq,maxdist_sq;
-		CALC_MAXDIST_SQ(id);
-		px-=stars->map[id].px;
-		py-=stars->map[id].py;
-		if (px<-0.5) px+=1.0;/* use whichever corner of the pixel gives the best score */
-		if (py<-0.5) py+=1.0;
-		return (maxdist_sq-(px*px+py*py))/(2*sigma_sq);
-		//return get_score(id, px, py, sigma_sq, maxdist_sq);
-	}
-			
-	float get_score(int id,float px,float py,float sigma_sq,float maxdist_sq) {
-		px-=stars->map[id].px;
-		py-=stars->map[id].py;
-		if (px<-0.5) px+=1.0;/* use whichever corner of the pixel gives the best score */
-		if (py<-0.5) py+=1.0;
-		return (maxdist_sq-(px*px+py*py))/(2*sigma_sq);
-	}
-	
-	//Used to resolve collisions where a star falls into the region of overlap.
-	//Adds a bit of complexity in exchange for being able to break ties at
-	//the subpixel level, which can sometimes make a difference 
-	int resolve_id(int id,float px,float py) {
-		if (id>=-1) return id;
-		//Any id <-1 is interpreted as an index in the collision buffer (starts at -2)
-		id=-id;
-		int id1=resolve_id(collision[id-2],px,py);
-		int id2=resolve_id(collision[id-1],px,py);
-		return (get_score(id1,px,py)>get_score(id2,px,py))?id1:id2;
-	}
-	star_fov(star_db* s, float db_max_variance_) {
-		db_max_variance=db_max_variance_;
-		stars=s;
-		collision=NULL;
-		collision_size=0;
+	int *overflow;
+	int overflow_size;
+	star_fov(star_db* s, float db_max_variance) {
+		overflow=NULL;
+		overflow_size=0;
 		mask=(int*)malloc(IMG_X*IMG_Y*sizeof(mask[0]));
 		memset(mask, -1, IMG_X*IMG_Y*sizeof(mask[0]));
 		/* generate image mask */
-		for (int id=0;id<stars->map_size;id++){
+		for (int id=0;id<s->map_size;id++){
 			/* assume the dimmest possible star since we dont know the brightness of the other image */
-			float sigma_sq,maxdist_sq;
-			CALC_MAXDIST_SQ(id);
+			float sigma_sq=s->map[id].sigma_sq+db_max_variance;
+			float maxdist_sq=-sigma_sq*(log(sigma_sq)+MATCH_VALUE);
 			float maxdist=sqrt(maxdist_sq);
-			int xmin=stars->map[id].px-maxdist-1;
-			int xmax=stars->map[id].px+maxdist+1;
-			int ymin=stars->map[id].py-maxdist-1;
-			int ymax=stars->map[id].py+maxdist+1;
+			int xmin=s->map[id].px-maxdist-1;
+			int xmax=s->map[id].px+maxdist+1;
+			int ymin=s->map[id].py-maxdist-1;
+			int ymax=s->map[id].py+maxdist+1;
 			
 			if(xmax>IMG_X/2) xmax=IMG_X/2;
 			if(xmin<-IMG_X/2)xmin=-IMG_X/2;
 			if(ymax>IMG_Y/2) ymax=IMG_Y/2;
 			if(ymin<-IMG_Y/2)ymin=-IMG_Y/2;
 			for(int i=xmin;i<xmax;i++) for (int j=ymin;j<ymax;j++) {
-
-				float score=get_score(id, i,j, sigma_sq, maxdist_sq);
+				float a=((float)i-s->map[id].px);
+				if (a<-0.5) a+=1.0;/* use whichever corner of the pixel gives the best score */
+				float b=((float)j-s->map[id].py);
+				if (b<-0.5) b+=1.0;
+				float score=(maxdist_sq-(a*a+b*b))/(2*sigma_sq);
 				
 				int x=i+IMG_X/2;
 				int y=j+IMG_Y/2;
@@ -230,13 +193,20 @@ struct star_fov {
 					/* has this pixel already been assigned to a different star? */
 					int id2=mask[x+y*IMG_X];
 					if (id2!=-1){
-						//Uncomment for simpler way of finding collision winner
-						//mask[x+y*IMG_X]=(score>get_score(id2,i,j))?id:id2;
-						collision_size+=2;
-						mask[x+y*IMG_X]=-collision_size;
-						collision=(int*)realloc(collision,collision_size*sizeof(collision[0]));
-						collision[collision_size-2]=id;
-						collision[collision_size-1]=id2;
+						//TODO:
+						mask[x+y*IMG_X]=-1;
+						//float sigma_sq2=s->map[id2].sigma_sq+db_max_variance;
+						//float maxdist_sq2=-sigma_sq2*(log(sigma_sq2)+MATCH_VALUE);
+						//float px2=s->map[id2].px;
+						//float py2=s->map[id2].py;
+						//float a2=((float)x-px2-IMG_X/2);
+						//if (a2<-0.5) a2+=1.0;/* use whichever corner of the pixel gives the best score */
+						//float b2=((float)y-py2-IMG_Y/2);
+						//if (b2<-0.5) b2+=1.0;
+						//float score2 = (maxdist_sq2-(a2*a2+b2*b2))/(2*sigma_sq2);
+						//if (score>score2){
+						//	mask[x+y*IMG_X]=id;
+						//}
 					} else {
 						mask[x+y*IMG_X]=id;
 					}
@@ -246,7 +216,7 @@ struct star_fov {
 	}
 	~star_fov() {
 		free(mask);
-		free(collision);
+		free(overflow);
 	}
 };
 

@@ -6,7 +6,6 @@
 #include <string.h>
 #include <math.h>
 
-
 #define PI		   3.14159265358979323846  /* pi */
 #define TWOPI		6.28318530717958647693
 
@@ -14,11 +13,9 @@ int DBG_ENABLE;
 #define DBG_PRINT(format,args...) if (DBG_ENABLE==1) fprintf(stderr,format, ## args);
 
 int IMG_X,IMG_Y,MAX_FALSE_STARS,DB_REDUNDANCY,REQUIRED_STARS;
-float DEG_X,DEG_Y,PIXX_TANGENT,PIXY_TANGENT,DOUBLE_STAR_PX;
-float PIXSCALE,POS_ERR_SIGMA,POS_VARIANCE;
-float IMAGE_VARIANCE,EXPECTED_FALSE_STARS,MATCH_VALUE;
-float PHOTONS,BRIGHT_THRESH;
-float MAXFOV,MINFOV;
+float PIXSCALE,EXPECTED_FALSE_STARS,DOUBLE_STAR_PX;
+float BASE_FLUX,IMAGE_VARIANCE,THRESH_FACTOR,POS_VARIANCE,POS_ERR_SIGMA;
+float MAXFOV,MINFOV,MATCH_VALUE,PIXX_TANGENT,PIXY_TANGENT;
 
 
 int ENV_VARS_SIZE;
@@ -48,24 +45,22 @@ void load_config(const char *filename) {
 
 	IMG_X=atoi(getenv("IMG_X"));
 	IMG_Y=atoi(getenv("IMG_Y"));
-	DEG_X=atof(getenv("DEG_X"));
-	DEG_Y=atof(getenv("DEG_Y"));
-	MAXFOV=3600*sqrt(DEG_X*DEG_X+DEG_Y*DEG_Y);
-	MINFOV=3600*DEG_Y;
-	POS_ERR_SIGMA=atof(getenv("POS_ERR_SIGMA"));
 	PIXSCALE=atof(getenv("PIXSCALE"));
+	POS_ERR_SIGMA=atof(getenv("POS_ERR_SIGMA"));
 	POS_VARIANCE=atof(getenv("POS_VARIANCE"));/* sigma_r^2 */
 	IMAGE_VARIANCE=atof(getenv("IMAGE_VARIANCE"));/* lambda */
-	BRIGHT_THRESH=atof(getenv("BRIGHT_THRESH"));
+	THRESH_FACTOR=atof(getenv("THRESH_FACTOR"));/* lambda */
 	EXPECTED_FALSE_STARS=atof(getenv("EXPECTED_FALSE_STARS"));/* pfalse */
 	DOUBLE_STAR_PX=atof(getenv("DOUBLE_STAR_PX"));
 	MAX_FALSE_STARS=atoi(getenv("MAX_FALSE_STARS"));/* >10 is slow */
 	DB_REDUNDANCY=atoi(getenv("DB_REDUNDANCY"));
 	REQUIRED_STARS=atoi(getenv("REQUIRED_STARS"));
-	PHOTONS=atoi(getenv("PHOTONS"));
+	BASE_FLUX=atof(getenv("BASE_FLUX"));
+	
+	MAXFOV=PIXSCALE*sqrt(IMG_X*IMG_X+IMG_Y*IMG_Y);
+	MINFOV=PIXSCALE*IMG_Y;
 	MATCH_VALUE=4*log(EXPECTED_FALSE_STARS/(IMG_X*IMG_Y))+log(2*PI);/* base */
-
-	PIXX_TANGENT=2*tan(DEG_X*PI/(180*2))/IMG_X;
-	PIXY_TANGENT=2*tan(DEG_Y*PI/(180*2))/IMG_Y;
+	PIXX_TANGENT=2*tan((IMG_X*PIXSCALE/3600)*PI/(180*2))/IMG_X;
+	PIXY_TANGENT=2*tan((IMG_Y*PIXSCALE/3600)*PI/(180*2))/IMG_Y;
 }
 #endif

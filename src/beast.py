@@ -118,10 +118,10 @@ class star(_object):
     __swig_getmethods__["z"] = _beast.star_z_get
     if _newclass:
         z = _swig_property(_beast.star_z_get, _beast.star_z_set)
-    __swig_setmethods__["photons"] = _beast.star_photons_set
-    __swig_getmethods__["photons"] = _beast.star_photons_get
+    __swig_setmethods__["flux"] = _beast.star_flux_set
+    __swig_getmethods__["flux"] = _beast.star_flux_get
     if _newclass:
-        photons = _swig_property(_beast.star_photons_get, _beast.star_photons_set)
+        flux = _swig_property(_beast.star_flux_get, _beast.star_flux_set)
     __swig_setmethods__["star_idx"] = _beast.star_star_idx_set
     __swig_getmethods__["star_idx"] = _beast.star_star_idx_get
     if _newclass:
@@ -150,8 +150,8 @@ class star(_object):
     def dist_arcsec(self, s):
         return _beast.star_dist_arcsec(self, s)
 
-    def _print(self, s):
-        return _beast.star__print(self, s)
+    def DBG_(self, s):
+        return _beast.star_DBG_(self, s)
 
     def __init__(self):
         this = _beast.new_star()
@@ -178,9 +178,9 @@ def star_gt_z(s1, s2):
     return _beast.star_gt_z(s1, s2)
 star_gt_z = _beast.star_gt_z
 
-def star_gt_photons(s1, s2):
-    return _beast.star_gt_photons(s1, s2)
-star_gt_photons = _beast.star_gt_photons
+def star_gt_flux(s1, s2):
+    return _beast.star_gt_flux(s1, s2)
+star_gt_flux = _beast.star_gt_flux
 
 def star_lt_x(s1, s2):
     return _beast.star_lt_x(s1, s2)
@@ -194,9 +194,9 @@ def star_lt_z(s1, s2):
     return _beast.star_lt_z(s1, s2)
 star_lt_z = _beast.star_lt_z
 
-def star_lt_photons(s1, s2):
-    return _beast.star_lt_photons(s1, s2)
-star_lt_photons = _beast.star_lt_photons
+def star_lt_flux(s1, s2):
+    return _beast.star_lt_flux(s1, s2)
+star_lt_flux = _beast.star_lt_flux
 class star_db(_object):
     __swig_setmethods__ = {}
     __setattr__ = lambda self, name, value: _swig_setattr(self, star_db, name, value)
@@ -232,16 +232,47 @@ class star_db(_object):
     def add_star(self, *args):
         return _beast.star_db_add_star(self, *args)
 
-    def load_catalog(self):
-        return _beast.star_db_load_catalog(self)
+    def load_catalog(self, catalog, year):
+        return _beast.star_db_load_catalog(self, catalog, year)
 
-    def get_img_mask(self, db_max_variance):
-        return _beast.star_db_get_img_mask(self, db_max_variance)
-
-    def _print(self, s):
-        return _beast.star_db__print(self, s)
+    def DBG_(self, s):
+        return _beast.star_db_DBG_(self, s)
 star_db_swigregister = _beast.star_db_swigregister
 star_db_swigregister(star_db)
+
+class star_fov(_object):
+    __swig_setmethods__ = {}
+    __setattr__ = lambda self, name, value: _swig_setattr(self, star_fov, name, value)
+    __swig_getmethods__ = {}
+    __getattr__ = lambda self, name: _swig_getattr(self, star_fov, name)
+    __repr__ = _swig_repr
+    __swig_setmethods__["stars"] = _beast.star_fov_stars_set
+    __swig_getmethods__["stars"] = _beast.star_fov_stars_get
+    if _newclass:
+        stars = _swig_property(_beast.star_fov_stars_get, _beast.star_fov_stars_set)
+    __swig_setmethods__["mask"] = _beast.star_fov_mask_set
+    __swig_getmethods__["mask"] = _beast.star_fov_mask_get
+    if _newclass:
+        mask = _swig_property(_beast.star_fov_mask_get, _beast.star_fov_mask_set)
+    __swig_setmethods__["overflow"] = _beast.star_fov_overflow_set
+    __swig_getmethods__["overflow"] = _beast.star_fov_overflow_get
+    if _newclass:
+        overflow = _swig_property(_beast.star_fov_overflow_get, _beast.star_fov_overflow_set)
+    __swig_setmethods__["overflow_size"] = _beast.star_fov_overflow_size_set
+    __swig_getmethods__["overflow_size"] = _beast.star_fov_overflow_size_get
+    if _newclass:
+        overflow_size = _swig_property(_beast.star_fov_overflow_size_get, _beast.star_fov_overflow_size_set)
+
+    def __init__(self, s, db_max_variance):
+        this = _beast.new_star_fov(s, db_max_variance)
+        try:
+            self.this.append(this)
+        except Exception:
+            self.this = this
+    __swig_destroy__ = _beast.delete_star_fov
+    __del__ = lambda self: None
+star_fov_swigregister = _beast.star_fov_swigregister
+star_fov_swigregister(star_fov)
 
 class star_query(_object):
     __swig_setmethods__ = {}
@@ -301,20 +332,20 @@ class star_query(_object):
     def clear_kdresults(self):
         return _beast.star_query_clear_kdresults(self)
 
-    def kdcheck(self, idx, x, y, z, r, min_photons):
-        return _beast.star_query_kdcheck(self, idx, x, y, z, r, min_photons)
+    def kdcheck(self, idx, x, y, z, r, min_flux):
+        return _beast.star_query_kdcheck(self, idx, x, y, z, r, min_flux)
 
     def kdsearch(self, *args):
         return _beast.star_query_kdsearch(self, *args)
 
-    def kdsearch_x(self, x, y, z, r, min_photons, min, max):
-        return _beast.star_query_kdsearch_x(self, x, y, z, r, min_photons, min, max)
+    def kdsearch_x(self, x, y, z, r, min_flux, min, max):
+        return _beast.star_query_kdsearch_x(self, x, y, z, r, min_flux, min, max)
 
-    def kdsearch_y(self, x, y, z, r, min_photons, min, max):
-        return _beast.star_query_kdsearch_y(self, x, y, z, r, min_photons, min, max)
+    def kdsearch_y(self, x, y, z, r, min_flux, min, max):
+        return _beast.star_query_kdsearch_y(self, x, y, z, r, min_flux, min, max)
 
-    def kdsearch_z(self, x, y, z, r, min_photons, min, max):
-        return _beast.star_query_kdsearch_z(self, x, y, z, r, min_photons, min, max)
+    def kdsearch_z(self, x, y, z, r, min_flux, min, max):
+        return _beast.star_query_kdsearch_z(self, x, y, z, r, min_flux, min, max)
 
     def kdmask_filter_catalog(self):
         return _beast.star_query_kdmask_filter_catalog(self)
@@ -328,8 +359,8 @@ class star_query(_object):
     def from_kdresults(self):
         return _beast.star_query_from_kdresults(self)
 
-    def _print(self, s):
-        return _beast.star_query__print(self, s)
+    def DBG_(self, s):
+        return _beast.star_query_DBG_(self, s)
 star_query_swigregister = _beast.star_query_swigregister
 star_query_swigregister(star_query)
 
@@ -356,8 +387,8 @@ class constellation(_object):
     if _newclass:
         idx = _swig_property(_beast.constellation_idx_get, _beast.constellation_idx_set)
 
-    def _print(self, s):
-        return _beast.constellation__print(self, s)
+    def DBG_(self, s):
+        return _beast.constellation_DBG_(self, s)
 
     def __init__(self):
         this = _beast.new_constellation()
@@ -400,8 +431,8 @@ class constellation_pair(_object):
     def flip(self):
         return _beast.constellation_pair_flip(self)
 
-    def _print(self, s):
-        return _beast.constellation_pair__print(self, s)
+    def DBG_(self, s):
+        return _beast.constellation_pair_DBG_(self, s)
 
     def __init__(self):
         this = _beast.new_constellation_pair()
@@ -479,8 +510,8 @@ class constellation_db(_object):
     __swig_destroy__ = _beast.delete_constellation_db
     __del__ = lambda self: None
 
-    def _print(self, s):
-        return _beast.constellation_db__print(self, s)
+    def DBG_(self, s):
+        return _beast.constellation_db_DBG_(self, s)
 constellation_db_swigregister = _beast.constellation_db_swigregister
 constellation_db_swigregister(constellation_db)
 
@@ -585,8 +616,8 @@ class match_result(_object):
     def weighted_triad(self):
         return _beast.match_result_weighted_triad(self)
 
-    def _print(self, s):
-        return _beast.match_result__print(self, s)
+    def DBG_(self, s):
+        return _beast.match_result_DBG_(self, s)
 match_result_swigregister = _beast.match_result_swigregister
 match_result_swigregister(match_result)
 

@@ -9,7 +9,7 @@ struct  match_result {
 
 	constellation* db_const;
 
-	int32_t *img_mask;
+	star_fov *img_mask;
 	constellation_pair match;
 	int32_t *map; /* Usage: map[imgstar]=dbstar */
 	
@@ -20,7 +20,7 @@ struct  match_result {
 	
 	int db_results_size;
     
-	match_result(constellation_db *db_, constellation_db *img_, int32_t *img_mask_) {
+	match_result(constellation_db *db_, constellation_db *img_, star_fov *img_mask_) {
 		db=db_;
 		img=img_;
 		img_mask=img_mask_;
@@ -59,7 +59,7 @@ struct  match_result {
 		if (match.totalscore==-FLT_MAX || m.totalscore==-FLT_MAX) return 0;
 		return (map[m.img_s1]==m.db_s1 && map[m.img_s2]==m.db_s2)?1:0;
 	}
-	void search() {if (db->stars->kdsorted==1) db->results->kdsearch(R11,R12,R13,MAXFOV/2,BRIGHT_THRESH);}
+	void search() {if (db->stars->kdsorted==1) db->results->kdsearch(R11,R12,R13,MAXFOV/2,THRESH_FACTOR*IMAGE_VARIANCE);}
 	void clear_search() {if (db->stars->kdsorted==1) db->results->clear_kdresults();}
 	void compute_score() {
 		//TODO: figure out where 2*img->stars->map_size came from
@@ -76,23 +76,21 @@ struct  match_result {
 			float x=s->x*R11+s->y*R12+s->z*R13;
 			float y=s->x*R21+s->y*R22+s->z*R23;
 			float z=s->x*R31+s->y*R32+s->z*R33;
-			float px=y/(x*PIXX_TANGENT);
-			float py=z/(x*PIXY_TANGENT);
-			int nx,ny;
-			nx=(int)(px+IMG_X/2.0f);
-			ny=(int)(py+IMG_Y/2.0f);
-			int32_t n=-1;
+			float px=-y/(x*PIXX_TANGENT);
+			float py=-z/(x*PIXY_TANGENT);
+			
+			int nx=(int)(px+IMG_X/2.0f);
 			if (nx==-1) nx++;
 			else if (nx==IMG_X) nx--;
+
+			int ny=(int)(py+IMG_Y/2.0f);
 			if (ny==-1) ny++;
 			else if (ny==IMG_Y) ny--;
-			if (nx>=0&&nx<IMG_X&&ny>=0&&ny<IMG_Y) n=img_mask[nx+ny*IMG_X];
-			if (n!=-1) {
-				float sigma_sq=img->stars->map[n].sigma_sq+db->stars->max_variance;
-				float maxdist_sq=-sigma_sq*(log(sigma_sq)+MATCH_VALUE);
-				float a=(px-img->stars->map[n].px);
-				float b=(py-img->stars->map[n].py);
-				float score = (maxdist_sq-(a*a+b*b))/(2*sigma_sq);
+			int32_t n=-1;
+			if (nx>=0&&nx<IMG_X&&ny>=0&&ny<IMG_Y) n=img_mask->mask[nx+ny*IMG_X];
+			if (n<-1) n=img_mask->resolve_id(n,px,py);
+			if (n>=0) {
+				float score = img_mask->get_score(n,px,py);
 				if (score>scores[n]){/* only match the closest star */
 					map[n]=o;
 					scores[n]=score;
@@ -251,7 +249,7 @@ struct db_match {
 	match_result *winner;
 	constellation_pair *c_pairs;
 	int c_pairs_size;
-	int32_t *img_mask;
+	star_fov *img_mask;
 		
 	void set_map(constellation_db *db, constellation_db *img) {
 		star_db *img_stars=winner->img->stars;
@@ -282,7 +280,7 @@ struct db_match {
 		c_pairs_size=0;
 
 		if (db->stars->map_size<2||img->stars->map_size<2) return;
-		img_mask = img->stars->get_img_mask(db->stars->max_variance);
+		img_mask = new star_fov(img->stars,db->stars->max_variance);
 		
 		//find stars
 		match_result *m=new match_result(db, img, img_mask);
@@ -330,9 +328,9 @@ struct db_match {
 	
 	~db_match() {
 		delete winner;
+		delete img_mask;
 		free(c_pairs);
 		free(map);
-		free(img_mask);
 	}
 };
 #endif

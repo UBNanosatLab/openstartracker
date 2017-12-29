@@ -62,7 +62,7 @@ struct constellation_db {
 
 		if (from_image) {
 			map=NULL;
-			std::sort(stars->map, stars->map+stars->map_size,star_gt_photons);
+			std::sort(stars->map, stars->map+stars->map_size,star_gt_flux);
 			int ns=stars->map_size;/* number of stars to check */
 			if (ns>stars_per_fov) ns=stars_per_fov;//MAX_FALSE_STARS+2
 			
@@ -82,9 +82,9 @@ struct constellation_db {
 			results->kdmask_uniform_density(stars_per_fov);//2+DB_REDUNDANCY
 			std::set<constellation,constellation_lt> c_set;
 			for (int i=0;i<stars->map_size;i++) if (results->kdmask[i]==0) {
-				results->kdsearch(stars->map[i].x,stars->map[i].y,stars->map[i].z,MAXFOV,BRIGHT_THRESH);
+				results->kdsearch(stars->map[i].x,stars->map[i].y,stars->map[i].z,MAXFOV,THRESH_FACTOR*IMAGE_VARIANCE);
 				constellation c;
-				for (int j=0;j<results->kdresults_size;j++) if (i!=results->kdresults[j] && stars->map[i].photons>=stars->map[results->kdresults[j]].photons){
+				for (int j=0;j<results->kdresults_size;j++) if (i!=results->kdresults[j] && stars->map[i].flux>=stars->map[results->kdresults[j]].flux){
 					c.p=stars->map[i].dist_arcsec(stars->map[results->kdresults[j]]);
 					c.s1=i;
 					c.s2=results->kdresults[j];

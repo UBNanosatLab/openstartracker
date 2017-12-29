@@ -7,6 +7,3 @@ all: $(OBJ)
 	
 clean:
 	rm beast.so beast.o	beast.py beast.pyc beast_wrap.cxx beast_wrap.o
-
-debug:
-	$(CC) -Wall -Ofast -g test.c -o test -lm
