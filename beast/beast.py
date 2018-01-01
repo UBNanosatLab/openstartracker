@@ -229,6 +229,12 @@ class star_db(_object):
     __swig_destroy__ = _beast.delete_star_db
     __del__ = lambda self: None
 
+    def get_star(self, idx):
+        return _beast.star_db_get_star(self, idx)
+
+    def copy(self):
+        return _beast.star_db_copy(self)
+
     def add_star(self, *args):
         return _beast.star_db_add_star(self, *args)
 
@@ -254,17 +260,27 @@ class star_fov(_object):
     __swig_getmethods__["mask"] = _beast.star_fov_mask_get
     if _newclass:
         mask = _swig_property(_beast.star_fov_mask_get, _beast.star_fov_mask_set)
-    __swig_setmethods__["overflow"] = _beast.star_fov_overflow_set
-    __swig_getmethods__["overflow"] = _beast.star_fov_overflow_get
+    __swig_setmethods__["collision"] = _beast.star_fov_collision_set
+    __swig_getmethods__["collision"] = _beast.star_fov_collision_get
     if _newclass:
-        overflow = _swig_property(_beast.star_fov_overflow_get, _beast.star_fov_overflow_set)
-    __swig_setmethods__["overflow_size"] = _beast.star_fov_overflow_size_set
-    __swig_getmethods__["overflow_size"] = _beast.star_fov_overflow_size_get
+        collision = _swig_property(_beast.star_fov_collision_get, _beast.star_fov_collision_set)
+    __swig_setmethods__["collision_size"] = _beast.star_fov_collision_size_set
+    __swig_getmethods__["collision_size"] = _beast.star_fov_collision_size_get
     if _newclass:
-        overflow_size = _swig_property(_beast.star_fov_overflow_size_get, _beast.star_fov_overflow_size_set)
+        collision_size = _swig_property(_beast.star_fov_collision_size_get, _beast.star_fov_collision_size_set)
+    __swig_setmethods__["db_max_variance"] = _beast.star_fov_db_max_variance_set
+    __swig_getmethods__["db_max_variance"] = _beast.star_fov_db_max_variance_get
+    if _newclass:
+        db_max_variance = _swig_property(_beast.star_fov_db_max_variance_get, _beast.star_fov_db_max_variance_set)
 
-    def __init__(self, s, db_max_variance):
-        this = _beast.new_star_fov(s, db_max_variance)
+    def get_score(self, *args):
+        return _beast.star_fov_get_score(self, *args)
+
+    def resolve_id(self, id, px, py):
+        return _beast.star_fov_resolve_id(self, id, px, py)
+
+    def __init__(self, s, db_max_variance_):
+        this = _beast.new_star_fov(s, db_max_variance_)
         try:
             self.this.append(this)
         except Exception:
@@ -545,6 +561,10 @@ class match_result(_object):
     __swig_getmethods__["map"] = _beast.match_result_map_get
     if _newclass:
         map = _swig_property(_beast.match_result_map_get, _beast.match_result_map_set)
+    __swig_setmethods__["map_size"] = _beast.match_result_map_size_set
+    __swig_getmethods__["map_size"] = _beast.match_result_map_size_get
+    if _newclass:
+        map_size = _swig_property(_beast.match_result_map_size_get, _beast.match_result_map_size_set)
     __swig_setmethods__["R11"] = _beast.match_result_R11_set
     __swig_getmethods__["R11"] = _beast.match_result_R11_get
     if _newclass:
@@ -581,10 +601,6 @@ class match_result(_object):
     __swig_getmethods__["R33"] = _beast.match_result_R33_get
     if _newclass:
         R33 = _swig_property(_beast.match_result_R33_get, _beast.match_result_R33_set)
-    __swig_setmethods__["db_results_size"] = _beast.match_result_db_results_size_set
-    __swig_getmethods__["db_results_size"] = _beast.match_result_db_results_size_get
-    if _newclass:
-        db_results_size = _swig_property(_beast.match_result_db_results_size_get, _beast.match_result_db_results_size_set)
 
     def __init__(self, db_, img_, img_mask_):
         this = _beast.new_match_result(db_, img_, img_mask_)
@@ -613,6 +629,9 @@ class match_result(_object):
     def compute_score(self):
         return _beast.match_result_compute_score(self)
 
+    def from_match(self):
+        return _beast.match_result_from_match(self)
+
     def weighted_triad(self):
         return _beast.match_result_weighted_triad(self)
 
@@ -631,10 +650,6 @@ class db_match(_object):
     __swig_getmethods__["p_match"] = _beast.db_match_p_match_get
     if _newclass:
         p_match = _swig_property(_beast.db_match_p_match_get, _beast.db_match_p_match_set)
-    __swig_setmethods__["map"] = _beast.db_match_map_set
-    __swig_getmethods__["map"] = _beast.db_match_map_get
-    if _newclass:
-        map = _swig_property(_beast.db_match_map_get, _beast.db_match_map_set)
     __swig_setmethods__["winner"] = _beast.db_match_winner_set
     __swig_getmethods__["winner"] = _beast.db_match_winner_get
     if _newclass:
@@ -651,9 +666,6 @@ class db_match(_object):
     __swig_getmethods__["img_mask"] = _beast.db_match_img_mask_get
     if _newclass:
         img_mask = _swig_property(_beast.db_match_img_mask_get, _beast.db_match_img_mask_set)
-
-    def set_map(self, db, img):
-        return _beast.db_match_set_map(self, db, img)
 
     def __init__(self, db, img):
         this = _beast.new_db_match(db, img)

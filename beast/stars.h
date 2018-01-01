@@ -13,9 +13,9 @@ struct star {
 	float y;
 	float z;
 	float flux;
-	int32_t star_idx;//how many stars were inserted before this one?
-	int32_t id;//user defined id (ie hipparcos id, -1)
-	int32_t unreliable;
+	int star_idx;//how many stars were inserted before this one?
+	int id;//user defined id (ie hipparcos id, -1)
+	int unreliable;
 
 	float sigma_sq;
 	float px;
@@ -39,6 +39,12 @@ struct star {
 		DBG_PRINT("sigma_sq=%f ", sigma_sq);
 		DBG_PRINT("px=%f ", px);
 		DBG_PRINT("py=%f\n", py);
+	}
+	~star() {
+		if (DBG_ENABLE==1) {
+			DBG_PRINT("REEEEEEEEEE!!!\n");
+			assert(2+2==5);
+		}
 	}
 };
 
@@ -67,6 +73,16 @@ struct star_db {
 	}
 	~star_db() {
 		free(map);
+	}
+	
+	star* get_star(int idx) {return map_size>0?&map[idx%map_size]:NULL;}
+	
+	star_db* copy() {
+		star_db* s = new star_db;
+		*s = *this;
+		s->map=(star*) malloc(sizeof(map[0])*map_size);
+		memcpy(s->map,map,sizeof(map[0])*map_size);
+		return s;
 	}
 	
 	void add_star(float x, float y, float z, float flux, int id) {
@@ -98,7 +114,6 @@ struct star_db {
 		if (max_variance<map[n].sigma_sq) max_variance=map[n].sigma_sq;
 	}
 	
-	//TODO: should be part of config struct
 	void load_catalog(const char* catalog, float year) {
 		FILE *stream = fopen(catalog, "r");
 		if (stream == NULL) exit(EXIT_FAILURE);
@@ -415,7 +430,7 @@ struct star_query {
 	 * map with uniform density */
 	void kdmask_uniform_density(int min_stars_per_fov) {
 		std::set<int> uniform_set;
-		int kdresults_maxsize_old=kdresults_maxsize;//TODO: eliminate this variable once restructured?
+		int kdresults_maxsize_old=kdresults_maxsize;
 		kdresults_maxsize=min_stars_per_fov;
 		for (int i=0;i<stars->map_size;i++) if (kdmask[i]==0) {
 			kdsearch(stars->map[i].x,stars->map[i].y,stars->map[i].z,MINFOV/2,THRESH_FACTOR*IMAGE_VARIANCE);

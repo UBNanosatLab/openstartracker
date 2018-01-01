@@ -12,6 +12,7 @@
 int DBG_ENABLE;
 #define DBG_PRINT(format,args...) if (DBG_ENABLE==1) fprintf(stderr,format, ## args);
 
+//TODO: config class (allows different configs for different cameras)
 int IMG_X,IMG_Y,MAX_FALSE_STARS,DB_REDUNDANCY,REQUIRED_STARS;
 float PIXSCALE,EXPECTED_FALSE_STARS,DOUBLE_STAR_PX;
 float BASE_FLUX,IMAGE_VARIANCE,THRESH_FACTOR,POS_VARIANCE,POS_ERR_SIGMA;

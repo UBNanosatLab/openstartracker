@@ -11,24 +11,22 @@ struct  match_result {
 
 	star_fov *img_mask;
 	constellation_pair match;
-	int32_t *map; /* Usage: map[imgstar]=dbstar */
+	int *map; /* Usage: map[imgstar]=dbstar */
+	int map_size;
 	
-	//body to eci
+	//eci to body (body=R*eci)
 	float R11,R12,R13;
 	float R21,R22,R23;
 	float R31,R32,R33;
 	
-	int db_results_size;
-    
 	match_result(constellation_db *db_, constellation_db *img_, star_fov *img_mask_) {
 		db=db_;
 		img=img_;
 		img_mask=img_mask_;
-		map=(int32_t *)malloc(sizeof(int32_t)*img->stars->map_size);
+		map_size=img->stars->map_size;
+		map=(int *)malloc(sizeof(int)*map_size);
 		match.totalscore=-FLT_MAX;
 		
-		if (db->stars->kdsorted==0) db_results_size = db->stars->map_size;
-		else  db_results_size = db->results->kdresults_size;
 	}
 	~match_result() {free(map);}
 	void init(constellation &db_const_, constellation &img_const_) {
@@ -52,7 +50,7 @@ struct  match_result {
 		c->R21=R21,c->R22=R22,c->R23=R23;
 		c->R31=R31,c->R32=R32,c->R33=R33;
 		
-		memcpy(c->map, map, sizeof(int32_t)*img->stars->map_size);
+		memcpy(c->map, map, sizeof(int)*map_size);
 	}
 	int related(constellation_pair &m) {
 		
@@ -62,16 +60,15 @@ struct  match_result {
 	void search() {if (db->stars->kdsorted==1) db->results->kdsearch(R11,R12,R13,MAXFOV/2,THRESH_FACTOR*IMAGE_VARIANCE);}
 	void clear_search() {if (db->stars->kdsorted==1) db->results->clear_kdresults();}
 	void compute_score() {
-		//TODO: figure out where 2*img->stars->map_size came from
-		match.totalscore=log(EXPECTED_FALSE_STARS/(IMG_X*IMG_Y))*(2*img->stars->map_size);
-		float* scores=(float *)malloc(sizeof(float)*img->stars->map_size);
-		int img_map_sz=img->stars->map_size;
-		for (int i=0;i<img_map_sz;i++) {
+		//TODO: figure out where 2*map_size came from
+		match.totalscore=log(EXPECTED_FALSE_STARS/(IMG_X*IMG_Y))*(2*map_size);
+		float* scores=(float *)malloc(sizeof(float)*map_size);
+		for (int i=0;i<map_size;i++) {
 			map[i]=-1;
 			scores[i]=0.0;
 		}
-		for(int32_t i=0;i<db->results->kdresults_size;i++) {
-			int32_t o=db->results->kdresults[i];
+		for(int i=0;i<db->results->kdresults_size;i++) {
+			int o=db->results->kdresults[i];
 			star *s=&(db->stars->map[o]);
 			float x=s->x*R11+s->y*R12+s->z*R13;
 			float y=s->x*R21+s->y*R22+s->z*R23;
@@ -86,7 +83,7 @@ struct  match_result {
 			int ny=(int)(py+IMG_Y/2.0f);
 			if (ny==-1) ny++;
 			else if (ny==IMG_Y) ny--;
-			int32_t n=-1;
+			int n=-1;
 			if (nx>=0&&nx<IMG_X&&ny>=0&&ny<IMG_Y) n=img_mask->mask[nx+ny*IMG_X];
 			if (n<-1) n=img_mask->resolve_id(n,px,py);
 			if (n>=0) {
@@ -97,11 +94,31 @@ struct  match_result {
 				}
 			}
 		}
-		for(int n=0;n<img->stars->map_size;n++) {
+		for(int n=0;n<map_size;n++) {
 			match.totalscore+=scores[n];
 		}
 		free(scores);
 	}
+	//return matching stars from db, in order of star_idx
+	star_db* from_match() {
+		if (match.totalscore==-FLT_MAX) return NULL;
+		
+		star_db* s = new star_db;
+		s->map_size=map_size;
+		s->max_variance=db->stars->max_variance;
+		s->map=(star *)malloc(sizeof(s->map[0])*map_size);
+		memset(s->map,-1,sizeof(s->map[0])*map_size);
+		for(int n=0;n<map_size;n++) {
+			//catalog matching
+			int o=map[n];
+			if (o!=-1) {
+				int img_star_idx=img->stars->map[n].star_idx;
+				s->map[img_star_idx]=db->stars->map[o];
+			}
+		}
+		return s;
+	}
+	
 	/* weighted_triad results */
 
 	/* see https://en.wikipedia.org/wiki/Triad_method */
@@ -232,11 +249,15 @@ struct  match_result {
 		DBG_PRINT("%f\t%f\t%f\n", R11,R12,R13);
 		DBG_PRINT("%f\t%f\t%f\n", R21,R22,R23);
 		DBG_PRINT("%f\t%f\t%f\n", R31,R32,R33);
+		
+		DBG_PRINT("DEC=%f\n",asin(R13)* 180 / PI);
+		DBG_PRINT("RA=%f\n",atan2(R12,R11)* 180 / PI);
+		DBG_PRINT("ORIENTATION=%f\n",-atan2(R23,R33)* 180 / PI);
+		
 		db->DBG_("DB");
 		img->DBG_("IMG");
-		DBG_PRINT("db_results_size=%d\n", db_results_size);
-		DBG_PRINT("img->stars->map_size=%d\n", img->stars->map_size);
-		for (int i=0; i<img->stars->map_size; i++) {
+		DBG_PRINT("map_size=%d\n", map_size);
+		for (int i=0; i<map_size; i++) {
 			DBG_PRINT("map[%d]=%d\n",i,map[i]);
 		}
 	}
@@ -244,29 +265,12 @@ struct  match_result {
 
 struct db_match {
 	float p_match;
-	int32_t *map; /* Usage: map[imgstar.staridx]=dbstar.id */
 	
 	match_result *winner;
 	constellation_pair *c_pairs;
 	int c_pairs_size;
 	star_fov *img_mask;
-		
-	void set_map(constellation_db *db, constellation_db *img) {
-		star_db *img_stars=winner->img->stars;
-		star_db *db_stars=winner->db->stars;
-		//calculate map
-		map=(int32_t *)realloc(map,sizeof(int32_t)*img_stars->map_size);
-		for (int i=0;i<img_stars->map_size;i++) map[i]=-1;
-		for(int n=0;n<img_stars->map_size;n++) {
-			//catalog matching
-			int o=winner->map[n];
-			if (o!=-1) {
-				int img_star_idx=img_stars->map[n].star_idx;
-				int db_star_id=db_stars->map[o].id;
-				map[img_star_idx]=db_star_id;
-			}
-		}
-	}
+	
 	#define ADD_SCORE\
 		m->compute_score();\
 		if (m->match.totalscore>winner->match.totalscore) {\
@@ -275,7 +279,6 @@ struct db_match {
 		} else c_pairs[c_pairs_size++]=m->match;
 		
 	db_match(constellation_db *db, constellation_db *img) {
-		map=NULL;
 		c_pairs=NULL;
 		c_pairs_size=0;
 
@@ -311,6 +314,8 @@ struct db_match {
 			}
 		}
 		delete m;
+		
+		//calculate map
 		if (winner->match.totalscore==-FLT_MAX) { //Did we even match?
 			p_match=0.0;
 		} else {
@@ -322,7 +327,6 @@ struct db_match {
 				}
 			}
 			p_match=1.0/p_match;
-			set_map(db, img);
 		}
 	}
 	
@@ -330,7 +334,6 @@ struct db_match {
 		delete winner;
 		delete img_mask;
 		free(c_pairs);
-		free(map);
 	}
 };
 #endif

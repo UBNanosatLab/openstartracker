@@ -424,9 +424,7 @@ class StarCatalog:
 # -----
 
 class StarDetector:
-    def __init__(self, A_pixel, sigma_pixel, sigma_psf, t_exp, aperture, base_flux):
-        self.A_pixel = A_pixel
-        self.sigma_pixel = sigma_pixel
+    def __init__(self, sigma_psf, t_exp, aperture, base_flux):
         self.sigma_psf = sigma_psf
         self.t_exp = t_exp
         self.aperture = aperture
@@ -440,7 +438,7 @@ class StarDetector:
         flux = self.base_flux * (10 ** (-magnitude / 2.5))
 
         if add_noise:
-            flux = flux + np.random.normal(self.A_pixel, self.sigma_pixel, len(flux))
+            flux = flux + np.random.normal(0, IMAGE_VARIANCE, len(flux))
             
             flux_per_photon = self.base_flux* self.t_exp * self.aperture ** 2 * np.pi/BASE_PHOTONS
             flux += flux_per_photon*np.random.normal(0, self.norm_gaussian(self.sigma_psf)*np.sqrt(flux/flux_per_photon), len(flux))
@@ -451,7 +449,7 @@ class StarDetector:
         return -2.5 * np.log10(flux / self.base_flux)
 
     def compute_magnitude_threshold(self):
-        threshold = self.A_pixel + 5 * self.sigma_pixel
+        threshold = THRESH_FACTOR*IMAGE_VARIANCE
         return self.compute_magnitude(threshold)
 
     def add_noise(self, magnitude):
@@ -636,10 +634,6 @@ if __name__ == '__main__':
 	t_exp = EXPOSURE_TIME # s
 	aperture = APERTURE # mm
 	base_flux = BASE_FLUX
-	
-	
-	A_pixel = 0
-	sigma_pixel = IMAGE_VARIANCE 
 
 	magnitude_gaussian = 0.02 # mag
 
@@ -659,7 +653,7 @@ if __name__ == '__main__':
 	]
 
 	camera = cameras[cam](f, (res_x, res_y), pixel_ar, (ppx, ppy))
-	detector = StarDetector(A_pixel, sigma_pixel, sigma_psf, t_exp, aperture, base_flux)
+	detector = StarDetector(sigma_psf, t_exp, aperture, base_flux)
 	num_scenes = 100
 	inputs = []
 	outputs = []

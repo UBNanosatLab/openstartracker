@@ -89,7 +89,6 @@ if __name__ == '__main__':
 	
 	system("mv "+sys.argv[1]+"/checksum.txt "+sys.argv[1]+"/calibration_data/checksum.txt")
 		
-	
 	stardb=getstardb()
 	
 	astrometry_results={}

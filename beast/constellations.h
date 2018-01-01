@@ -5,9 +5,9 @@
 
 struct constellation {
 	float p;
-	int32_t s1;
-	int32_t s2;
-	int32_t idx;
+	int s1;
+	int s2;
+	int idx;
 	void DBG_(const char *s) {
 		DBG_PRINT("%s\t",s);
 		DBG_PRINT("p=%f ",p);
@@ -19,11 +19,11 @@ struct constellation {
 
 struct  constellation_pair {
 	float totalscore;
-	int32_t db_s1,db_s2;
-	int32_t img_s1,img_s2;
+	int db_s1,db_s2;
+	int img_s1,img_s2;
 	
 	void flip() {
-		int32_t t=img_s1;
+		int t=img_s1;
 		img_s1=img_s2;
 		img_s2=t;
 	}
@@ -57,8 +57,8 @@ struct constellation_db {
 	star_query* results;
 		
 	constellation_db(star_db *s,int stars_per_fov, int from_image) {
-		stars=s;
-		results=new star_query(s);
+		stars=s->copy();
+		results=new star_query(stars);
 
 		if (from_image) {
 			map=NULL;
