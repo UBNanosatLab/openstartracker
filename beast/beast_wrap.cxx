@@ -3135,6 +3135,13 @@ namespace swig {
   #define SWIG_From_double   PyFloat_FromDouble 
 
 
+SWIGINTERNINLINE PyObject*
+  SWIG_From_int  (int value)
+{
+  return PyInt_FromLong((long) value);
+}
+
+
 #include <limits.h>
 #if !defined(SWIG_NO_LLONG_MAX)
 # if !defined(LLONG_MAX) && defined(__GNUC__) && defined (__LONG_LONG_MAX__)
@@ -3283,13 +3290,6 @@ SWIG_AsVal_int (PyObject * obj, int *val)
     }
   }  
   return res;
-}
-
-
-SWIGINTERNINLINE PyObject*
-  SWIG_From_int  (int value)
-{
-  return PyInt_FromLong((long) value);
 }
 
 
@@ -3483,6 +3483,17 @@ SWIGINTERN PyObject *TWOPI_swigconstant(PyObject *SWIGUNUSEDPARM(self), PyObject
 }
 
 
+SWIGINTERN PyObject *IMG_ROTATION_swigconstant(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *module;
+  PyObject *d;
+  if (!PyArg_ParseTuple(args,(char*)"O:swigconstant", &module)) return NULL;
+  d = PyModule_GetDict(module);
+  if (!d) return NULL;
+  SWIG_Python_SetConstant(d, "IMG_ROTATION",SWIG_From_int(static_cast< int >(1)));
+  return SWIG_Py_Void();
+}
+
+
 SWIGINTERN int Swig_var_DBG_ENABLE_set(PyObject *_val) {
   {
     int val;
@@ -3502,6 +3513,144 @@ SWIGINTERN PyObject *Swig_var_DBG_ENABLE_get(void) {
   PyObject *pyobj = 0;
   
   pyobj = SWIG_From_int(static_cast< int >(DBG_ENABLE));
+  return pyobj;
+}
+
+
+SWIGINTERN int Swig_var_DBG_STAR_DB_COUNT_set(PyObject *_val) {
+  {
+    int val;
+    int res = SWIG_AsVal_int(_val, &val);
+    if (!SWIG_IsOK(res)) {
+      SWIG_exception_fail(SWIG_ArgError(res), "in variable '""DBG_STAR_DB_COUNT""' of type '""int""'");
+    }
+    DBG_STAR_DB_COUNT = static_cast< int >(val);
+  }
+  return 0;
+fail:
+  return 1;
+}
+
+
+SWIGINTERN PyObject *Swig_var_DBG_STAR_DB_COUNT_get(void) {
+  PyObject *pyobj = 0;
+  
+  pyobj = SWIG_From_int(static_cast< int >(DBG_STAR_DB_COUNT));
+  return pyobj;
+}
+
+
+SWIGINTERN int Swig_var_DBG_CONSTELLATION_DB_COUNT_set(PyObject *_val) {
+  {
+    int val;
+    int res = SWIG_AsVal_int(_val, &val);
+    if (!SWIG_IsOK(res)) {
+      SWIG_exception_fail(SWIG_ArgError(res), "in variable '""DBG_CONSTELLATION_DB_COUNT""' of type '""int""'");
+    }
+    DBG_CONSTELLATION_DB_COUNT = static_cast< int >(val);
+  }
+  return 0;
+fail:
+  return 1;
+}
+
+
+SWIGINTERN PyObject *Swig_var_DBG_CONSTELLATION_DB_COUNT_get(void) {
+  PyObject *pyobj = 0;
+  
+  pyobj = SWIG_From_int(static_cast< int >(DBG_CONSTELLATION_DB_COUNT));
+  return pyobj;
+}
+
+
+SWIGINTERN int Swig_var_DBG_DB_MATCH_COUNT_set(PyObject *_val) {
+  {
+    int val;
+    int res = SWIG_AsVal_int(_val, &val);
+    if (!SWIG_IsOK(res)) {
+      SWIG_exception_fail(SWIG_ArgError(res), "in variable '""DBG_DB_MATCH_COUNT""' of type '""int""'");
+    }
+    DBG_DB_MATCH_COUNT = static_cast< int >(val);
+  }
+  return 0;
+fail:
+  return 1;
+}
+
+
+SWIGINTERN PyObject *Swig_var_DBG_DB_MATCH_COUNT_get(void) {
+  PyObject *pyobj = 0;
+  
+  pyobj = SWIG_From_int(static_cast< int >(DBG_DB_MATCH_COUNT));
+  return pyobj;
+}
+
+
+SWIGINTERN int Swig_var_DBG_MATCH_RESULT_COUNT_set(PyObject *_val) {
+  {
+    int val;
+    int res = SWIG_AsVal_int(_val, &val);
+    if (!SWIG_IsOK(res)) {
+      SWIG_exception_fail(SWIG_ArgError(res), "in variable '""DBG_MATCH_RESULT_COUNT""' of type '""int""'");
+    }
+    DBG_MATCH_RESULT_COUNT = static_cast< int >(val);
+  }
+  return 0;
+fail:
+  return 1;
+}
+
+
+SWIGINTERN PyObject *Swig_var_DBG_MATCH_RESULT_COUNT_get(void) {
+  PyObject *pyobj = 0;
+  
+  pyobj = SWIG_From_int(static_cast< int >(DBG_MATCH_RESULT_COUNT));
+  return pyobj;
+}
+
+
+SWIGINTERN int Swig_var_DBG_STAR_FOV_COUNT_set(PyObject *_val) {
+  {
+    int val;
+    int res = SWIG_AsVal_int(_val, &val);
+    if (!SWIG_IsOK(res)) {
+      SWIG_exception_fail(SWIG_ArgError(res), "in variable '""DBG_STAR_FOV_COUNT""' of type '""int""'");
+    }
+    DBG_STAR_FOV_COUNT = static_cast< int >(val);
+  }
+  return 0;
+fail:
+  return 1;
+}
+
+
+SWIGINTERN PyObject *Swig_var_DBG_STAR_FOV_COUNT_get(void) {
+  PyObject *pyobj = 0;
+  
+  pyobj = SWIG_From_int(static_cast< int >(DBG_STAR_FOV_COUNT));
+  return pyobj;
+}
+
+
+SWIGINTERN int Swig_var_DBG_STAR_QUERY_COUNT_set(PyObject *_val) {
+  {
+    int val;
+    int res = SWIG_AsVal_int(_val, &val);
+    if (!SWIG_IsOK(res)) {
+      SWIG_exception_fail(SWIG_ArgError(res), "in variable '""DBG_STAR_QUERY_COUNT""' of type '""int""'");
+    }
+    DBG_STAR_QUERY_COUNT = static_cast< int >(val);
+  }
+  return 0;
+fail:
+  return 1;
+}
+
+
+SWIGINTERN PyObject *Swig_var_DBG_STAR_QUERY_COUNT_get(void) {
+  PyObject *pyobj = 0;
+  
+  pyobj = SWIG_From_int(static_cast< int >(DBG_STAR_QUERY_COUNT));
   return pyobj;
 }
 
@@ -3640,29 +3789,6 @@ SWIGINTERN PyObject *Swig_var_PIXSCALE_get(void) {
   PyObject *pyobj = 0;
   
   pyobj = SWIG_From_float(static_cast< float >(PIXSCALE));
-  return pyobj;
-}
-
-
-SWIGINTERN int Swig_var_EXPECTED_FALSE_STARS_set(PyObject *_val) {
-  {
-    float val;
-    int res = SWIG_AsVal_float(_val, &val);
-    if (!SWIG_IsOK(res)) {
-      SWIG_exception_fail(SWIG_ArgError(res), "in variable '""EXPECTED_FALSE_STARS""' of type '""float""'");
-    }
-    EXPECTED_FALSE_STARS = static_cast< float >(val);
-  }
-  return 0;
-fail:
-  return 1;
-}
-
-
-SWIGINTERN PyObject *Swig_var_EXPECTED_FALSE_STARS_get(void) {
-  PyObject *pyobj = 0;
-  
-  pyobj = SWIG_From_float(static_cast< float >(EXPECTED_FALSE_STARS));
   return pyobj;
 }
 
@@ -5202,7 +5328,7 @@ SWIGINTERN PyObject *_wrap_star_db_copy(PyObject *SWIGUNUSEDPARM(self), PyObject
   }
   arg1 = reinterpret_cast< star_db * >(argp1);
   result = (star_db *)(arg1)->copy();
-  resultobj = SWIG_NewPointerObj(SWIG_as_voidptr(result), SWIGTYPE_p_star_db, 0 |  0 );
+  resultobj = SWIG_NewPointerObj(SWIG_as_voidptr(result), SWIGTYPE_p_star_db, SWIG_POINTER_OWN |  0 );
   return resultobj;
 fail:
   return NULL;
@@ -7285,7 +7411,7 @@ SWIGINTERN PyObject *_wrap_star_query_from_kdmask(PyObject *SWIGUNUSEDPARM(self)
   }
   arg1 = reinterpret_cast< star_query * >(argp1);
   result = (star_db *)(arg1)->from_kdmask();
-  resultobj = SWIG_NewPointerObj(SWIG_as_voidptr(result), SWIGTYPE_p_star_db, 0 |  0 );
+  resultobj = SWIG_NewPointerObj(SWIG_as_voidptr(result), SWIGTYPE_p_star_db, SWIG_POINTER_OWN |  0 );
   return resultobj;
 fail:
   return NULL;
@@ -7307,7 +7433,7 @@ SWIGINTERN PyObject *_wrap_star_query_from_kdresults(PyObject *SWIGUNUSEDPARM(se
   }
   arg1 = reinterpret_cast< star_query * >(argp1);
   result = (star_db *)(arg1)->from_kdresults();
-  resultobj = SWIG_NewPointerObj(SWIG_as_voidptr(result), SWIGTYPE_p_star_db, 0 |  0 );
+  resultobj = SWIG_NewPointerObj(SWIG_as_voidptr(result), SWIGTYPE_p_star_db, SWIG_POINTER_OWN |  0 );
   return resultobj;
 fail:
   return NULL;
@@ -9578,7 +9704,7 @@ SWIGINTERN PyObject *_wrap_match_result_from_match(PyObject *SWIGUNUSEDPARM(self
   }
   arg1 = reinterpret_cast< match_result * >(argp1);
   result = (star_db *)(arg1)->from_match();
-  resultobj = SWIG_NewPointerObj(SWIG_as_voidptr(result), SWIGTYPE_p_star_db, 0 |  0 );
+  resultobj = SWIG_NewPointerObj(SWIG_as_voidptr(result), SWIGTYPE_p_star_db, SWIG_POINTER_OWN |  0 );
   return resultobj;
 fail:
   return NULL;
@@ -9969,6 +10095,7 @@ static PyMethodDef SwigMethods[] = {
 	 { (char *)"SWIG_PyInstanceMethod_New", (PyCFunction)SWIG_PyInstanceMethod_New, METH_O, NULL},
 	 { (char *)"PI_swigconstant", PI_swigconstant, METH_VARARGS, NULL},
 	 { (char *)"TWOPI_swigconstant", TWOPI_swigconstant, METH_VARARGS, NULL},
+	 { (char *)"IMG_ROTATION_swigconstant", IMG_ROTATION_swigconstant, METH_VARARGS, NULL},
 	 { (char *)"load_config", _wrap_load_config, METH_VARARGS, NULL},
 	 { (char *)"star_x_set", _wrap_star_x_set, METH_VARARGS, NULL},
 	 { (char *)"star_x_get", _wrap_star_x_get, METH_VARARGS, NULL},
@@ -10932,13 +11059,18 @@ SWIG_init(void) {
   
   PyDict_SetItemString(md,(char*)"cvar", SWIG_globals());
   SWIG_addvarlink(SWIG_globals(),(char*)"DBG_ENABLE",Swig_var_DBG_ENABLE_get, Swig_var_DBG_ENABLE_set);
+  SWIG_addvarlink(SWIG_globals(),(char*)"DBG_STAR_DB_COUNT",Swig_var_DBG_STAR_DB_COUNT_get, Swig_var_DBG_STAR_DB_COUNT_set);
+  SWIG_addvarlink(SWIG_globals(),(char*)"DBG_CONSTELLATION_DB_COUNT",Swig_var_DBG_CONSTELLATION_DB_COUNT_get, Swig_var_DBG_CONSTELLATION_DB_COUNT_set);
+  SWIG_addvarlink(SWIG_globals(),(char*)"DBG_DB_MATCH_COUNT",Swig_var_DBG_DB_MATCH_COUNT_get, Swig_var_DBG_DB_MATCH_COUNT_set);
+  SWIG_addvarlink(SWIG_globals(),(char*)"DBG_MATCH_RESULT_COUNT",Swig_var_DBG_MATCH_RESULT_COUNT_get, Swig_var_DBG_MATCH_RESULT_COUNT_set);
+  SWIG_addvarlink(SWIG_globals(),(char*)"DBG_STAR_FOV_COUNT",Swig_var_DBG_STAR_FOV_COUNT_get, Swig_var_DBG_STAR_FOV_COUNT_set);
+  SWIG_addvarlink(SWIG_globals(),(char*)"DBG_STAR_QUERY_COUNT",Swig_var_DBG_STAR_QUERY_COUNT_get, Swig_var_DBG_STAR_QUERY_COUNT_set);
   SWIG_addvarlink(SWIG_globals(),(char*)"IMG_X",Swig_var_IMG_X_get, Swig_var_IMG_X_set);
   SWIG_addvarlink(SWIG_globals(),(char*)"IMG_Y",Swig_var_IMG_Y_get, Swig_var_IMG_Y_set);
   SWIG_addvarlink(SWIG_globals(),(char*)"MAX_FALSE_STARS",Swig_var_MAX_FALSE_STARS_get, Swig_var_MAX_FALSE_STARS_set);
   SWIG_addvarlink(SWIG_globals(),(char*)"DB_REDUNDANCY",Swig_var_DB_REDUNDANCY_get, Swig_var_DB_REDUNDANCY_set);
   SWIG_addvarlink(SWIG_globals(),(char*)"REQUIRED_STARS",Swig_var_REQUIRED_STARS_get, Swig_var_REQUIRED_STARS_set);
   SWIG_addvarlink(SWIG_globals(),(char*)"PIXSCALE",Swig_var_PIXSCALE_get, Swig_var_PIXSCALE_set);
-  SWIG_addvarlink(SWIG_globals(),(char*)"EXPECTED_FALSE_STARS",Swig_var_EXPECTED_FALSE_STARS_get, Swig_var_EXPECTED_FALSE_STARS_set);
   SWIG_addvarlink(SWIG_globals(),(char*)"DOUBLE_STAR_PX",Swig_var_DOUBLE_STAR_PX_get, Swig_var_DOUBLE_STAR_PX_set);
   SWIG_addvarlink(SWIG_globals(),(char*)"BASE_FLUX",Swig_var_BASE_FLUX_get, Swig_var_BASE_FLUX_set);
   SWIG_addvarlink(SWIG_globals(),(char*)"IMAGE_VARIANCE",Swig_var_IMAGE_VARIANCE_get, Swig_var_IMAGE_VARIANCE_set);

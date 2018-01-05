@@ -137,8 +137,6 @@ if __name__ == '__main__':
 	
 	POS_VARIANCE=np.mean(db_img_dist)
 	
-	EXPECTED_FALSE_STARS = MAX_FALSE_STARS/2.0
-	
 	execfile(sys.argv[1]+"/calibration_data/"+basename(bestimage)+".solved")
 	
 	
@@ -150,7 +148,6 @@ if __name__ == '__main__':
 	f_calib.write("DOUBLE_STAR_PX=3.5\n")
 	f_calib.write("REQUIRED_STARS=4\n")
 	f_calib.write("MAX_FALSE_STARS="+str(MAX_FALSE_STARS)+"\n")
-	f_calib.write("EXPECTED_FALSE_STARS="+str(EXPECTED_FALSE_STARS)+"\n")
 	f_calib.write("BASE_FLUX="+str(BASE_FLUX)+"\n")
 	f_calib.write("THRESH_FACTOR="+str(THRESH_FACTOR)+"\n")
 	f_calib.write("IMAGE_VARIANCE="+str(IMAGE_VARIANCE)+"\n")

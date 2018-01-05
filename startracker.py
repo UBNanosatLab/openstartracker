@@ -8,7 +8,7 @@ import fcntl
 import beast
 
 def trace(frame, event, arg):
-    print "%s, %s:%d" % (event, frame.f_code.co_filename, frame.f_lineno)
+    print>>sys.stderr,"%s, %s:%d" % (event, frame.f_code.co_filename, frame.f_lineno)
     return trace
 
 #sys.settrace(trace)
@@ -37,13 +37,8 @@ print "Generating DB"
 C_DB=beast.constellation_db(S_FILTERED,2+beast.cvar.DB_REDUNDANCY,0)
 print "Ready"
 
-
-#Note: SWIG's policy is to always garbage collect objects that you are using
-#and never garbage collect the ones you are done with
-#This is to help keep developers on their toes. As a result, this is probably 
-#chock full'O memory leaks
-
-#TODO: check for memory leaks
+#Note: SWIG's policy is to garbage collect objects created with
+#constructors, but not objects created by returning from a function
 
 class star_image:
 	def __init__(self, imagefile,median_image):
@@ -55,14 +50,18 @@ class star_image:
 		self.db_stars=None
 		self.db_stars_rel=None
 		
-		#Thanks SWIG
-		self.near=None
-		self.rel=None
-		self.lis=None
+		#Placeholders so that these don't get garbage collected by SWIG
 		self.fov_db=None
 		self.lm_const_rel=None
 		
-		img=np.clip(cv2.imread(imagefile).astype(float)-median_image,a_min=0,a_max=255).astype(np.uint8)
+		#TODO: improve memory efficiency
+		if "://" in imagefile:
+			import urllib
+			img=cv2.imdecode(np.asarray(bytearray(urllib.urlopen(imagefile).read()), dtype="uint8"), cv2.IMREAD_COLOR)
+		else:
+			img=cv2.imread(imagefile)
+			
+		img=np.clip(img.astype(np.int16)-median_image,a_min=0,a_max=255).astype(np.uint8)
 		img_grey = cv2.cvtColor(img,cv2.COLOR_RGB2GRAY)
 		
 		#removes areas of the image that don't meet our brightness threshold
@@ -80,30 +79,29 @@ class star_image:
 				self.img_stars.add_star(cx-beast.cvar.IMG_X/2.0,(cy-beast.cvar.IMG_Y/2.0),float(cv2.getRectSubPix(img_grey,(1,1),(cx,cy))[0,0]),self.img_stars.map_size)
 				self.img_flux.append(cv2.getRectSubPix(img,(1,1),(cx,cy))[0,0].tolist())
 				
-		self.img_const=beast.constellation_db(self.img_stars,beast.cvar.MAX_FALSE_STARS+2,1)
+		self.img_const=beast.constellation_db(self.img_stars.copy(),beast.cvar.MAX_FALSE_STARS+2,1)
 		
 	
 	def match_near(self,x,y,z,r):
 		SQ_RESULTS.kdsearch(x,y,z,r,beast.cvar.THRESH_FACTOR*beast.cvar.IMAGE_VARIANCE)
 		#estimate density for constellation generation
 		C_DB.results.kdsearch(x,y,z,r,beast.cvar.THRESH_FACTOR*beast.cvar.IMAGE_VARIANCE)
-		fov_stars=SQ_RESULTS.from_kdresults()
+		fov_stars=SQ_RESULTS.from_kdresults()#REE
 		self.fov_db = beast.constellation_db(fov_stars,C_DB.results.kdresults_size,1)
 		C_DB.results.clear_kdresults()
 		SQ_RESULTS.clear_kdresults()
 		
-		self.near = beast.db_match(self.fov_db,self.img_const)
-		if self.near.p_match>0.9:
-			self.match = self.near
-			self.db_stars = self.near.winner.from_match()
-			self.db_stars.DBG_("db_stars")
+		near = beast.db_match(self.fov_db,self.img_const)
+		if near.p_match>0.9:
+			self.match = near
+			self.db_stars = near.winner.from_match()
 		
 	def match_lis(self):
-		self.lis=beast.db_match(C_DB,self.img_const)
-		if self.lis.p_match>0.9:
-			x=self.lis.winner.R11
-			y=self.lis.winner.R12
-			z=self.lis.winner.R13
+		lis=beast.db_match(C_DB,self.img_const)
+		if lis.p_match>0.9:
+			x=lis.winner.R11
+			y=lis.winner.R12
+			z=lis.winner.R13
 			self.match_near(x,y,z,beast.cvar.MAXFOV/2)
 
 	def match_rel(self,last_match):
@@ -111,6 +109,7 @@ class star_image:
 		lm_db_stars=last_match.img_stars.copy()
 		#update positions to eci
 		w=last_match.match.winner
+		#convert the stars to ECI
 		for i in range(lm_db_stars.map_size):
 			s=lm_db_stars.get_star(i)
 			x=s.x*w.R11+s.y*w.R21+s.z*w.R31
@@ -120,14 +119,13 @@ class star_image:
 			s.y=y
 			s.z=z
 		self.lm_const_rel=beast.constellation_db(lm_db_stars,beast.cvar.MAX_FALSE_STARS+2,1)
-		self.rel=beast.db_match(self.lm_const_rel,self.img_const)
-		if self.rel.p_match>0.9:
-			self.match_rel_result = self.rel
-			self.db_stars_rel = self.rel.winner.from_match()
+		rel=beast.db_match(self.lm_const_rel,self.img_const)
+		if rel.p_match>0.9:
+			self.match_rel_result = rel
+			self.db_stars_rel = rel.winner.from_match()
 			if self.match is None:
 				self.match = self.match_rel_result
 				self.db_stars = self.db_stars_rel
-		beast.cvar.DBG_ENABLE=1
 				
 	def print_match(self):
 		if self.match is None:
@@ -146,41 +144,24 @@ class star_image:
 class star_camera:
 	def __init__(self, median_file):
 		self.last_match=None
-		self.median_image=cv2.imread(median_file).astype(float)
+		self.median_image=cv2.imread(median_file)
 		
-	def solve_image(self,imagefile,x=None,y=None,z=None,arc_error=0):
+	def solve_image(self,imagefile):
 		starttime=time()
 		self.current_image=star_image(imagefile,self.median_image)
+		self.current_image.match_lis()
 		if self.last_match is not None:
-			if x is None:
-				x=self.last_match.match.winner.R11
-			if y is None:
-				y=self.last_match.match.winner.R12
-			if z is None:
-				z=self.last_match.match.winner.R13
-			self.current_image.match_near(x,y,z,beast.cvar.MAXFOV/2+arc_error/beast.cvar.PIXSCALE)
 			self.current_image.match_rel(self.last_match)
-			beast.cvar.DBG_ENABLE=0
-			if self.current_image.match is None:
-				self.current_image.match_lis()
-		else:
-			self.current_image.match_lis()
-		print dir(self.current_image)
 		self.current_image.print_match()
 		if self.current_image.match is not None:
 			self.last_match=self.current_image
-			#beast.cvar.DBG_ENABLE=1
-			print dir(self.current_image.match.winner)
-			print self.current_image.match.p_match
-			self.current_image.match.winner.DBG_("current_image")
-			#beast.cvar.DBG_ENABLE=0
 		else:
 			self.last_match=None
-		
 		print>>sys.stderr,"Time: "+str(time() - starttime)
 
-rgb=star_camera("tests/xmas/median_image.png")
-ir=star_camera("tests/xmas/median_image.png")
+rgb=star_camera(sys.argv[3])
+ir=star_camera(sys.argv[3])
+
 
 CONNECTIONS = {}
 class connection:
@@ -211,10 +192,12 @@ class connection:
 		data = ''
 		try:
 			while True:
+				lastlen=len(data)
 				data += os.read(self.fd, 1024)
-				if len(data)==0:
+				if len(data)==lastlen:
 					break
 		except OSError, e:
+			pass
 			# error 11 means we have no more data to read
 			if e.errno != 11:
 				raise
@@ -244,7 +227,12 @@ class connection:
 
 epoll = select.epoll()
 epoll.register(server.fileno(), select.EPOLLIN)
-connection(sys.stdin,epoll)
+
+try:
+	connection(sys.stdin,epoll)
+except IOError:
+	pass
+	
 while True:
 	events = epoll.poll()
 	for fd, event_type in events:

@@ -97,6 +97,9 @@ PI = _beast.PI
 _beast.TWOPI_swigconstant(_beast)
 TWOPI = _beast.TWOPI
 
+_beast.IMG_ROTATION_swigconstant(_beast)
+IMG_ROTATION = _beast.IMG_ROTATION
+
 def load_config(filename):
     return _beast.load_config(filename)
 load_config = _beast.load_config

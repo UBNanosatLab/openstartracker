@@ -20,6 +20,8 @@ struct  match_result {
 	float R31,R32,R33;
 	
 	match_result(constellation_db *db_, constellation_db *img_, star_fov *img_mask_) {
+		DBG_MATCH_RESULT_COUNT++;
+		DBG_PRINT("DBG_MATCH_RESULT_COUNT++ %d\n",DBG_MATCH_RESULT_COUNT);
 		db=db_;
 		img=img_;
 		img_mask=img_mask_;
@@ -28,7 +30,11 @@ struct  match_result {
 		match.totalscore=-FLT_MAX;
 		
 	}
-	~match_result() {free(map);}
+	~match_result() {
+		DBG_MATCH_RESULT_COUNT--;
+		DBG_PRINT("DBG_MATCH_RESULT_COUNT-- %d\n",DBG_MATCH_RESULT_COUNT);
+		free(map);
+	}
 	void init(constellation &db_const_, constellation &img_const_) {
 		db_const=&db_const_;
 		
@@ -61,7 +67,7 @@ struct  match_result {
 	void clear_search() {if (db->stars->kdsorted==1) db->results->clear_kdresults();}
 	void compute_score() {
 		//TODO: figure out where 2*map_size came from
-		match.totalscore=log(EXPECTED_FALSE_STARS/(IMG_X*IMG_Y))*(2*map_size);
+		match.totalscore=log(1.0/(IMG_X*IMG_Y))*(2*map_size);
 		float* scores=(float *)malloc(sizeof(float)*map_size);
 		for (int i=0;i<map_size;i++) {
 			map[i]=-1;
@@ -73,8 +79,8 @@ struct  match_result {
 			float x=s->x*R11+s->y*R12+s->z*R13;
 			float y=s->x*R21+s->y*R22+s->z*R23;
 			float z=s->x*R31+s->y*R32+s->z*R33;
-			float px=-y/(x*PIXX_TANGENT);
-			float py=-z/(x*PIXY_TANGENT);
+			float px=IMG_ROTATION*y/(x*PIXX_TANGENT);
+			float py=IMG_ROTATION*z/(x*PIXY_TANGENT);
 			
 			int nx=(int)(px+IMG_X/2.0f);
 			if (nx==-1) nx++;
@@ -252,14 +258,14 @@ struct  match_result {
 		
 		DBG_PRINT("DEC=%f\n",asin(R13)* 180 / PI);
 		DBG_PRINT("RA=%f\n",atan2(R12,R11)* 180 / PI);
-		DBG_PRINT("ORIENTATION=%f\n",-atan2(R23,R33)* 180 / PI);
+		DBG_PRINT("ORIENTATION=%f\n",fmod(360-atan2(R23,R33)* 180 / PI ,360));
 		
-		db->DBG_("DB");
-		img->DBG_("IMG");
-		DBG_PRINT("map_size=%d\n", map_size);
-		for (int i=0; i<map_size; i++) {
-			DBG_PRINT("map[%d]=%d\n",i,map[i]);
-		}
+		//db->DBG_("DB");
+		//img->DBG_("IMG");
+		//DBG_PRINT("map_size=%d\n", map_size);
+		//for (int i=0; i<map_size; i++) {
+		//	DBG_PRINT("map[%d]=%d\n",i,map[i]);
+		//}
 	}
 };
 
@@ -279,6 +285,8 @@ struct db_match {
 		} else c_pairs[c_pairs_size++]=m->match;
 		
 	db_match(constellation_db *db, constellation_db *img) {
+		DBG_DB_MATCH_COUNT++;
+		DBG_PRINT("DBG_DB_MATCH_COUNT++ %d\n",DBG_DB_MATCH_COUNT);
 		c_pairs=NULL;
 		c_pairs_size=0;
 
@@ -331,6 +339,8 @@ struct db_match {
 	}
 	
 	~db_match() {
+		DBG_DB_MATCH_COUNT--;
+		DBG_PRINT("DBG_DB_MATCH_COUNT-- %d\n",DBG_DB_MATCH_COUNT);
 		delete winner;
 		delete img_mask;
 		free(c_pairs);

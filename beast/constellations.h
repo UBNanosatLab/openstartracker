@@ -57,6 +57,8 @@ struct constellation_db {
 	star_query* results;
 		
 	constellation_db(star_db *s,int stars_per_fov, int from_image) {
+		DBG_CONSTELLATION_DB_COUNT++;
+		DBG_PRINT("DBG_CONSTELLATION_DB_COUNT++ %d\n",DBG_CONSTELLATION_DB_COUNT);
 		stars=s->copy();
 		results=new star_query(stars);
 
@@ -104,6 +106,8 @@ struct constellation_db {
 		}
 	}
 	~constellation_db() {
+		DBG_CONSTELLATION_DB_COUNT--;
+		DBG_PRINT("DBG_CONSTELLATION_DB_COUNT-- %d\n",DBG_CONSTELLATION_DB_COUNT);
 		free(map);
 		delete results;
 		delete stars;

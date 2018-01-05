@@ -40,12 +40,6 @@ struct star {
 		DBG_PRINT("px=%f ", px);
 		DBG_PRINT("py=%f\n", py);
 	}
-	~star() {
-		if (DBG_ENABLE==1) {
-			DBG_PRINT("REEEEEEEEEE!!!\n");
-			assert(2+2==5);
-		}
-	}
 };
 
 bool star_gt_x(const star &s1, const star &s2) {return s1.x > s2.x;}
@@ -66,12 +60,16 @@ struct star_db {
 	int kdsorted;
 	
 	star_db() {
+		DBG_STAR_DB_COUNT++;
+		DBG_PRINT("DBG_STAR_DB_COUNT++ %d\n",DBG_STAR_DB_COUNT);
 		map=NULL;
 		map_size=0;
 		kdsorted=0;
 		max_variance=0.0;
 	}
 	~star_db() {
+		DBG_STAR_DB_COUNT--;
+		DBG_PRINT("DBG_STAR_DB_COUNT-- %d\n",DBG_STAR_DB_COUNT);
 		free(map);
 	}
 	
@@ -96,8 +94,8 @@ struct star_db {
 		map[n].id=id;
 		map[n].unreliable=0;
 		map[n].flux=flux;
-		map[n].px=-y/(x*PIXX_TANGENT);
-		map[n].py=-z/(x*PIXY_TANGENT);
+		map[n].px=IMG_ROTATION*y/(x*PIXX_TANGENT);
+		map[n].py=IMG_ROTATION*z/(x*PIXY_TANGENT);
 		map[n].sigma_sq=POS_VARIANCE;
 		map[n].star_idx=n;
 	}
@@ -106,8 +104,8 @@ struct star_db {
 		float j=PIXX_TANGENT*px; /* j=(y/x) */
 		float k=PIXY_TANGENT*py; /* k=z/x */
 		float x=1./sqrt(j*j+k*k+1);
-		float y=-j*x;
-		float z=-k*x;
+		float y=IMG_ROTATION*j*x;
+		float z=IMG_ROTATION*k*x;
 		int n=map_size;
 		add_star(x,y,z,flux,id);
 		map[n].sigma_sq=IMAGE_VARIANCE/map[n].flux;
@@ -146,8 +144,8 @@ struct star_db {
 				map[i].y=sin(PI*RA/180.0)*cosdec;
 				map[i].z=sin(PI*DEC/180.0);
 				map[i].unreliable=((atoi(hip_record[29])==0||atoi(hip_record[29])==1)&&atoi(hip_record[6])!=3)?0:1;
-				map[i].px=-map[i].y/(map[i].x*PIXX_TANGENT);
-				map[i].py=-map[i].z/(map[i].x*PIXY_TANGENT);
+				map[i].px=IMG_ROTATION*map[i].y/(map[i].x*PIXX_TANGENT);
+				map[i].py=IMG_ROTATION*map[i].z/(map[i].x*PIXY_TANGENT);
 				map[i].sigma_sq=POS_VARIANCE;
 			}
 		}
@@ -185,20 +183,19 @@ struct star_fov {
 	float get_score(int id,float px,float py) {
 		float sigma_sq,maxdist_sq;
 		CALC_MAXDIST_SQ(id);
-		px-=stars->map[id].px;
-		py-=stars->map[id].py;
-		if (px<-0.5) px+=1.0;/* use whichever corner of the pixel gives the best score */
-		if (py<-0.5) py+=1.0;
-		return (maxdist_sq-(px*px+py*py))/(2*sigma_sq);
-		//return get_score(id, px, py, sigma_sq, maxdist_sq);
+		float dx=px-stars->map[id].px;
+		float dy=py-stars->map[id].py;
+		if (dx<-0.5) dx+=1.0;/* use whichever corner of the pixel gives the best score */
+		if (dy<-0.5) dy+=1.0;
+		return (maxdist_sq-(dx*dx+dy*dy))/(2*sigma_sq);
 	}
 			
 	float get_score(int id,float px,float py,float sigma_sq,float maxdist_sq) {
-		px-=stars->map[id].px;
-		py-=stars->map[id].py;
-		if (px<-0.5) px+=1.0;/* use whichever corner of the pixel gives the best score */
-		if (py<-0.5) py+=1.0;
-		return (maxdist_sq-(px*px+py*py))/(2*sigma_sq);
+		float dx=px-stars->map[id].px;
+		float dy=py-stars->map[id].py;
+		if (dx<-0.5) dx+=1.0;/* use whichever corner of the pixel gives the best score */
+		if (dy<-0.5) dy+=1.0;
+		return (maxdist_sq-(dx*dx+dy*dy))/(2*sigma_sq);
 	}
 	
 	//Used to resolve collisions where a star falls into the region of overlap.
@@ -213,6 +210,8 @@ struct star_fov {
 		return (get_score(id1,px,py)>get_score(id2,px,py))?id1:id2;
 	}
 	star_fov(star_db* s, float db_max_variance_) {
+		DBG_STAR_FOV_COUNT++;
+		DBG_PRINT("DBG_STAR_FOV_COUNT++ %d\n",DBG_STAR_FOV_COUNT);
 		db_max_variance=db_max_variance_;
 		stars=s;
 		collision=NULL;
@@ -260,6 +259,8 @@ struct star_fov {
 		}
 	}
 	~star_fov() {
+		DBG_STAR_FOV_COUNT--;
+		DBG_PRINT("DBG_STAR_FOV_COUNT-- %d\n",DBG_STAR_FOV_COUNT);
 		free(mask);
 		free(collision);
 	}
@@ -276,6 +277,8 @@ struct star_query {
 	
 	star_db *stars;
 	star_query(star_db *s) {
+		DBG_STAR_QUERY_COUNT++;
+		DBG_PRINT("DBG_STAR_QUERY_COUNT++ %d\n",DBG_STAR_QUERY_COUNT);
 		stars=s;
 		
 		kdresults_size=stars->map_size;
@@ -293,6 +296,8 @@ struct star_query {
 		reset_kdmask();
 	}
 	~star_query() {
+		DBG_STAR_QUERY_COUNT--;
+		DBG_PRINT("DBG_STAR_QUERY_COUNT-- %d\n",DBG_STAR_QUERY_COUNT);
 		free(kdresults);
 		free(kdmask);
 	}
