@@ -287,10 +287,13 @@ struct db_match {
 	db_match(constellation_db *db, constellation_db *img) {
 		DBG_DB_MATCH_COUNT++;
 		DBG_PRINT("DBG_DB_MATCH_COUNT++ %d\n",DBG_DB_MATCH_COUNT);
+		winner=NULL;
+		img_mask=NULL;
 		c_pairs=NULL;
 		c_pairs_size=0;
+		p_match=0.0;
 
-		if (db->stars->map_size<2||img->stars->map_size<2) return;
+		if (db->stars->map_size<3||img->stars->map_size<3) return;
 		img_mask = new star_fov(img->stars,db->stars->max_variance);
 		
 		//find stars
@@ -324,9 +327,7 @@ struct db_match {
 		delete m;
 		
 		//calculate map
-		if (winner->match.totalscore==-FLT_MAX) { //Did we even match?
-			p_match=0.0;
-		} else {
+		if (winner->match.totalscore!=-FLT_MAX) { //Did we even match?
 			//calculate p_match
 			p_match=1.0;
 			for (int idx=0; idx<c_pairs_size;idx++) {

@@ -70,9 +70,6 @@ class star_image:
 		#removes areas of the image that don't meet our brightness threshold
 		ret,thresh = cv2.threshold(img_grey,beast.cvar.THRESH_FACTOR*beast.cvar.IMAGE_VARIANCE,255,cv2.THRESH_BINARY)
 		contours,heirachy = cv2.findContours(thresh,1,2);
-		if len(contours)<2:
-			return
-			
 
 		for c in contours:
 			M = cv2.moments(c)
@@ -89,7 +86,8 @@ class star_image:
 				self.img_stars.add_star(cx-beast.cvar.IMG_X/2.0,(cy-beast.cvar.IMG_Y/2.0),float(cv2.getRectSubPix(img_grey,(1,1),(cx,cy))[0,0]),-1)
 				self.img_data.append(b_conf+[cx,cy,u20,u02,u11]+cv2.getRectSubPix(img,(1,1),(cx,cy))[0,0].tolist())
 				
-		self.img_const=beast.constellation_db(self.img_stars.copy(),beast.cvar.MAX_FALSE_STARS+2,1)
+		#self.img_const=beast.constellation_db(self.img_stars.copy(),beast.cvar.MAX_FALSE_STARS+2,1)
+		self.img_const=beast.constellation_db(self.img_stars,beast.cvar.MAX_FALSE_STARS+2,1)
 		
 	
 	def match_near(self,x,y,z,r):

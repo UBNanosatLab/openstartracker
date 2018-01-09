@@ -75,6 +75,9 @@ if [[ $IMG_TEST == 1 ]]; then
 	$@ python startracker.py $TESTDIR/calibration.txt 1991.25 $TESTDIR/median_image.png &
 	KILLPID="$!"
 	sleep 10
+	#make sure we dont crash when given an image w/ no stars
+	echo "rgb.solve_image('$TESTDIR/median_image.png')" | nc 127.0.0.1 8010
+	sleep 0.5
 	for i in $TESTDIR/samples/*; do
 		echo "rgb.solve_image('$i')" | nc 127.0.0.1 8010
 		sleep 0.5
