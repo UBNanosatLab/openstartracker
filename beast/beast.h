@@ -256,16 +256,17 @@ struct  match_result {
 		DBG_PRINT("%f\t%f\t%f\n", R21,R22,R23);
 		DBG_PRINT("%f\t%f\t%f\n", R31,R32,R33);
 		
-		DBG_PRINT("DEC=%f\n",asin(R13)* 180 / PI);
-		DBG_PRINT("RA=%f\n",atan2(R12,R11)* 180 / PI);
-		DBG_PRINT("ORIENTATION=%f\n",fmod(360-atan2(R23,R33)* 180 / PI ,360));
-		
-		//db->DBG_("DB");
-		//img->DBG_("IMG");
-		//DBG_PRINT("map_size=%d\n", map_size);
-		//for (int i=0; i<map_size; i++) {
-		//	DBG_PRINT("map[%d]=%d\n",i,map[i]);
-		//}
+		db->DBG_("DB");
+		img->DBG_("IMG");
+		DBG_PRINT("map_size=%d\n", map_size);
+		for (int i=0; i<map_size; i++) {
+			DBG_PRINT("map[%d]=%d\n",i,map[i]);
+		}
+	}
+	void print_ori() {
+		fprintf(stderr,"DEC=%f\n",asin(R13)* 180 / PI);
+		fprintf(stderr,"RA=%f\n",atan2(R12,R11)* 180 / PI);
+		fprintf(stderr,"ORIENTATION=%f\n",fmod(360-atan2(R23,R33)* 180 / PI ,360));
 	}
 };
 

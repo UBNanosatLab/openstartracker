@@ -9765,6 +9765,27 @@ fail:
 }
 
 
+SWIGINTERN PyObject *_wrap_match_result_print_ori(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  match_result *arg1 = (match_result *) 0 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  PyObject * obj0 = 0 ;
+  
+  if (!PyArg_ParseTuple(args,(char *)"O:match_result_print_ori",&obj0)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_match_result, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "match_result_print_ori" "', argument " "1"" of type '" "match_result *""'"); 
+  }
+  arg1 = reinterpret_cast< match_result * >(argp1);
+  (arg1)->print_ori();
+  resultobj = SWIG_Py_Void();
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
 SWIGINTERN PyObject *match_result_swigregister(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *obj;
   if (!PyArg_ParseTuple(args,(char*)"O:swigregister", &obj)) return NULL;
@@ -10281,6 +10302,7 @@ static PyMethodDef SwigMethods[] = {
 	 { (char *)"match_result_from_match", _wrap_match_result_from_match, METH_VARARGS, NULL},
 	 { (char *)"match_result_weighted_triad", _wrap_match_result_weighted_triad, METH_VARARGS, NULL},
 	 { (char *)"match_result_DBG_", _wrap_match_result_DBG_, METH_VARARGS, NULL},
+	 { (char *)"match_result_print_ori", _wrap_match_result_print_ori, METH_VARARGS, NULL},
 	 { (char *)"match_result_swigregister", match_result_swigregister, METH_VARARGS, NULL},
 	 { (char *)"db_match_p_match_set", _wrap_db_match_p_match_set, METH_VARARGS, NULL},
 	 { (char *)"db_match_p_match_get", _wrap_db_match_p_match_get, METH_VARARGS, NULL},

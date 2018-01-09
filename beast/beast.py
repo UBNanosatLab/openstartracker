@@ -640,6 +640,9 @@ class match_result(_object):
 
     def DBG_(self, s):
         return _beast.match_result_DBG_(self, s)
+
+    def print_ori(self):
+        return _beast.match_result_print_ori(self)
 match_result_swigregister = _beast.match_result_swigregister
 match_result_swigregister(match_result)
 

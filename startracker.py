@@ -86,7 +86,6 @@ class star_image:
 				self.img_stars.add_star(cx-beast.cvar.IMG_X/2.0,(cy-beast.cvar.IMG_Y/2.0),float(cv2.getRectSubPix(img_grey,(1,1),(cx,cy))[0,0]),-1)
 				self.img_data.append(b_conf+[cx,cy,u20,u02,u11]+cv2.getRectSubPix(img,(1,1),(cx,cy))[0,0].tolist())
 				
-		#self.img_const=beast.constellation_db(self.img_stars.copy(),beast.cvar.MAX_FALSE_STARS+2,1)
 		self.img_const=beast.constellation_db(self.img_stars,beast.cvar.MAX_FALSE_STARS+2,1)
 		
 	
@@ -133,6 +132,8 @@ class star_image:
 			self.db_stars_from_lm = rel.winner.from_match()
 				
 	def print_match(self):
+		if self.match is not None:
+			self.match.winner.print_ori()
 		db=self.db_stars
 		im=self.img_stars
 		if db is None:
