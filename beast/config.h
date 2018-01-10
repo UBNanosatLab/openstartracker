@@ -9,7 +9,6 @@
 #define PI		   3.14159265358979323846  /* pi */
 #define TWOPI		6.28318530717958647693
 #define IMG_ROTATION 1
-//#define IMG_ROTATION -1
 
 int DBG_ENABLE;
 #define DBG_PRINT(format,args...) if (DBG_ENABLE==1) fprintf(stderr,format, ## args);
