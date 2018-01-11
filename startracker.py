@@ -41,7 +41,19 @@ print "Ready"
 
 #Note: SWIG's policy is to garbage collect objects created with
 #constructors, but not objects created by returning from a function
-
+def apply_calibration(cal):
+	old=np.array([[beast.cvar.CAL11,beast.cvar.CAL12,beast.cvar.CAL13],[beast.cvar.CAL21,beast.cvar.CAL22,beast.cvar.CAL23],[beast.cvar.CAL31,beast.cvar.CAL32,beast.cvar.CAL33]])
+	new=np.dot(old,cal)
+	beast.cvar.CAL11=new[0,0]
+	beast.cvar.CAL12=new[0,1]
+	beast.cvar.CAL13=new[0,2]
+	beast.cvar.CAL21=new[1,0]
+	beast.cvar.CAL22=new[1,1]
+	beast.cvar.CAL23=new[1,2]
+	beast.cvar.CAL31=new[2,0]
+	beast.cvar.CAL32=new[2,1]
+	beast.cvar.CAL33=new[2,2]
+	
 class star_image:
 	def __init__(self, imagefile,median_image):
 		b_conf=[time(),beast.cvar.PIXSCALE,beast.cvar.BASE_FLUX]
@@ -266,6 +278,13 @@ class science_camera:
 		self.median_image=cv2.imread(median_file)
 	def solve_image(self,imagefile):
 		os.write(1,os.path.abspath(NONSTAR_DATAFILENAME))
+
+measuredAttitude=np.array([[1,0,0],[0,1,0],[0,0,1]])
+trueAttitude=np.array([[1,0,0],[0,1,0],[0,0,1]])
+
+cal=np.dot(trueAttitude,np.transpose(measuredAttitude))
+#cal=np.transpose(cal)
+apply_calibration(cal)
 
 rgb=star_camera(sys.argv[3])
 ir=science_camera(sys.argv[3])
