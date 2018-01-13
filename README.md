@@ -1,14 +1,21 @@
 # openstartracker
 A fast, robust, open source startracker based on a new class of baysian startracker algorithms
 
+Features:
+
+* Fast lost in space identification
+* Image to image matching
+* Collect and store size, shape and color information of unknown objects
+* Tracks unknown objects between images
+
 ### Basic setup:
 
 ##### From a fresh xubuntu 16.04 linux install
-~~~~
 Development computer setup:
+~~~~
 sudo apt-get install git libvte-dev libtool ctags gdb meld nemiver libwebkit-dev vim geany geany-plugins astrometry.net python-astropy  g++-multilib
 
-Note: These are needed for actually building (ie. on flight computer)
+Note: The following also needed for actually building (ie. on flight computer)
 sudo apt-get install python-scipy libopencv-dev python-opencv swig
 cd /usr/share/astrometry
 
