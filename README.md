@@ -41,7 +41,7 @@ mkdir yourcamera/calibration_data
 ~~~~
 add 3-10 star images of different parts of the sky taken with your camera to yourcamera/samples
 
-edit APERTURE and EXPOSURE_TIME in calibrate.py (you want to take images with the lowest exposure time consistently solves)
+edit APERTURE and EXPOSURE_TIME in calibrate.py (you want to take images with the lowest exposure time that consistently solves)
 
 run ./unit_test.sh -crei yourcamera to recalibrate and test
 
