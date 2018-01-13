@@ -7,7 +7,7 @@ Features:
 * Image to image matching
 * Collect and store size, shape and color information of unknown objects
 * Tracks unknown objects between images
-* Programable python frontend / reusable C++ backend (BEAST) with no external dependencies 
+* Programable python frontend / reusable C++ backend (BEAST-2) with no external dependencies 
 
 ### Basic setup:
 
