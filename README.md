@@ -7,7 +7,7 @@ Features:
 * Image to image matching
 * Collect and store size, shape and color information of unknown objects
 * Tracks unknown objects between images
-* Programable python frontend / C++ backend
+* Programable python frontend / reusable C++ backend
 ### Basic setup:
 
 ##### From a fresh xubuntu 16.04 linux install
