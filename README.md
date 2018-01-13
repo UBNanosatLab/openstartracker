@@ -30,13 +30,14 @@ git clone https://github.com/UBNanosatLab/openstartracker.git
 
 cd openstartracker/tests
 ./unit_test.sh -crei xmas
-
+~~~~
 ##### To calibrate a new camera:
+~~~~
 cd openstartracker/
 mkdir yourcamera
 mkdir yourcamera/samples
 mkdir yourcamera/calibration_data
-
+~~~~
 add 3-10 star images of different parts of the sky taken with your camera to yourcamera/samples
 
 edit APERTURE and EXPOSURE_TIME in calibrate.py (you want to take images with the lowest exposure time consistantly solves)
