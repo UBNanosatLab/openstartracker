@@ -45,4 +45,4 @@ edit APERTURE and EXPOSURE_TIME in calibrate.py (you want to take images with th
 
 run ./unit_test.sh -crei yourcamera to recalibrate and test
 
-the ESA test should have a score of >70. if its worse than this, play around with exposure time (50ms is a good starting point)
+The ESA test should have a score of >70. If its worse than this, play around with exposure time (50ms is a good starting point)
