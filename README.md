@@ -22,6 +22,9 @@ cd /usr/share/astrometry
 
 Download fits files corresponding to your camera fov size (see astrometry.net for details
 sudo wget http://data.astrometry.net/4100/index-4112.fits
+sudo wget http://data.astrometry.net/4100/index-4113.fits
+sudo wget http://data.astrometry.net/4100/index-4114.fits
+sudo wget http://data.astrometry.net/4100/index-4115.fits
 sudo wget http://data.astrometry.net/4100/index-4116.fits
 sudo wget http://data.astrometry.net/4100/index-4117.fits
 sudo wget http://data.astrometry.net/4100/index-4118.fits
