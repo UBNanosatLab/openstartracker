@@ -8,6 +8,7 @@ Features:
 * Collect and store size, shape and color information of unknown objects
 * Tracks unknown objects between images
 * Programable python frontend / reusable C++ backend (BEAST-2) with no external dependencies 
+* Uses astrometry.net for calibration (check if your camera is good enough by uploading your star images to nova.astrometry.net)
 
 ### Basic setup:
 
