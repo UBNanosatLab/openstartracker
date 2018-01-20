@@ -41,19 +41,67 @@ print "Ready"
 
 #Note: SWIG's policy is to garbage collect objects created with
 #constructors, but not objects created by returning from a function
-def apply_calibration(cal):
-	old=np.array([[beast.cvar.CAL11,beast.cvar.CAL12,beast.cvar.CAL13],[beast.cvar.CAL21,beast.cvar.CAL22,beast.cvar.CAL23],[beast.cvar.CAL31,beast.cvar.CAL32,beast.cvar.CAL33]])
-	new=np.dot(old,cal)
-	beast.cvar.CAL11=new[0,0]
-	beast.cvar.CAL12=new[0,1]
-	beast.cvar.CAL13=new[0,2]
-	beast.cvar.CAL21=new[1,0]
-	beast.cvar.CAL22=new[1,1]
-	beast.cvar.CAL23=new[1,2]
-	beast.cvar.CAL31=new[2,0]
-	beast.cvar.CAL32=new[2,1]
-	beast.cvar.CAL33=new[2,2]
+
+def wahba(A, B, weight=[]):
+	"""
+	Takes in two matrices of points and finds the attitude matrix needed to
+	transform one onto the other
+
+	Input:
+		A: nx3 matrix - x,y,z in body frame
+		B: nx3 matrix - x,y,z in eci
+		Note: the "n" dimension of both matrices must match
+	Output:
+		attitude_matrix: returned as a numpy matrix
+	"""
+	assert len(A) == len(B)
+	if (len(weight) == 0):
+		weight=np.array([1]*len(A))
+	# dot is matrix multiplication for array
+	H =  np.dot(np.transpose(A)*weight,B)
+
+	#calculate attitude matrix
+	#from http://malcolmdshuster.com/FC_MarkleyMortari_Girdwood_1999_AAS.pdf
+	U, S, Vt = np.linalg.svd(H)
+	flip=np.linalg.det(U)*np.linalg.det(Vt)
+
+	#S=np.diag([1,1,flip]); U=np.dot(U,S)
+	U[:,2]*=flip
+
+	body2ECI = np.dot(U,Vt)
+	return body2ECI
 	
+def print_ori(body2ECI):
+	#DEC=np.degrees(np.arcsin(body2ECI[2,0]))
+	##rotation about the z axis (-180 to +180)
+	#RA=np.degrees(np.arctan2(body2ECI[1,0],body2ECI[0,0]))
+	##rotation about the camera axis (-180 to +180)
+	#ORIENTATION=np.degrees(-np.arctan2(body2ECI[1,2],body2ECI[2,2]))
+	DEC=np.degrees(np.arcsin(body2ECI[0,2]))
+	RA=np.degrees(np.arctan2(body2ECI[0,1],body2ECI[0,0]))
+	ORIENTATION=np.degrees(-np.arctan2(body2ECI[1,2],body2ECI[2,2]))
+
+	#rotation about the y axis (-90 to +90)
+	print >>sys.stderr, "DEC="+str(DEC)
+	#rotation about the z axis (-180 to +180)
+	print >>sys.stderr, "RA="+str(RA)
+	#rotation about the camera axis (-180 to +180)
+	print >>sys.stderr, "ORIENTATION="+str(ORIENTATION)
+	
+measuredAttitude=np.array([[1,0,0],[0,1,0],[0,0,1]],dtype=float)
+trueAttitude=np.array([[1,0,0],[0,1,0],[0,0,1]],dtype=float)
+
+trueAttitude=np.array([[ 0.36722 , -0.474063,  0.800259],[ 0.60442 , -0.532334, -0.592702],[ 0.706983,  0.701345,  0.091049]])
+measuredAttitude=np.array([[ 0.24019355,  0.50099146,  0.8314532 ],[-0.19167839, -0.81518614,  0.54656267],[ 0.95161241, -0.29065245, -0.09977322]])
+
+
+
+# Truth: DEC = -41.4217831105, RA = -8.10307699822, ORI = -24.6358127234
+#measuredAttitude=np.array([[0.77653974,-0.0286448,-0.62941664],[0.33462691,0.86518496,0.37346971],[0.53386396,-0.5006339,0.68143594]],dtype=float)
+#trueAttitude=np.array([[0.742373,-0.135621,0.656117],[-0.105696,0.943328,0.314579],[-0.661597,-0.302884,0.685967]],dtype=float)
+
+cal=wahba(measuredAttitude, trueAttitude)
+
 class star_image:
 	def __init__(self, imagefile,median_image):
 		b_conf=[time(),beast.cvar.PIXSCALE,beast.cvar.BASE_FLUX]
@@ -119,8 +167,8 @@ class star_image:
 		lis=beast.db_match(C_DB,self.img_const)
 		if lis.p_match>P_MATCH_THRESH:
 			x=lis.winner.R11
-			y=lis.winner.R12
-			z=lis.winner.R13
+			y=lis.winner.R21
+			z=lis.winner.R31
 			self.match_near(x,y,z,beast.cvar.MAXFOV/2)
 
 	def match_rel(self,last_match):
@@ -131,9 +179,9 @@ class star_image:
 		#convert the stars to ECI
 		for i in range(img_stars_from_lm.map_size):
 			s=img_stars_from_lm.get_star(i)
-			x=s.x*w.R11+s.y*w.R21+s.z*w.R31
-			y=s.x*w.R12+s.y*w.R22+s.z*w.R32
-			z=s.x*w.R13+s.y*w.R23+s.z*w.R33
+			x=s.x*w.R11+s.y*w.R12+s.z*w.R13
+			y=s.x*w.R21+s.y*w.R22+s.z*w.R23
+			z=s.x*w.R31+s.y*w.R32+s.z*w.R33
 			s.x=x
 			s.y=y
 			s.z=z
@@ -191,9 +239,9 @@ class nonstar:
 			w=current_image.match_from_lm.winner
 		if w != None:
 			#convert the stars to ECI
-			s_db_x=s_im.x*w.R11+s_im.y*w.R21+s_im.z*w.R31
-			s_db_y=s_im.x*w.R12+s_im.y*w.R22+s_im.z*w.R32
-			s_db_z=s_im.x*w.R13+s_im.y*w.R23+s_im.z*w.R33
+			s_db_x=s_im.x*w.R11+s_im.y*w.R12+s_im.z*w.R13
+			s_db_y=s_im.x*w.R21+s_im.y*w.R22+s_im.z*w.R23
+			s_db_z=s_im.x*w.R31+s_im.y*w.R32+s_im.z*w.R33
 		self.data.append([source,s_im.x,s_im.y,s_im.z,s_db_x,s_db_y,s_db_z]+current_image.img_data[i])
 	def write_data(self,fd):
 		os.write(fd,str(self.id)+" " +str(len(self.data))+"\n")
@@ -253,6 +301,22 @@ class star_camera:
 		self.current_image=None
 		self.last_match=None
 		self.median_image=cv2.imread(median_file)
+	
+	def last_match_attitude(self):
+		R=np.array([[1,0,0],[0,1,0],[0,0,1]],dtype=float)
+		if self.last_match is not None:
+			w=self.last_match.match.winner
+			
+			R[0,0]=w.R11
+			R[0,1]=w.R12
+			R[0,2]=w.R13
+			R[1,0]=w.R21
+			R[1,1]=w.R22
+			R[1,2]=w.R23
+			R[2,0]=w.R31
+			R[2,1]=w.R32
+			R[2,2]=w.R33
+		return R
 
 	def solve_image(self,imagefile):
 		starttime=time()
@@ -278,13 +342,6 @@ class science_camera:
 		self.median_image=cv2.imread(median_file)
 	def solve_image(self,imagefile):
 		os.write(1,os.path.abspath(NONSTAR_DATAFILENAME))
-
-measuredAttitude=np.array([[1,0,0],[0,1,0],[0,0,1]])
-trueAttitude=np.array([[1,0,0],[0,1,0],[0,0,1]])
-
-cal=np.dot(trueAttitude,np.transpose(measuredAttitude))
-#cal=np.transpose(cal)
-apply_calibration(cal)
 
 rgb=star_camera(sys.argv[3])
 ir=science_camera(sys.argv[3])

@@ -106,13 +106,6 @@ struct star_db {
 		float x=1./sqrt(j*j+k*k+1);
 		float y=IMG_ROTATION*j*x;
 		float z=IMG_ROTATION*k*x;
-		float x_temp=x*CAL11+y*CAL12+z*CAL13;
-		float y_temp=x*CAL21+y*CAL22+z*CAL23;
-		float z_temp=x*CAL31+y*CAL32+z*CAL33;
-		
-		x=x_temp;
-		y=y_temp;
-		z=z_temp;
 		
 		int n=map_size;
 		add_star(x,y,z,flux,id);

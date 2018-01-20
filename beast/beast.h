@@ -63,7 +63,7 @@ struct  match_result {
 		if (match.totalscore==-FLT_MAX || m.totalscore==-FLT_MAX) return 0;
 		return (map[m.img_s1]==m.db_s1 && map[m.img_s2]==m.db_s2)?1:0;
 	}
-	void search() {if (db->stars->kdsorted==1) db->results->kdsearch(R11,R12,R13,MAXFOV/2,THRESH_FACTOR*IMAGE_VARIANCE);}
+	void search() {if (db->stars->kdsorted==1) db->results->kdsearch(R11,R21,R31,MAXFOV/2,THRESH_FACTOR*IMAGE_VARIANCE);}
 	void clear_search() {if (db->stars->kdsorted==1) db->results->clear_kdresults();}
 	void compute_score() {
 		//TODO: figure out where 2*map_size came from
@@ -76,9 +76,9 @@ struct  match_result {
 		for(int i=0;i<db->results->kdresults_size;i++) {
 			int o=db->results->kdresults[i];
 			star *s=&(db->stars->map[o]);
-			float x=s->x*R11+s->y*R12+s->z*R13;
-			float y=s->x*R21+s->y*R22+s->z*R23;
-			float z=s->x*R31+s->y*R32+s->z*R33;
+			float x=s->x*R11+s->y*R21+s->z*R31;
+			float y=s->x*R12+s->y*R22+s->z*R32;
+			float z=s->x*R13+s->y*R23+s->z*R33;
 			float px=IMG_ROTATION*y/(x*PIXX_TANGENT);
 			float py=IMG_ROTATION*z/(x*PIXY_TANGENT);
 			
@@ -239,15 +239,15 @@ struct  match_result {
 		sx=sx/mx;
 		
 		R11=cy*cz;
-		R12=cz*sx*sy - cx*sz;
-		R13=sx*sz + cx*cz*sy;
+		R21=cz*sx*sy - cx*sz;
+		R31=sx*sz + cx*cz*sy;
 		
-		R21=cy*sz;
+		R12=cy*sz;
 		R22=cx*cz + sx*sy*sz;
-		R23=cx*sy*sz - cz*sx;
+		R32=cx*sy*sz - cz*sx;
 		
-		R31=-sy;
-		R32=cy*sx;
+		R13=-sy;
+		R23=cy*sx;
 		R33=cx*cy;
 	}
 	void DBG_(const char *s) {
@@ -264,9 +264,17 @@ struct  match_result {
 		}
 	}
 	void print_ori() {
-		fprintf(stderr,"DEC=%f\n",asin(R13)* 180 / PI);
-		fprintf(stderr,"RA=%f\n",atan2(R12,R11)* 180 / PI);
-		fprintf(stderr,"ORIENTATION=%f\n",fmod(360-atan2(R23,R33)* 180 / PI ,360));
+		fprintf(stderr,"DEC=%f\n",fmod(360+asin(R31)* 180 / PI,360));
+		fprintf(stderr,"RA=%f\n",fmod(360+atan2(R21,R11)* 180 / PI,360));
+		fprintf(stderr,"ORIENTATION=%f\n",fmod(360-atan2(R32,R33)* 180 / PI ,360));
+		
+		//fprintf(stderr,"DEC=%f\n",fmod(360+asin(R31)* 180 / PI,360));
+		//fprintf(stderr,"RA=%f\n",fmod(360+atan2(R21,R11)* 180 / PI,360));
+		//fprintf(stderr,"ORIENTATION=%f\n",fmod(360-atan2(R32,R33)* 180 / PI ,360));
+		//
+		//fprintf(stderr,"TDEC=%f\n",fmod(360+asin(R13)* 180 / PI,360));
+		//fprintf(stderr,"TRA=%f\n",fmod(360+atan2(R12,R11)* 180 / PI,360));
+		//fprintf(stderr,"TORIENTATION=%f\n",fmod(360-atan2(R23,R33)* 180 / PI ,360));
 	}
 };
 

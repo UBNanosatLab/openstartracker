@@ -62,8 +62,8 @@ void star_id(double spikes[], int result[], size_t length)
 	db_match* lis = new db_match(C_DB,img);
 	if (lis->p_match>0.9) {
 		float x=lis->winner->R11;
-		float y=lis->winner->R12;
-		float z=lis->winner->R13;
+		float y=lis->winner->R21;
+		float z=lis->winner->R31;
 		
 		//Tests relative matching, and fills in missing stars
 		//and fill in missing stars
