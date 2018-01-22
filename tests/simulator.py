@@ -32,10 +32,7 @@
 
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
 import math
-from mpl_toolkits.mplot3d import Axes3D
 import sys
 
 BASE_PHOTONS = 19100 # photoelectrons per mm^2 and second of a magnitude 0 G2 star
@@ -75,8 +72,8 @@ def randomVectors(num):
     """Generates `num` random three dimensional unit-length vectors."""
     rands = np.random.rand(num, 2)
 
-    ca = np.cos(2 * np.pi * rands[:, 0])
-    sa = np.sin(2 * np.pi * rands[:, 0])
+    ca = np.cos(2. * np.pi * rands[:, 0])
+    sa = np.sin(2. * np.pi * rands[:, 0])
 
     z = rands[:, 1] * 2 - 1
     r = np.sqrt(1 - z * z)
@@ -88,12 +85,12 @@ def random_matrix():
     Based on James Arvo's algorithm from Graphics Gems III, pages 117-120"""
     rands = np.random.rand(3)
 
-    ca = np.cos(2 * np.pi * rands[0])
-    sa = np.sin(2 * np.pi * rands[0])
+    ca = np.cos(2. * np.pi * rands[0])
+    sa = np.sin(2. * np.pi * rands[0])
 
     R = ([[ca, sa, 0],
         [-sa, ca, 0],
-        [0, 0, 1]])
+        [0, 0, 1.]])
 
     cb = np.cos(2 * np.pi * rands[1])
     sb = np.sin(2 * np.pi * rands[1])
@@ -123,34 +120,10 @@ def add_vector_noise(base_vectors, stddev):
 
     return v_r / np.linalg.norm(v_r, axis=1).reshape((-1, 1))
 
-# Drawing Functions
-# -----------------
-
-def plot_vectors(vectors, limit_unit_sphere=False):
-    """Scatter plots 3D vectors."""
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-    x, y, z = split_vectors(vectors)
-    ax.scatter(x, y, z, c='r', marker='o')
-
-    if limit_unit_sphere:
-        ax.set_xlim3d(-1, 1)
-        ax.set_ylim3d(-1, 1)
-        ax.set_zlim3d(-1, 1)
-
-def circle(pos, radius, image):
-    """Draws a circle on an image."""
-    cy, cx = pos
-
-    # y-axis flip: in images the y-coordinate points down, so we need to flip it
-    cy = image.shape[0] - cy
-    y, x = np.ogrid[:image.shape[0], :image.shape[1]]
-    image[(x - cx)*(x - cx) + (y - cy)*(y - cy) < radius*radius] = 1
-
 # Camera
 # ------
 
-class Camera:
+class Camera(object):
     def __init__(self, resolution, pixel_ar = 1, principal_point = (0.5, 0.5)):
         self.resolution = resolution
         self.pixel_ar = pixel_ar
@@ -201,7 +174,7 @@ class Camera:
         return az, alt
 
 class EquidistantCamera(Camera):
-    def __init__(self, f, resolution, pixel_ar = 1, principal_point = (0.5, 0.5)):
+    def __init__(self, f, resolution, pixel_ar = 1., principal_point = (0.5, 0.5)):
         self.f = f
         super(EquidistantCamera, self).__init__(resolution, pixel_ar, principal_point)
 
@@ -212,59 +185,59 @@ class EquidistantCamera(Camera):
         return r / self.f
 
 class RectilinearCamera(Camera):
-    def __init__(self, f, resolution, pixel_ar = 1, principal_point = (0.5, 0.5)):
+    def __init__(self, f, resolution, pixel_ar = 1., principal_point = (0.5, 0.5)):
         self.f = f
         super(RectilinearCamera, self).__init__(resolution, pixel_ar, principal_point)
 
     def project(self, theta):
         result = np.tan(theta) * self.f
-        result[theta > np.pi / 2] = 1e9
+        result[theta > np.pi / 2.] = 1.e9
         return result
 
     def unproject(self, r):
         return np.arctan(r / self.f)
 
 class OrthographicCamera(Camera):
-    def __init__(self, f, resolution, pixel_ar = 1, principal_point = (0.5, 0.5)):
+    def __init__(self, f, resolution, pixel_ar = 1., principal_point = (0.5, 0.5)):
         self.f = f
         super(OrthographicCamera, self).__init__(resolution, pixel_ar, principal_point)
 
     def project(self, theta):
         result = np.sin(theta) * self.f
-        result[theta > np.pi / 2] = 1e9
+        result[theta > np.pi / 2.] = 1.e9
         return result
 
     def unproject(self, r):
         return np.arcsin(r / self.f)
 
 class EquisolidAngleCamera(Camera):
-    def __init__(self, f, resolution, pixel_ar = 1, principal_point = (0.5, 0.5)):
+    def __init__(self, f, resolution, pixel_ar = 1., principal_point = (0.5, 0.5)):
         self.f = f
         super(EquisolidAngleCamera, self).__init__(resolution, pixel_ar, principal_point)
 
     def project(self, theta):
-        result = np.sin(theta / 2) * 2 * self.f
-        result[theta > np.pi] = 1e9
+        result = np.sin(theta / 2.) * 2. * self.f
+        result[theta > np.pi] = 1.e9
         return result
 
     def unproject(self, r):
-        return 2 * np.arcsin(r / (2 * self.f))
+        return 2. * np.arcsin(r / (2. * self.f))
 
 class StereographicCamera(Camera):
-    def __init__(self, f, resolution, pixel_ar = 1, principal_point = (0.5, 0.5)):
+    def __init__(self, f, resolution, pixel_ar = 1., principal_point = (0.5, 0.5)):
         self.f = f
         super(StereographicCamera, self).__init__(resolution, pixel_ar, principal_point)
 
     def project(self, theta):
-        result = np.tan(theta / 2) * 2 * self.f
-        result[theta > np.pi] = 1e9
+        result = np.tan(theta / 2.) * 2. * self.f
+        result[theta > np.pi] = 1.e9
         return result
 
     def unproject(self, r):
-        return 2 * np.arctan(r / (2 * self.f))
+        return 2. * np.arctan(r / (2. * self.f))
 
 class CubicCamera(Camera):
-    def __init__(self, k1, k2, resolution, pixel_ar = 1, principal_point = (0.5, 0.5)):
+    def __init__(self, k1, k2, resolution, pixel_ar = 1., principal_point = (0.5, 0.5)):
         self.k1 = k1
         self.k2 = k2
         super(CubicCamera, self).__init__(resolution, pixel_ar, principal_point)
@@ -282,17 +255,17 @@ class CubicCamera(Camera):
             theta = r/c
             return theta
 
-        delta_0 = -3 * a * c
-        delta_1 = 27 * a * a * d
+        delta_0 = -3. * a * c
+        delta_1 = 27. * a * a * d
 
         if a < 0:
-            C = ((delta_1 + np.sqrt(np.complex64(delta_1 ** 2 - 4 * delta_0 ** 3))) / 2) ** (1 / 3)
+            C = ((delta_1 + np.sqrt(np.complex64(delta_1 ** 2 - 4. * delta_0 ** 3))) / 2.) ** (1. / 3.)
 
-            theta = np.real(-1 / (3 * a) * (C + delta_0 / (C)))
+            theta = np.real(-1. / (3. * a) * (C + delta_0 / (C)))
         else:
-            C = ((delta_1 + np.sqrt(delta_1 ** 2 - 4 * delta_0 ** 3)) / 2) ** (1 / 3)
+            C = ((delta_1 + np.sqrt(delta_1 ** 2 - 4. * delta_0 ** 3)) / 2) ** (1. / 3.)
 
-            theta = -1 / (3 * a) * (C + delta_0 / (C))
+            theta = -1. / (3. * a) * (C + delta_0 / (C))
 
 
         return theta
@@ -432,7 +405,7 @@ class StarDetector:
         
     @staticmethod
     def norm_gaussian(sigma):
-        return math.erf((2*sigma)**-0.5)**2/4
+        return math.erf((2*sigma)**-0.5)**2/4.
         
     def compute_flux(self, magnitude, add_noise=True):
         flux = self.base_flux * (10 ** (-magnitude / 2.5))
@@ -607,18 +580,18 @@ class Scene:
 #only do this part if we were run as a python script
 if __name__ == '__main__':
 	if len(sys.argv)!=4:
-		print("Usage: python3 simulator.py calibration.txt input.csv results.csv")
+		sys.stdout.write("Usage: python simulator.py calibration.txt input.csv results.csv\n")
 		exit()
 
 	exec(open(sys.argv[1]).read())
 
-	res_x = IMG_X # pixels
-	res_y = IMG_Y # pixels
+	res_x = float(IMG_X) # pixels
+	res_y = float(IMG_Y) # pixels
 
 	# normalized focal length
-	f = 0.5 / np.tan(np.deg2rad((IMG_X*PIXSCALE/3600)) / 2)
+	f = 0.5 / np.tan(np.deg2rad((IMG_X*PIXSCALE/3600)) / 2.)
 	# pixel aspect ratio
-	pixel_ar = 1
+	pixel_ar = 1.
 
 	# normalized principal point
 	ppx = 0.5
@@ -628,12 +601,12 @@ if __name__ == '__main__':
 
 	cam = 0
 
-	sigma_psf = 0.5*DOUBLE_STAR_PX # pixel
+	sigma_psf = 0.5*float(DOUBLE_STAR_PX) # pixel
 
 
-	t_exp = EXPOSURE_TIME # s
-	aperture = APERTURE # mm
-	base_flux = BASE_FLUX
+	t_exp = float(EXPOSURE_TIME) # s
+	aperture = float(APERTURE) # mm
+	base_flux = float(BASE_FLUX)
 
 	magnitude_gaussian = 0.02 # mag
 

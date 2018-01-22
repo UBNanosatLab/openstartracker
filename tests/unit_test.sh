@@ -57,10 +57,10 @@ if [[ $IMG_TEST == 1 ]]; then
 	popd>/dev/null
 fi
 if [[ $CALIBRATE == 1 ]]; then
-	time python calibrate.py $TESTDIR || exit
+	time python2.7 calibrate.py $TESTDIR || exit
 fi
 if [[ $REGENERATE == 1 ]]; then
-	time python3 simulator.py $TESTDIR/calibration.txt $TESTDIR/input.csv $TESTDIR/result.csv || exit
+	time python2.7 simulator.py $TESTDIR/calibration.txt $TESTDIR/input.csv $TESTDIR/result.csv || exit
 fi
 
 if [[ $ESA_TEST == 1 ]]; then
@@ -68,11 +68,11 @@ if [[ $ESA_TEST == 1 ]]; then
 	time $@ ./test $TESTDIR/input.csv $TESTDIR/calibration.txt 1991.25 | tee $TESTDIR/result_real.csv &&
 	echo "camera coverage simulation percent:" &&
 	echo "100-`diff --suppress-common-lines --speed-large-files -y $TESTDIR/result.csv $TESTDIR/result_real.csv | wc -l`/1" | bc -l &&
-	python score.py $TESTDIR/result.csv $TESTDIR/result_real.csv
+	python2.7 score.py $TESTDIR/result.csv $TESTDIR/result_real.csv
 fi
 
 if [[ $IMG_TEST == 1 ]]; then
-	$@ python startracker.py $TESTDIR/calibration.txt 1991.25 $TESTDIR/median_image.png &
+	$@ python2.7 startracker.py $TESTDIR/calibration.txt 1991.25 $TESTDIR/median_image.png &
 	KILLPID="$!"
 	sleep 10
 	#make sure we dont crash when given an image w/ no stars
