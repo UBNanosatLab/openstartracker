@@ -22,6 +22,9 @@ struct  constellation_pair {
 	int db_s1,db_s2;
 	int img_s1,img_s2;
 	
+/**
+* @brief TODO
+*/
 	void flip() {
 		int t=img_s1;
 		img_s1=img_s2;
@@ -56,6 +59,13 @@ struct constellation_db {
 	star_db* stars;
 	star_query* results;
 		
+/**
+* @brief TODO
+*
+* @param s
+* @param stars_per_fov
+* @param from_image
+*/
 	constellation_db(star_db *s,int stars_per_fov, int from_image) {
 		DBG_CONSTELLATION_DB_COUNT++;
 		DBG_PRINT("DBG_CONSTELLATION_DB_COUNT++ %d\n",DBG_CONSTELLATION_DB_COUNT);

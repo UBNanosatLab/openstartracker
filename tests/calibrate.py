@@ -11,7 +11,7 @@ from scipy import spatial
 
 ## Environment variables:
 try: EXPOSURE_TIME = float(environ['EXPOSURE_TIME'])
-except KeyError: EXPOSURE_TIME = 0.1 # s
+except KeyError: EXPOSURE_TIME = 0.03 # s
 try: APERTURE = float(environ['APERTURE'])
 except KeyError: APERTURE = 60.7 # mm
 try: DOUBLE_STAR_PX = float(environ['DOUBLE_STAR_PX'])
@@ -24,11 +24,11 @@ except KeyError: POS_ERR_SIGMA = 2 #Check all constellations which fall inside t
 
 ### NOTE: all of the following options multiply runtime by (N+2)^2
 try: MAX_FALSE_STARS = int(environ['MAX_FALSE_STARS'])
-except KeyError: MAX_FALSE_STARS = 5 #maximum number of objects that can be brighter than the two brightest stars 
+except KeyError: MAX_FALSE_STARS = 2 #maximum number of objects that can be brighter than the two brightest stars 
 try: DB_REDUNDANCY = int(environ['DB_REDUNDANCY'])
-except KeyError: DB_REDUNDANCY = 1 #of the brightest N+2 stars, we need at least 2
+except KeyError: DB_REDUNDANCY = 1 #of the brightest DB_REDUNDANCY+2 stars, we need at least 2
 try: REQUIRED_STARS = int(environ['REQUIRED_STARS'])
-except KeyError: REQUIRED_STARS = 4 #How many stars should we try to match?
+except KeyError: REQUIRED_STARS = 5 #How many stars should we try to match?
 ### For ultrawide fov this may be set to 3 for faster matching
 ### For ultranarrow fov, it may be necessary to set this to 5 (Also send me an email and we'll talk)
 ### TODO: figure out how big "ultrawide" and "ultranarrow" are

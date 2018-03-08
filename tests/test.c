@@ -58,8 +58,9 @@ void star_id(double spikes[], int result[], size_t length)
 		img_stars->add_star(spikes[3*i]-IMG_X/2.0,-(spikes[3*i+1]-IMG_Y/2.0),BASE_FLUX*powf(10.0,-spikes[3*i+2]/2.5),-1);
 		result[i] = -1;
 	}
-	constellation_db * img=new constellation_db(img_stars,MAX_FALSE_STARS+2,1);
-	db_match* lis = new db_match(C_DB,img);
+	star_db* img_stars_n_brightest=img_stars->copy_n_brightest(MAX_FALSE_STARS+REQUIRED_STARS);
+	constellation_db * img_n_brightest=new constellation_db(img_stars_n_brightest,MAX_FALSE_STARS+2,1);
+	db_match* lis = new db_match(C_DB,img_n_brightest);
 	if (lis->p_match>0.9) {
 		float x=lis->winner->R11;
 		float y=lis->winner->R21;
@@ -75,16 +76,19 @@ void star_id(double spikes[], int result[], size_t length)
 		C_DB->results->clear_kdresults();
 		SQ_RESULTS->clear_kdresults();
 		
+		constellation_db * img=new constellation_db(img_stars,MAX_FALSE_STARS+2,1);
 		db_match* fov_match = new db_match(fov_db,img);
 		star_db* db_stars=fov_match->winner->from_match();
 		for(size_t i = 0; i < length; i++) result[i] = db_stars->map[i].id;
+		delete img;
 		delete db_stars;
 		delete fov_db;
 		delete fov_match;
 	}
 	delete lis;
-	delete img;
+	delete img_n_brightest;
 	delete img_stars;
+	delete img_stars_n_brightest;
 }
 
 

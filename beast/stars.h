@@ -13,20 +13,30 @@ struct star {
 	float y;
 	float z;
 	float flux;
-	int star_idx;//how many stars were inserted before this one?
-	int id;//user defined id (ie hipparcos id, -1)
+	/** how many stars were inserted before this one? */
+	int star_idx;
+	/**user defined id (ie hipparcos id, -1)*/
+	int id;
 	int unreliable;
 
 	float sigma_sq;
 	float px;
 	float py;
-	/* numerically stable method to calculate distance between stars */
+/**
+* @brief numerically stable method to calculate distance between stars
+* @param s Star
+* @return Angular seperation in arcsec
+*/
 	float dist_arcsec(const star& s) const {
 		float a=x*s.y - s.x*y;
 		float b=x*s.z - s.x*z;
 		float c=y*s.z - s.y*z;
 		return (3600*180.0/PI)*asin(sqrt(a*a+b*b+c*c));
 	}
+/**
+* @brief Print debug info
+* @param s Label
+*/
 	void DBG_(const char *s) {
 		DBG_PRINT("%s\t",s);
 		DBG_PRINT("x=%f ", x);
@@ -52,7 +62,7 @@ bool star_lt_z(const star &s1, const star &s2) {return s1.z < s2.z;}
 bool star_lt_flux(const star &s1, const star &s2) {return s1.flux < s2.flux;}
 
 
-
+//TODO change to class
 struct star_db {
 	star *map;
 	int map_size;
@@ -74,7 +84,6 @@ struct star_db {
 	}
 	
 	star* get_star(int idx) {return map_size>0?&map[idx%map_size]:NULL;}
-	
 	star_db* copy() {
 		star_db* s = new star_db;
 		*s = *this;
@@ -82,7 +91,24 @@ struct star_db {
 		memcpy(s->map,map,sizeof(map[0])*map_size);
 		return s;
 	}
+	star_db* copy_n_brightest(int n) {
+		star_db* s = this->copy();
+		s->map_size=std::min(n,map_size);
+		std::nth_element(s->map,s->map+s->map_size,s->map+map_size,star_gt_flux);
+		for (int i=0;i<s->map_size;i++) s->map[i].star_idx=i;
+		s->map=(star*)realloc(s->map,sizeof(s->map[0])*s->map_size);
+		return s;
+	}
 	
+/**
+* @brief add star directly 
+*
+* @param x ECI  'coming out of image'
+* @param y ECI 
+* @param z ECI z
+* @param flux Pixel brightness
+* @param id User defined id
+*/
 	void add_star(float x, float y, float z, float flux, int id) {
 		assert(kdsorted==0);
 		int n=map_size++;
@@ -99,6 +125,14 @@ struct star_db {
 		map[n].sigma_sq=POS_VARIANCE;
 		map[n].star_idx=n;
 	}
+/**
+* @brief add star from image
+*
+* @param px Pixel x minus camera center
+* @param py Pixel y minus camera center
+* @param flux Pixel brightness
+* @param id  User defined id
+*/
 	void add_star(float px, float py, float flux, int id) {
 		assert(kdsorted==0);
 		float j=PIXX_TANGENT*px; /* j=(y/x) */
@@ -113,6 +147,12 @@ struct star_db {
 		if (max_variance<map[n].sigma_sq) max_variance=map[n].sigma_sq;
 	}
 	
+/**
+* @brief Load stars from hip_main.dat
+*
+* @param catalog path to hip_main.dat
+* @param year Update to the specified year
+*/
 	void load_catalog(const char* catalog, float year) {
 		FILE *stream = fopen(catalog, "r");
 		if (stream == NULL) exit(EXIT_FAILURE);
@@ -181,6 +221,15 @@ struct star_fov {
 		maxdist_sq=-sigma_sq*(log(sigma_sq)+MATCH_VALUE);
 
 
+/**
+* @brief TODO
+*
+* @param id
+* @param px
+* @param py
+*
+* @return 
+*/
 	float get_score(int id,float px,float py) {
 		float sigma_sq,maxdist_sq;
 		CALC_MAXDIST_SQ(id);
@@ -191,6 +240,17 @@ struct star_fov {
 		return (maxdist_sq-(dx*dx+dy*dy))/(2*sigma_sq);
 	}
 			
+/**
+* @brief TODO
+*
+* @param id
+* @param px
+* @param py
+* @param sigma_sq
+* @param maxdist_sq
+*
+* @return 
+*/
 	float get_score(int id,float px,float py,float sigma_sq,float maxdist_sq) {
 		float dx=px-stars->map[id].px;
 		float dy=py-stars->map[id].py;
@@ -199,9 +259,20 @@ struct star_fov {
 		return (maxdist_sq-(dx*dx+dy*dy))/(2*sigma_sq);
 	}
 	
-	//Used to resolve collisions where a star falls into the region of overlap.
-	//Adds a bit of complexity in exchange for being able to break ties at
-	//the subpixel level, which can sometimes make a difference 
+/**
+* @brief Get the id of the best match to the specified coordinates 
+* Used to resolve collisions where the coordinates falls into the region of overlap between two stars
+* Adds a bit of complexity in exchange for being able to break ties at
+* the subpixel level, which can sometimes make a difference 
+* 
+* @param id - the id from the image map
+* Any id <-1 is interpreted as an index in the collision buffer (starts at -2)
+*
+* @param px Pixel x minus camera center
+* @param py Pixel y minus camera center
+*
+* @return The id of whichever star is the best match to the coordinates in question 
+*/
 	int resolve_id(int id,float px,float py) {
 		if (id>=-1) return id;
 		//Any id <-1 is interpreted as an index in the collision buffer (starts at -2)
@@ -210,6 +281,11 @@ struct star_fov {
 		int id2=resolve_id(collision[id-1],px,py);
 		return (get_score(id1,px,py)>get_score(id2,px,py))?id1:id2;
 	}
+/**
+* @brief TODO
+* @param s
+* @param db_max_variance_
+*/
 	star_fov(star_db* s, float db_max_variance_) {
 		DBG_STAR_FOV_COUNT++;
 		DBG_PRINT("DBG_STAR_FOV_COUNT++ %d\n",DBG_STAR_FOV_COUNT);
@@ -277,6 +353,10 @@ struct star_query {
 	int kdbucket_size;
 	
 	star_db *stars;
+/**
+* @brief  TODO
+* @param s
+*/
 	star_query(star_db *s) {
 		DBG_STAR_QUERY_COUNT++;
 		DBG_PRINT("DBG_STAR_QUERY_COUNT++ %d\n",DBG_STAR_QUERY_COUNT);
@@ -302,16 +382,15 @@ struct star_query {
 		free(kdresults);
 		free(kdmask);
 	}
-	/* You may be looking at the most compact kd-tree in existence
-	 * It does not use pointers or indexes or leaf nodes or any extra memory
-	 * Instead the list is kdsorted in place using std::nth_element()
-	 * which is standard c++ implementation of quickselect.
+	/** You may be looking at the most compact kd-tree in existence
+	 *  It does not use pointers or indexes or leaf nodes or any extra memory
+	 *  Instead the list is kdsorted in place using std::nth_element()
+	 *  which is standard c++ implementation of quickselect.
 	 * 
-	 * References:
-	 * Numerical Recipies (ISBN: 9780521884075)
-	 * https://en.wikipedia.org/wiki/Quickselect
-	 * https://stackoverflow.com/questions/17021379/balancing-kd-tree-which-approach-is-more-efficient
-	 * 
+	 *  References:
+	 *  Numerical Recipies (ISBN: 9780521884075)
+	 *  https://en.wikipedia.org/wiki/Quickselect
+	 *  https://stackoverflow.com/questions/17021379/balancing-kd-tree-which-approach-is-more-efficient
 	 */
 
 	#define KDSORT_NEXT(A,B)\
@@ -324,6 +403,9 @@ struct star_query {
 			else std::sort(stars->map+(mid+1), stars->map+max,star_gt_flux);\
 		}
 
+/**
+* @brief kdsort the list in question. This happens automatically upon kdsearch if needed
+*/
 	void kdsort() {
 		kdsort_x(0,stars->map_size);
 		kdresults_size=0;
@@ -334,11 +416,16 @@ struct star_query {
 	void kdsort_z(int min, int max) {KDSORT_NEXT(star_lt_z,kdsort_x)}
 	#undef KDSORT_NEXT
 	
-	/* Clears kdmask, but does not reset kdresults. Slow.*/
+/**
+* @brief Clears kdmask, but does not reset kdresults. Slow.
+*/
 	void reset_kdmask() {
 		memset(kdmask,0,sizeof(kdmask[0])*stars->map_size);
 	}
 	
+/**
+* @brief TODO
+*/
 	void clear_kdresults() {
 		while (kdresults_size>0) {
 			kdresults_size--;
@@ -346,6 +433,16 @@ struct star_query {
 		}
 	}
 	 
+/**
+* @brief TODO
+*
+* @param idx
+* @param x
+* @param y
+* @param z
+* @param r
+* @param min_flux
+*/
 	void kdcheck(int idx, float x, float y, float z, float r, float min_flux){
 		x-=stars->map[idx].x;
 		y-=stars->map[idx].y;
@@ -361,8 +458,7 @@ struct star_query {
 			 * 
 			 * Note: Different sorting algorithms can result in different
 			 * stars being selected in the case where there are two candidates of
-			 * equal brightness for the last star. Do not be alarmed -
-			 * they all work fine
+			 * equal brightness for the last star. This has no effect on match quality
 			 */
 			 
 			int n=kdresults_size++;
@@ -379,18 +475,18 @@ struct star_query {
 	}
 	
 	
-	/**
-	 * @fn		kdsearch(float x, float y, float z, float r, float min_flux)
-	 * @param	x	cos(deg2rad*RA)*cos(deg2rad*DEC)
-	 * @param	y	sin(deg2rad*RA)*cos(deg2rad*DEC)
-	 * @param	z	sin(deg2rad*DEC)
-	 * @param	r	search distance (pixels)
-	 * @param	min	start of bounding box
-	 * @param	max	end of bounding box
-	 * @param	dim	start dimension
-	 * @brief	search map for points within r pixels of x,y,z 
-	 * @details put all results found into kdresults (sorted by brightness), mask via kdmask
-	 */
+/**
+* @brief		search map for points within r pixels of x,y,z 
+* @details		put all results found into kdresults (sorted by brightness), mask via kdmask
+* @param x		cos(deg2rad*RA)*cos(deg2rad*DEC)
+* @param y		sin(deg2rad*RA)*cos(deg2rad*DEC)
+* @param z		sin(deg2rad*DEC)
+* @param r		search distance (pixels)
+* @param min_flux	minimum pixel brightness
+* @param min		start of bounding box
+* @param max		end of bounding box
+* @param dim		start dimension
+*/
 	void kdsearch(float x, float y, float z, float r, float min_flux, int min, int max, int dim) {
 		if (stars->kdsorted==0) kdsort();
 		float r_deg=r/3600.0;
@@ -418,11 +514,14 @@ struct star_query {
 	void kdsearch_z(const float x, const float y, const float z, const float r, float min_flux, int min, int max) {KDSEARCH_NEXT(z-r,z,z+r,kdsearch_x)}
 	#undef KDSEARCH_NEXT
 
+/**
+* @brief set mask for stars that are too bright,too close, highly variable, or unreliable
+*/
 	void kdmask_filter_catalog() {
 		for (int i=0;i<stars->map_size;i++) {
-			//set mask for stars that are too bright,too close, highly variable, or unreliable
 			int8_t lastmask=kdmask[i];
 			kdsearch(stars->map[i].x,stars->map[i].y,stars->map[i].z,DOUBLE_STAR_PX*PIXSCALE,THRESH_FACTOR*IMAGE_VARIANCE);
+			//TODO uncomment for real stars
 			//if (kdresults_size>1||lastmask || stars->map[i].unreliable>0||stars->map[i].flux<THRESH_FACTOR*IMAGE_VARIANCE) {
 			if (kdresults_size>1||lastmask || stars->map[i].flux<THRESH_FACTOR*IMAGE_VARIANCE) {
 				kdmask[i]=1;
@@ -432,8 +531,10 @@ struct star_query {
 			}
 		}
 	}
-	/* Masks the dimmest stars in each area to produce a 
-	 * map with uniform density */
+/**
+* @brief Masks the dimmest stars in each area to produce a map with uniform density 
+* @param min_stars_per_fov Don't mask anything which could result in less than this many stars per field of view
+*/
 	void kdmask_uniform_density(int min_stars_per_fov) {
 		std::set<int> uniform_set;
 		int kdresults_maxsize_old=kdresults_maxsize;
@@ -448,6 +549,10 @@ struct star_query {
 		for (int i=0; i<uniform_set.size();i++,it++) kdmask[*it]=0;
 		kdresults_maxsize=kdresults_maxsize_old;
 	}
+/**
+* @brief Filter stardb based on mask
+* @return A new stardb containing only the stars which are not masked
+*/
 	star_db* from_kdmask() {
 		star_db* rd=new star_db;
 		rd->max_variance=stars->max_variance;
@@ -464,6 +569,10 @@ struct star_query {
 		}
 		return rd;
 	}
+/**
+* @brief TODO
+* @return 
+*/
 	star_db* from_kdresults() {
 		star_db* rd=new star_db;
 		rd->max_variance=stars->max_variance;

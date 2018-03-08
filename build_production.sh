@@ -10,6 +10,6 @@ cp hip_main.dat startracker-production&&
 cp startracker.py startracker-production/&&
 touch startracker-production.tgz&&
 rm startracker-production.tgz &&
-rsync -av startracker-production/ root@192.168.100.205:~/startracker-production/ &&
+rsync -av startracker-production/ root@192.168.100.213:~/startracker-production/ &&
 rm -rf startracker-production
 

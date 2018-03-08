@@ -19,6 +19,12 @@ struct  match_result {
 	float R21,R22,R23;
 	float R31,R32,R33;
 	
+/**
+* @brief TODO
+* @param db_
+* @param img_
+* @param img_mask_
+*/
 	match_result(constellation_db *db_, constellation_db *img_, star_fov *img_mask_) {
 		DBG_MATCH_RESULT_COUNT++;
 		DBG_PRINT("DBG_MATCH_RESULT_COUNT++ %d\n",DBG_MATCH_RESULT_COUNT);
@@ -35,6 +41,11 @@ struct  match_result {
 		DBG_PRINT("DBG_MATCH_RESULT_COUNT-- %d\n",DBG_MATCH_RESULT_COUNT);
 		free(map);
 	}
+/**
+* @brief TODO
+* @param db_const_
+* @param img_const_
+*/
 	void init(constellation &db_const_, constellation &img_const_) {
 		db_const=&db_const_;
 		
@@ -44,6 +55,10 @@ struct  match_result {
 		match.db_s2=db_const_.s2;
 	}
 	
+/**
+* @brief TODO
+* @param c
+*/
 	void copy_over(match_result *c) {
 		assert(c->db==db);
 		assert(c->img==img);
@@ -58,13 +73,27 @@ struct  match_result {
 		
 		memcpy(c->map, map, sizeof(int)*map_size);
 	}
+/**
+* @brief TODO
+* @param m
+* @return 
+*/
 	int related(constellation_pair &m) {
 		
 		if (match.totalscore==-FLT_MAX || m.totalscore==-FLT_MAX) return 0;
 		return (map[m.img_s1]==m.db_s1 && map[m.img_s2]==m.db_s2)?1:0;
 	}
+/**
+* @brief TODO
+*/
 	void search() {if (db->stars->kdsorted==1) db->results->kdsearch(R11,R21,R31,MAXFOV/2,THRESH_FACTOR*IMAGE_VARIANCE);}
+/**
+* @brief TODO
+*/
 	void clear_search() {if (db->stars->kdsorted==1) db->results->clear_kdresults();}
+/**
+* @brief TODO
+*/
 	void compute_score() {
 		//TODO: figure out where 2*map_size came from
 		match.totalscore=log(1.0/(IMG_X*IMG_Y))*(2*map_size);
@@ -105,7 +134,9 @@ struct  match_result {
 		}
 		free(scores);
 	}
-	//return matching stars from db, in order of star_idx
+/**
+* @return matching stars from db, in order of star_idx
+*/
 	star_db* from_match() {
 		if (match.totalscore==-FLT_MAX) return NULL;
 		
@@ -135,6 +166,15 @@ struct  match_result {
 	/* according to https://www.karlrupp.net/2016/02/gemm-and-stream-results-on-intel-edison/ */
 	/* we can perform >250 MFLOPS with doubles, and >500 MFLOPS with floats */
 	
+/**
+* @brief weighted_triad results
+* see https://en.wikipedia.org/wiki/Triad_method 
+* and http://nghiaho.com/?page_id=846
+* 
+* when compiled, this section contains roughly 430 floating point operations
+* according to https://www.karlrupp.net/2016/02/gemm-and-stream-results-on-intel-edison
+* we can perform >250 MFLOPS with doubles, and >500 MFLOPS with floats
+*/
 	void weighted_triad() {
 		star db_s1=db->stars->map[match.db_s1];
 		star db_s2=db->stars->map[match.db_s2];
@@ -263,18 +303,13 @@ struct  match_result {
 			DBG_PRINT("map[%d]=%d\n",i,map[i]);
 		}
 	}
+/**
+* @brief TODO
+*/
 	void print_ori() {
 		fprintf(stderr,"DEC=%f\n",fmod(360+asin(R31)* 180 / PI,360));
 		fprintf(stderr,"RA=%f\n",fmod(360+atan2(R21,R11)* 180 / PI,360));
 		fprintf(stderr,"ORIENTATION=%f\n",fmod(360-atan2(R32,R33)* 180 / PI ,360));
-		
-		//fprintf(stderr,"DEC=%f\n",fmod(360+asin(R31)* 180 / PI,360));
-		//fprintf(stderr,"RA=%f\n",fmod(360+atan2(R21,R11)* 180 / PI,360));
-		//fprintf(stderr,"ORIENTATION=%f\n",fmod(360-atan2(R32,R33)* 180 / PI ,360));
-		//
-		//fprintf(stderr,"TDEC=%f\n",fmod(360+asin(R13)* 180 / PI,360));
-		//fprintf(stderr,"TRA=%f\n",fmod(360+atan2(R12,R11)* 180 / PI,360));
-		//fprintf(stderr,"TORIENTATION=%f\n",fmod(360-atan2(R23,R33)* 180 / PI ,360));
 	}
 };
 
@@ -293,6 +328,11 @@ struct db_match {
 			m->copy_over(winner);\
 		} else c_pairs[c_pairs_size++]=m->match;
 		
+/**
+* @brief TODO
+* @param db
+* @param img
+*/
 	db_match(constellation_db *db, constellation_db *img) {
 		DBG_DB_MATCH_COUNT++;
 		DBG_PRINT("DBG_DB_MATCH_COUNT++ %d\n",DBG_DB_MATCH_COUNT);
@@ -301,7 +341,7 @@ struct db_match {
 		c_pairs=NULL;
 		c_pairs_size=0;
 		p_match=0.0;
-
+//TODO - set size to 4 in python
 		if (db->stars->map_size<3||img->stars->map_size<3) return;
 		img_mask = new star_fov(img->stars,db->stars->max_variance);
 		

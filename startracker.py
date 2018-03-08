@@ -3,15 +3,18 @@ import sys, traceback
 import socket,select, os, gc
 import cv2
 import numpy as np
+import numpy.linalg as LA
 import cStringIO
 import fcntl
 import beast
 
-P_MATCH_THRESH=0.9
+P_MATCH_THRESH=0.99
+SIMULATE=0
+
 
 def trace(frame, event, arg):
-    print>>sys.stderr,"%s, %s:%d" % (event, frame.f_code.co_filename, frame.f_lineno)
-    return trace
+	print>>sys.stderr,"%s, %s:%d" % (event, frame.f_code.co_filename, frame.f_lineno)
+	return trace
 
 #sys.settrace(trace)
 
@@ -39,6 +42,41 @@ print "Generating DB"
 C_DB=beast.constellation_db(S_FILTERED,2+beast.cvar.DB_REDUNDANCY,0)
 print "Ready"
 
+def a2q(A):
+	q4=0.5*np.sqrt(1+np.trace(A));
+	
+	q1=1/(4*q4)*(A[1,2]-A[2,1]);
+	q2=1/(4*q4)*(A[2,0]-A[0,2]);
+	q3=1/(4*q4)*(A[0,1]-A[1,0]);
+	
+	return np.array([q1,q2,q3,q4])
+
+def q2a(q):
+	q=q/LA.norm(q)
+	return np.array([[q[0]**2-q[1]**2-q[2]**2+q[3]**2,2*(q[0]*q[1]+q[2]*q[3]),2*(q[0]*q[2]-q[1]*q[3])],[2*(q[0]*q[1]-q[2]*q[3]),-q[0]**2+q[1]**2-q[2]**2+q[3]**2,2*(q[1]*q[2]+q[0]*q[3])],[2*(q[0]*q[2]+q[1]*q[3]),2*(q[1]*q[2]-q[0]*q[3]),-q[0]**2-q[1]**2+q[2]**2+q[3]**2]])
+
+#A=prev_body2ECI
+#B=curr_body2ECI
+#t1=prev_updatetime
+#t2=curr_updatetime
+#t3=present_time
+def extrapolate_matrix(A,B,t1,t2,t3):
+	# Calculate error angles between A and B via small angle approximation
+	# of MRPs.
+	R=np.dot(B,np.transpose(A))
+	dq=a2q(R)
+	dp=np.array([dq[0],dq[1],dq[2]])/(1 + dq[3])
+	anglesAB=4*dp
+
+	# Extrapolate to new error angles between B and C.
+	anglesBC=anglesAB/(t2-t1)*(t3-t2)
+
+	# Convert to a quaternion via small angle approximation, then get C.
+	#C=np.dot(q2a(np.array([0.5*anglesBC[0],0.5*anglesBC[1],0.5*anglesBC[2],1])),B)
+	C=q2a(np.array([0.5*anglesBC[0],0.5*anglesBC[1],0.5*anglesBC[2],1]))
+
+	return (C,(1000000.0)*anglesAB/(t2-t1))
+
 #Note: SWIG's policy is to garbage collect objects created with
 #constructors, but not objects created by returning from a function
 
@@ -62,15 +100,15 @@ def wahba(A, B, weight=[]):
 
 	#calculate attitude matrix
 	#from http://malcolmdshuster.com/FC_MarkleyMortari_Girdwood_1999_AAS.pdf
-	U, S, Vt = np.linalg.svd(H)
-	flip=np.linalg.det(U)*np.linalg.det(Vt)
+	U, S, Vt = LA.svd(H)
+	flip=LA.det(U)*LA.det(Vt)
 
 	#S=np.diag([1,1,flip]); U=np.dot(U,S)
 	U[:,2]*=flip
 
 	body2ECI = np.dot(U,Vt)
 	return body2ECI
-	
+
 def print_ori(body2ECI):
 	#DEC=np.degrees(np.arcsin(body2ECI[2,0]))
 	##rotation about the z axis (-180 to +180)
@@ -87,20 +125,6 @@ def print_ori(body2ECI):
 	print >>sys.stderr, "RA="+str(RA)
 	#rotation about the camera axis (-180 to +180)
 	print >>sys.stderr, "ORIENTATION="+str(ORIENTATION)
-	
-measuredAttitude=np.array([[1,0,0],[0,1,0],[0,0,1]],dtype=float)
-trueAttitude=np.array([[1,0,0],[0,1,0],[0,0,1]],dtype=float)
-
-trueAttitude=np.array([[ 0.36722 , -0.474063,  0.800259],[ 0.60442 , -0.532334, -0.592702],[ 0.706983,  0.701345,  0.091049]])
-measuredAttitude=np.array([[ 0.24019355,  0.50099146,  0.8314532 ],[-0.19167839, -0.81518614,  0.54656267],[ 0.95161241, -0.29065245, -0.09977322]])
-
-
-
-# Truth: DEC = -41.4217831105, RA = -8.10307699822, ORI = -24.6358127234
-#measuredAttitude=np.array([[0.77653974,-0.0286448,-0.62941664],[0.33462691,0.86518496,0.37346971],[0.53386396,-0.5006339,0.68143594]],dtype=float)
-#trueAttitude=np.array([[0.742373,-0.135621,0.656117],[-0.105696,0.943328,0.314579],[-0.661597,-0.302884,0.685967]],dtype=float)
-
-cal=wahba(measuredAttitude, trueAttitude)
 
 class star_image:
 	def __init__(self, imagefile,median_image):
@@ -123,6 +147,9 @@ class star_image:
 			img=cv2.imdecode(np.asarray(bytearray(urllib.urlopen(imagefile).read()), dtype="uint8"), cv2.IMREAD_COLOR)
 		else:
 			img=cv2.imread(imagefile)
+		if img is None:
+			print >>sys.stderr, "Invalid image, using blank dummy image"
+			img=median_image
 			
 		img=np.clip(img.astype(np.int16)-median_image,a_min=0,a_max=255).astype(np.uint8)
 		img_grey = cv2.cvtColor(img,cv2.COLOR_RGB2GRAY)
@@ -145,7 +172,6 @@ class star_image:
 				#the center pixel is used as the approximation of the brightest pixel
 				self.img_stars.add_star(cx-beast.cvar.IMG_X/2.0,(cy-beast.cvar.IMG_Y/2.0),float(cv2.getRectSubPix(img_grey,(1,1),(cx,cy))[0,0]),-1)
 				self.img_data.append(b_conf+[cx,cy,u20,u02,u11]+cv2.getRectSubPix(img,(1,1),(cx,cy))[0,0].tolist())
-				
 		self.img_const=beast.constellation_db(self.img_stars,beast.cvar.MAX_FALSE_STARS+2,1)
 		
 	
@@ -164,17 +190,23 @@ class star_image:
 			self.db_stars = near.winner.from_match()
 		
 	def match_lis(self):
-		lis=beast.db_match(C_DB,self.img_const)
-		if lis.p_match>P_MATCH_THRESH:
+		#for the first pass, we only want to use the brightest MAX_FALSE_STARS+REQUIRED_STARS
+		img_stars_n_brightest = self.img_stars.copy_n_brightest(beast.cvar.MAX_FALSE_STARS+beast.cvar.REQUIRED_STARS)
+		img_const_n_brightest=beast.constellation_db(img_stars_n_brightest,beast.cvar.MAX_FALSE_STARS+2,1)
+		lis=beast.db_match(C_DB,img_const_n_brightest)
+		#TODO: uncomment once p_match is fixed
+		#if lis.p_match>P_MATCH_THRESH:
+		if lis.p_match>P_MATCH_THRESH and lis.winner.map_size>=beast.cvar.REQUIRED_STARS:
 			x=lis.winner.R11
 			y=lis.winner.R21
 			z=lis.winner.R31
 			self.match_near(x,y,z,beast.cvar.MAXFOV/2)
-
+			#self.match = lis
+			#self.db_stars = lis.winner.from_match()
+			
 	def match_rel(self,last_match):
 		#make copy of stars from lastmatch
 		img_stars_from_lm=last_match.img_stars.copy()
-		#update positions to eci
 		w=last_match.match.winner
 		#convert the stars to ECI
 		for i in range(img_stars_from_lm.map_size):
@@ -185,13 +217,17 @@ class star_image:
 			s.x=x
 			s.y=y
 			s.z=z
+		#create constellation from last match
 		self.const_from_lm=beast.constellation_db(img_stars_from_lm,beast.cvar.MAX_FALSE_STARS+2,1)
+		#match between last and current
 		rel=beast.db_match(self.const_from_lm,self.img_const)
 		if rel.p_match>P_MATCH_THRESH:
 			self.match_from_lm = rel
 			self.db_stars_from_lm = rel.winner.from_match()
 				
-	def print_match(self):
+	def print_match(self,bodyCorrection=None,angrate_string=""):
+		if bodyCorrection is None:
+			bodyCorrection=np.eye(3)
 		if self.match is not None:
 			self.match.winner.print_ori()
 		db=self.db_stars
@@ -210,8 +246,11 @@ class star_image:
 			s_db=db.get_star(i)
 			if (s_db.id>=0):
 				weight=1.0/(s_db.sigma_sq+s_im.sigma_sq)
-				star_out.append(str(s_im.x)+','+str(s_im.y)+','+str(s_im.z)+','+str(s_db.x)+','+str(s_db.y)+','+str(s_db.z)+','+str(weight))
-		print " ".join(star_out)
+				temp=np.dot(bodyCorrection, np.array([[s_im.x],[s_im.y],[s_im.z]]))
+				star_out.append(str(temp[0,0])+','+str(temp[1,0])+','+str(temp[2,0])+','+str(s_db.x)+','+str(s_db.y)+','+str(s_db.z)+','+str(weight))
+		print >>sys.stderr,"stars",len(star_out)
+		print >>sys.stderr,"ang_rate: "+angrate_string
+		print " ".join(star_out)+" "+angrate_string
 
 NONSTARS={}
 NONSTAR_NEXT_ID=0
@@ -293,7 +332,19 @@ def update_nonstars(current_image,source):
 	if (NONSTAR_NEXT_ID>2**30):
 		flush_nonstars()
 
-
+def winner_attitude(w):
+	#w=self.last_match.match.winner
+	eci2body=np.array([[1,0,0],[0,1,0],[0,0,1]],dtype=float)
+	eci2body[0,0]=w.R11
+	eci2body[0,1]=w.R12
+	eci2body[0,2]=w.R13
+	eci2body[1,0]=w.R21
+	eci2body[1,1]=w.R22
+	eci2body[1,2]=w.R23
+	eci2body[2,0]=w.R31
+	eci2body[2,1]=w.R32
+	eci2body[2,2]=w.R33
+	return np.transpose(eci2body)
 
 class star_camera:
 	def __init__(self, median_file,source="RGB"):
@@ -302,36 +353,58 @@ class star_camera:
 		self.last_match=None
 		self.median_image=cv2.imread(median_file)
 	
-	def last_match_attitude(self):
-		R=np.array([[1,0,0],[0,1,0],[0,0,1]],dtype=float)
-		if self.last_match is not None:
-			w=self.last_match.match.winner
-			
-			R[0,0]=w.R11
-			R[0,1]=w.R12
-			R[0,2]=w.R13
-			R[1,0]=w.R21
-			R[1,1]=w.R22
-			R[1,2]=w.R23
-			R[2,0]=w.R31
-			R[2,1]=w.R32
-			R[2,2]=w.R33
-		return R
-
-	def solve_image(self,imagefile):
+	def solve_image(self,imagefile,lis=1,quiet=0):
 		starttime=time()
+		if (SIMULATE==1 and quiet==0):
+			s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+			s.connect(("jeb",7011))
+			data = s.recv(2048)
+			s.close()
+		print>>sys.stderr,"Time1: "+str(time() - starttime)
 		self.current_image=star_image(imagefile,self.median_image)
-		self.current_image.match_lis()
+		print>>sys.stderr,"Time2: "+str(time() - starttime)
+		if (lis==1):
+			self.current_image.match_lis()
+		print>>sys.stderr,"Time3: "+str(time() - starttime)
 		if self.last_match is not None:
 			self.current_image.match_rel(self.last_match)
-		self.current_image.print_match()
+		if (quiet==0):
+			if (SIMULATE==1): 
+				print data.rstrip("\n").rstrip("\r")
+			else:
+				self.current_image.print_match()
+			print>>sys.stderr,"Time4: "+str(time() - starttime)
+			
 		update_nonstars(self.current_image,self.source)
+		print>>sys.stderr,"Time5: "+str(time() - starttime)
 		if self.current_image.match is not None:
 			self.last_match=self.current_image
 		else:
 			self.last_match=None
-		print>>sys.stderr,"Time: "+str(time() - starttime)
-
+		print>>sys.stderr,"Time6: "+str(time() - starttime)
+		
+	def extrapolate_image(self,imagefile1,imagefile2,time1,time2):
+		#self.solve_image(imagefile2,lis=1,quiet=0)
+		self.solve_image(imagefile1,lis=1,quiet=1)
+		print>>sys.stderr,1
+		if (self.last_match is None):
+			print>>sys.stderr,2
+			print ""
+			return
+		a1=winner_attitude(self.last_match.match.winner)
+		self.solve_image(imagefile2,lis=1,quiet=1)
+		print>>sys.stderr,3
+		if (self.last_match is None):
+			print>>sys.stderr,4
+			print ""
+			return
+		a2=winner_attitude(self.last_match.match.winner)
+		print>>sys.stderr,a1,a2,LA.svd(a1)[1],LA.svd(a1)[1]
+		a,angrate=extrapolate_matrix(a1,a2,time1,time2,time()*1e6)
+		print>>sys.stderr,a,LA.svd(a)[1]
+		
+		self.last_match.print_match(a,",".join([str(i) for i in angrate.tolist()]))
+		
 #dummy for now
 #TODO: add science data from IR cam
 class science_camera:
@@ -380,9 +453,12 @@ class connection:
 				if len(data)==lastlen:
 					break
 		except OSError, e:
-			pass
 			# error 11 means we have no more data to read
-			if e.errno != 11:
+			if e.errno == 11:
+				pass
+			elif e.errno == 104:
+				print >>sys.stderr, "WARNING: ABNORMAL DISCONNECT"
+			else:
 				raise
 		return data
 
@@ -426,7 +502,7 @@ while True:
 		elif fd in CONNECTIONS:
 			w = CONNECTIONS[fd]
 			data = w.read()
-			print data
+			print>>sys.stderr, data
 			if len(data) > 0:
 				stdout_redir = cStringIO.StringIO()
 				stdout_old = sys.stdout
@@ -437,7 +513,7 @@ while True:
 					traceback.print_exc(file=sys.stdout)
 				sys.stdout = stdout_old
 				data_out = stdout_redir.getvalue()
-				print data_out
+				print>>sys.stderr, data_out
 				w.write(data_out)
 			else:
 				w.close()
