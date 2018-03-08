@@ -5,7 +5,6 @@
 #include "constellations.h"
 #include "beast.h"
 %}
-%include output.i
 //newobject gives python control of these objects
 %newobject star_db::copy;
 %newobject star_db::copy_n_brightest;

@@ -131,7 +131,6 @@ class star_image:
 		b_conf=[time(),beast.cvar.PIXSCALE,beast.cvar.BASE_FLUX]
 		self.img_stars = beast.star_db()
 		self.img_data = []
-		self.img_const = None
 		self.match=None
 		self.db_stars=None
 		self.match_from_lm=None
@@ -172,7 +171,6 @@ class star_image:
 				#the center pixel is used as the approximation of the brightest pixel
 				self.img_stars.add_star(cx-beast.cvar.IMG_X/2.0,(cy-beast.cvar.IMG_Y/2.0),float(cv2.getRectSubPix(img_grey,(1,1),(cx,cy))[0,0]),-1)
 				self.img_data.append(b_conf+[cx,cy,u20,u02,u11]+cv2.getRectSubPix(img,(1,1),(cx,cy))[0,0].tolist())
-		self.img_const=beast.constellation_db(self.img_stars,beast.cvar.MAX_FALSE_STARS+2,1)
 		
 	
 	def match_near(self,x,y,z,r):
@@ -184,7 +182,8 @@ class star_image:
 		C_DB.results.clear_kdresults()
 		SQ_RESULTS.clear_kdresults()
 		
-		near = beast.db_match(self.fov_db,self.img_const)
+		img_const=beast.constellation_db(self.img_stars,beast.cvar.MAX_FALSE_STARS+2,1)
+		near = beast.db_match(self.fov_db,img_const)
 		if near.p_match>P_MATCH_THRESH:
 			self.match = near
 			self.db_stars = near.winner.from_match()
@@ -192,7 +191,7 @@ class star_image:
 	def match_lis(self):
 		#for the first pass, we only want to use the brightest MAX_FALSE_STARS+REQUIRED_STARS
 		img_stars_n_brightest = self.img_stars.copy_n_brightest(beast.cvar.MAX_FALSE_STARS+beast.cvar.REQUIRED_STARS)
-		img_const_n_brightest=beast.constellation_db(img_stars_n_brightest,beast.cvar.MAX_FALSE_STARS+2,1)
+		img_const_n_brightest = beast.constellation_db(img_stars_n_brightest,beast.cvar.MAX_FALSE_STARS+2,1)
 		lis=beast.db_match(C_DB,img_const_n_brightest)
 		#TODO: uncomment once p_match is fixed
 		#if lis.p_match>P_MATCH_THRESH:
@@ -220,7 +219,8 @@ class star_image:
 		#create constellation from last match
 		self.const_from_lm=beast.constellation_db(img_stars_from_lm,beast.cvar.MAX_FALSE_STARS+2,1)
 		#match between last and current
-		rel=beast.db_match(self.const_from_lm,self.img_const)
+		img_const=beast.constellation_db(self.img_stars,beast.cvar.MAX_FALSE_STARS+2,1)
+		rel=beast.db_match(self.const_from_lm,img_const)
 		if rel.p_match>P_MATCH_THRESH:
 			self.match_from_lm = rel
 			self.db_stars_from_lm = rel.winner.from_match()
