@@ -13,12 +13,13 @@ Features:
 ### Basic setup:
 
 ##### From a fresh xubuntu 16.04 linux install
-Development computer setup:
-~~~~
-sudo apt-get install git libvte-dev libtool ctags gdb meld nemiver libwebkit-dev vim geany geany-plugins astrometry.net python-astropy  g++-multilib
-
-Note: The following also needed for actually building (ie. on flight computer)
+```
 sudo apt-get install python-scipy libopencv-dev python-opencv swig
+```
+Additional packages needed for calibration and unit testing:
+~~~~
+sudo apt-get install git astrometry.net python-astropy
+
 cd /usr/share/astrometry
 
 Download fits files corresponding to your camera fov size (see astrometry.net for details
