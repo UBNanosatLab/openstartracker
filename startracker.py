@@ -7,9 +7,11 @@ import numpy.linalg as LA
 import cStringIO
 import fcntl
 import beast
+from systemd import daemon
 
 P_MATCH_THRESH=0.99
 SIMULATE=0
+WATCHDOG_TIMEOUT = 30 #seconds
 
 
 def trace(frame, event, arg):
@@ -491,9 +493,17 @@ try:
 	connection(sys.stdin,epoll)
 except IOError:
 	pass
-	
+
+daemon.notify("WATCHDOG=1")
+lastPing = time()
 while True:
-	events = epoll.poll()
+	#systemd watchdog
+	events = epoll.poll(WATCHDOG_TIMEOUT - (time() - lastPing))
+	if len(events) == 0 or time() >= lastPing + WATCHDOG_TIMEOUT:
+		daemon.notify("WATCHDOG=1")
+		lastPing = time()
+		print>>sys.stderr, "Sent watchdog ping."
+	#events = epoll.poll()
 	for fd, event_type in events:
 		# Activity on the master socket means a new connection.
 		if fd == server.fileno():

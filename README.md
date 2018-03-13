@@ -14,7 +14,7 @@ Features:
 
 ##### From a fresh xubuntu 16.04 linux install
 ```
-sudo apt-get install python-scipy libopencv-dev python-opencv swig
+sudo apt-get install python-scipy libopencv-dev python-opencv swig python-systemd
 ```
 Additional packages needed for calibration and unit testing:
 ~~~~
