@@ -69,17 +69,59 @@ struct star {
 		star_idx=-1;
 		sigma_sq=IMAGE_VARIANCE/flux;
 	}
-	/**
-	* @brief Hash function works by mapping x,y,z onto a long
-	*/
-	inline unsigned long hash() {
-		return 	(unsigned long)((1<<20)*(x+1.0f))<<42|
-				(unsigned long)((1<<20)*(y+1.0f))<<21|
-				(unsigned long)((1<<20)*(z+1.0f));
-	}
 
+
+
+	/** @brief optimal hash function which uses "smallest two" packing, which in 3D is equivalent to 
+	* specifying coordinates on a skybox. The upper 3 bits are used for specifying the "face" of the box
+	* The two coordinated are interleaved so that nearby stars will have nearby hashes
+	* this approach also  also allows you to truncate the hash when less precision is needed
+	* 
+	* for the magic numbers used for interleaving
+	* See: https://stackoverflow.com/questions/1024754/how-to-compute-a-3d-morton-number-interleave-the-bits-of-3-ints
+	*/
+	
+	#define INTERLEAVE_TWO(X)\
+		X &= 0x3fffffff;\
+		X=(X|X<<16)&0x3fff0000ffff;\
+		X=(X|X<< 8)&0x3f00ff00ff00ff;\
+		X=(X|X<< 4)&0x30f0f0f0f0f0f0f;\
+		X=(X|X<< 2)&0x333333333333333;\
+		X=(X|X<< 1)&0x555555555555555;
+
+	//percision limit for float. Good to ~ 1 arcsec
+	#define KEEP_BITS 48
+	
+	inline size_t hash() const {
+		//2^29*(sqrt(2)*X+1.0)
+		unsigned long h0=759250123*x+536870912;
+		unsigned long h1=759250123*y+536870912;
+		unsigned long h2=759250123*z+536870912;
+		unsigned long rv;
+		if (std::fabs(x)>std::max(std::fabs(y),std::fabs(z))) {
+			INTERLEAVE_TWO(h1)
+			INTERLEAVE_TWO(h2)
+			if (x>0)	rv=0l<<60|h1<<1|h2;
+			else 		rv=1l<<60|h1<<1|h2;
+		} else if (std::fabs(y)>std::max(std::fabs(x),std::fabs(z))) {
+			INTERLEAVE_TWO(h0)
+			INTERLEAVE_TWO(h2)
+			if (y>0)	rv=2l<<60|h0<<1|h2;
+			else		rv=3l<<60|h0<<1|h2;
+		} else {
+			INTERLEAVE_TWO(h0)
+			INTERLEAVE_TWO(h1)
+			if (z>0)	rv=4l<<60|h0<<1|h1;
+			else 		rv=5l<<60|h0<<1|h1;
+		}
+		//if we're on a 32 bit system, don't keep more bits than that!
+		return rv>>(64-((KEEP_BITS<8*sizeof(size_t))?KEEP_BITS:8*sizeof(size_t)));
+	}
+	#undef KEEP_BITS
+	#undef INTERLEAVE_TWO
+	
 	#define OP operator==
-	inline bool OP(star& s) {return hash()==s.hash();}
+	inline bool OP(const star& s) const {return hash()==s.hash();}
 	#undef OP
 	
 	/**
@@ -123,6 +165,14 @@ bool star_lt_y(const star &s1, const star &s2) {return s1.y < s2.y;}
 bool star_lt_z(const star &s1, const star &s2) {return s1.z < s2.z;}
 bool star_lt_flux(const star &s1, const star &s2) {return s1.flux < s2.flux;}
 
+namespace std {
+	template<>
+	struct hash<star> {
+		size_t operator()(const star& s) const {
+			return s.hash();
+		}
+	};
+}
 
 struct star_db {
 //TODO:

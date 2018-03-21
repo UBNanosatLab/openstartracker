@@ -3463,6 +3463,13 @@ SWIG_From_unsigned_SS_long  (unsigned long value)
 }
 
 
+SWIGINTERNINLINE PyObject *
+SWIG_From_size_t  (size_t value)
+{    
+  return SWIG_From_unsigned_SS_long  (static_cast< unsigned long >(value));
+}
+
+
 SWIGINTERNINLINE PyObject*
   SWIG_From_bool  (bool value)
 {
@@ -4850,22 +4857,33 @@ fail:
 }
 
 
+SWIGINTERN PyObject *KEEP_BITS_swigconstant(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *module;
+  PyObject *d;
+  if (!PyArg_ParseTuple(args,(char*)"O:swigconstant", &module)) return NULL;
+  d = PyModule_GetDict(module);
+  if (!d) return NULL;
+  SWIG_Python_SetConstant(d, "KEEP_BITS",SWIG_From_int(static_cast< int >(48)));
+  return SWIG_Py_Void();
+}
+
+
 SWIGINTERN PyObject *_wrap_star_hash(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0;
   star *arg1 = (star *) 0 ;
   void *argp1 = 0 ;
   int res1 = 0 ;
   PyObject * obj0 = 0 ;
-  unsigned long result;
+  size_t result;
   
   if (!PyArg_ParseTuple(args,(char *)"O:star_hash",&obj0)) SWIG_fail;
   res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_star, 0 |  0 );
   if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "star_hash" "', argument " "1"" of type '" "star *""'"); 
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "star_hash" "', argument " "1"" of type '" "star const *""'"); 
   }
   arg1 = reinterpret_cast< star * >(argp1);
-  result = (unsigned long)(arg1)->hash();
-  resultobj = SWIG_From_unsigned_SS_long(static_cast< unsigned long >(result));
+  result = ((star const *)arg1)->hash();
+  resultobj = SWIG_From_size_t(static_cast< size_t >(result));
   return resultobj;
 fail:
   return NULL;
@@ -4887,18 +4905,18 @@ SWIGINTERN PyObject *_wrap_star___eq__(PyObject *SWIGUNUSEDPARM(self), PyObject 
   if (!PyArg_ParseTuple(args,(char *)"OO:star___eq__",&obj0,&obj1)) SWIG_fail;
   res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_star, 0 |  0 );
   if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "star___eq__" "', argument " "1"" of type '" "star *""'"); 
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "star___eq__" "', argument " "1"" of type '" "star const *""'"); 
   }
   arg1 = reinterpret_cast< star * >(argp1);
-  res2 = SWIG_ConvertPtr(obj1, &argp2, SWIGTYPE_p_star,  0 );
+  res2 = SWIG_ConvertPtr(obj1, &argp2, SWIGTYPE_p_star,  0  | 0);
   if (!SWIG_IsOK(res2)) {
-    SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "star___eq__" "', argument " "2"" of type '" "star &""'"); 
+    SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "star___eq__" "', argument " "2"" of type '" "star const &""'"); 
   }
   if (!argp2) {
-    SWIG_exception_fail(SWIG_ValueError, "invalid null reference " "in method '" "star___eq__" "', argument " "2"" of type '" "star &""'"); 
+    SWIG_exception_fail(SWIG_ValueError, "invalid null reference " "in method '" "star___eq__" "', argument " "2"" of type '" "star const &""'"); 
   }
   arg2 = reinterpret_cast< star * >(argp2);
-  result = (bool)(arg1)->operator ==(*arg2);
+  result = (bool)((star const *)arg1)->operator ==((star const &)*arg2);
   resultobj = SWIG_From_bool(static_cast< bool >(result));
   return resultobj;
 fail:
@@ -9781,6 +9799,7 @@ static PyMethodDef SwigMethods[] = {
 	 { (char *)"star_sigma_sq_set", _wrap_star_sigma_sq_set, METH_VARARGS, NULL},
 	 { (char *)"star_sigma_sq_get", _wrap_star_sigma_sq_get, METH_VARARGS, NULL},
 	 { (char *)"new_star", _wrap_new_star, METH_VARARGS, NULL},
+	 { (char *)"KEEP_BITS_swigconstant", KEEP_BITS_swigconstant, METH_VARARGS, NULL},
 	 { (char *)"star_hash", _wrap_star_hash, METH_VARARGS, NULL},
 	 { (char *)"star___eq__", _wrap_star___eq__, METH_VARARGS, NULL},
 	 { (char *)"star___mul__", _wrap_star___mul__, METH_VARARGS, NULL},
