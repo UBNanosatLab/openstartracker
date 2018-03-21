@@ -11,8 +11,8 @@ from systemd import daemon
 
 P_MATCH_THRESH=0.99
 SIMULATE=0
-WATCHDOG_TIMEOUT = 30 #seconds
-
+if 'WATCHDOG_USEC' not in os.environ:
+	os.environ['WATCHDOG_USEC']="30000000"
 
 def trace(frame, event, arg):
 	print>>sys.stderr,"%s, %s:%d" % (event, frame.f_code.co_filename, frame.f_lineno)
@@ -43,7 +43,6 @@ S_FILTERED=SQ_RESULTS.from_kdmask()
 print "Generating DB" 
 C_DB=beast.constellation_db(S_FILTERED,2+beast.cvar.DB_REDUNDANCY,0)
 print "Ready"
-
 def a2q(A):
 	q4=0.5*np.sqrt(1+np.trace(A));
 	
@@ -171,7 +170,7 @@ class star_image:
 				u02 = M["m02"]/M["m00"] - cy**2
 				u11 = M["m11"]/M["m00"] - cx*cy
 				#the center pixel is used as the approximation of the brightest pixel
-				self.img_stars.add_star(cx-beast.cvar.IMG_X/2.0,(cy-beast.cvar.IMG_Y/2.0),float(cv2.getRectSubPix(img_grey,(1,1),(cx,cy))[0,0]),-1)
+				self.img_stars+=beast.star(cx-beast.cvar.IMG_X/2.0,(cy-beast.cvar.IMG_Y/2.0),float(cv2.getRectSubPix(img_grey,(1,1),(cx,cy))[0,0]),-1)
 				self.img_data.append(b_conf+[cx,cy,u20,u02,u11]+cv2.getRectSubPix(img,(1,1),(cx,cy))[0,0].tolist())
 		
 	
@@ -256,7 +255,8 @@ class star_image:
 
 NONSTARS={}
 NONSTAR_NEXT_ID=0
-NONSTAR_DATAFILENAME="data"+str(time())+".txt"
+NONSTAR_DATAFILENAME="/dev/null"
+#NONSTAR_DATAFILENAME="data"+str(time())+".txt"
 NONSTAR_DATAFILE=open(NONSTAR_DATAFILENAME,"w")
 class nonstar:
 	def __init__(self,current_image,i,source):
@@ -498,11 +498,10 @@ daemon.notify("WATCHDOG=1")
 lastPing = time()
 while True:
 	#systemd watchdog
-	events = epoll.poll(WATCHDOG_TIMEOUT - (time() - lastPing))
-	if len(events) == 0 or time() >= lastPing + WATCHDOG_TIMEOUT:
+	events = epoll.poll(float(os.environ['WATCHDOG_USEC'])/2.0e6 - (time() - lastPing))
+	if len(events) == 0 or time() >= lastPing + float(os.environ['WATCHDOG_USEC'])/2.0e6:
 		daemon.notify("WATCHDOG=1")
 		lastPing = time()
-		print>>sys.stderr, "Sent watchdog ping."
 	#events = epoll.poll()
 	for fd, event_type in events:
 		# Activity on the master socket means a new connection.

@@ -3135,13 +3135,6 @@ namespace swig {
   #define SWIG_From_double   PyFloat_FromDouble 
 
 
-SWIGINTERNINLINE PyObject*
-  SWIG_From_int  (int value)
-{
-  return PyInt_FromLong((long) value);
-}
-
-
 #include <limits.h>
 #if !defined(SWIG_NO_LLONG_MAX)
 # if !defined(LLONG_MAX) && defined(__GNUC__) && defined (__LONG_LONG_MAX__)
@@ -3290,6 +3283,13 @@ SWIG_AsVal_int (PyObject * obj, int *val)
     }
   }  
   return res;
+}
+
+
+SWIGINTERNINLINE PyObject*
+  SWIG_From_int  (int value)
+{
+  return PyInt_FromLong((long) value);
 }
 
 
@@ -3452,6 +3452,17 @@ SWIG_AsCharPtrAndSize(PyObject *obj, char** cptr, size_t* psize, int *alloc)
 
 
 
+  #define SWIG_From_long   PyLong_FromLong 
+
+
+SWIGINTERNINLINE PyObject* 
+SWIG_From_unsigned_SS_long  (unsigned long value)
+{
+  return (value > LONG_MAX) ?
+    PyLong_FromUnsignedLong(value) : PyLong_FromLong(static_cast< long >(value)); 
+}
+
+
 SWIGINTERNINLINE PyObject*
   SWIG_From_bool  (bool value)
 {
@@ -3479,17 +3490,6 @@ SWIGINTERN PyObject *TWOPI_swigconstant(PyObject *SWIGUNUSEDPARM(self), PyObject
   d = PyModule_GetDict(module);
   if (!d) return NULL;
   SWIG_Python_SetConstant(d, "TWOPI",SWIG_From_double(static_cast< double >(6.28318530717958647693)));
-  return SWIG_Py_Void();
-}
-
-
-SWIGINTERN PyObject *IMG_ROTATION_swigconstant(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *module;
-  PyObject *d;
-  if (!PyArg_ParseTuple(args,(char*)"O:swigconstant", &module)) return NULL;
-  d = PyModule_GetDict(module);
-  if (!d) return NULL;
-  SWIG_Python_SetConstant(d, "IMG_ROTATION",SWIG_From_int(static_cast< int >(1)));
   return SWIG_Py_Void();
 }
 
@@ -4046,6 +4046,29 @@ SWIGINTERN PyObject *Swig_var_PIXY_TANGENT_get(void) {
 }
 
 
+SWIGINTERN int Swig_var_KDBUCKET_SIZE_set(PyObject *_val) {
+  {
+    int val;
+    int res = SWIG_AsVal_int(_val, &val);
+    if (!SWIG_IsOK(res)) {
+      SWIG_exception_fail(SWIG_ArgError(res), "in variable '""KDBUCKET_SIZE""' of type '""int""'");
+    }
+    KDBUCKET_SIZE = static_cast< int >(val);
+  }
+  return 0;
+fail:
+  return 1;
+}
+
+
+SWIGINTERN PyObject *Swig_var_KDBUCKET_SIZE_get(void) {
+  PyObject *pyobj = 0;
+  
+  pyobj = SWIG_From_int(static_cast< int >(KDBUCKET_SIZE));
+  return pyobj;
+}
+
+
 SWIGINTERN int Swig_var_ENV_VARS_SIZE_set(PyObject *_val) {
   {
     int val;
@@ -4324,58 +4347,6 @@ fail:
 }
 
 
-SWIGINTERN PyObject *_wrap_star_star_idx_set(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *resultobj = 0;
-  star *arg1 = (star *) 0 ;
-  int arg2 ;
-  void *argp1 = 0 ;
-  int res1 = 0 ;
-  int val2 ;
-  int ecode2 = 0 ;
-  PyObject * obj0 = 0 ;
-  PyObject * obj1 = 0 ;
-  
-  if (!PyArg_ParseTuple(args,(char *)"OO:star_star_idx_set",&obj0,&obj1)) SWIG_fail;
-  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_star, 0 |  0 );
-  if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "star_star_idx_set" "', argument " "1"" of type '" "star *""'"); 
-  }
-  arg1 = reinterpret_cast< star * >(argp1);
-  ecode2 = SWIG_AsVal_int(obj1, &val2);
-  if (!SWIG_IsOK(ecode2)) {
-    SWIG_exception_fail(SWIG_ArgError(ecode2), "in method '" "star_star_idx_set" "', argument " "2"" of type '" "int""'");
-  } 
-  arg2 = static_cast< int >(val2);
-  if (arg1) (arg1)->star_idx = arg2;
-  resultobj = SWIG_Py_Void();
-  return resultobj;
-fail:
-  return NULL;
-}
-
-
-SWIGINTERN PyObject *_wrap_star_star_idx_get(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *resultobj = 0;
-  star *arg1 = (star *) 0 ;
-  void *argp1 = 0 ;
-  int res1 = 0 ;
-  PyObject * obj0 = 0 ;
-  int result;
-  
-  if (!PyArg_ParseTuple(args,(char *)"O:star_star_idx_get",&obj0)) SWIG_fail;
-  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_star, 0 |  0 );
-  if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "star_star_idx_get" "', argument " "1"" of type '" "star *""'"); 
-  }
-  arg1 = reinterpret_cast< star * >(argp1);
-  result = (int) ((arg1)->star_idx);
-  resultobj = SWIG_From_int(static_cast< int >(result));
-  return resultobj;
-fail:
-  return NULL;
-}
-
-
 SWIGINTERN PyObject *_wrap_star_id_set(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0;
   star *arg1 = (star *) 0 ;
@@ -4422,110 +4393,6 @@ SWIGINTERN PyObject *_wrap_star_id_get(PyObject *SWIGUNUSEDPARM(self), PyObject 
   arg1 = reinterpret_cast< star * >(argp1);
   result = (int) ((arg1)->id);
   resultobj = SWIG_From_int(static_cast< int >(result));
-  return resultobj;
-fail:
-  return NULL;
-}
-
-
-SWIGINTERN PyObject *_wrap_star_unreliable_set(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *resultobj = 0;
-  star *arg1 = (star *) 0 ;
-  int arg2 ;
-  void *argp1 = 0 ;
-  int res1 = 0 ;
-  int val2 ;
-  int ecode2 = 0 ;
-  PyObject * obj0 = 0 ;
-  PyObject * obj1 = 0 ;
-  
-  if (!PyArg_ParseTuple(args,(char *)"OO:star_unreliable_set",&obj0,&obj1)) SWIG_fail;
-  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_star, 0 |  0 );
-  if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "star_unreliable_set" "', argument " "1"" of type '" "star *""'"); 
-  }
-  arg1 = reinterpret_cast< star * >(argp1);
-  ecode2 = SWIG_AsVal_int(obj1, &val2);
-  if (!SWIG_IsOK(ecode2)) {
-    SWIG_exception_fail(SWIG_ArgError(ecode2), "in method '" "star_unreliable_set" "', argument " "2"" of type '" "int""'");
-  } 
-  arg2 = static_cast< int >(val2);
-  if (arg1) (arg1)->unreliable = arg2;
-  resultobj = SWIG_Py_Void();
-  return resultobj;
-fail:
-  return NULL;
-}
-
-
-SWIGINTERN PyObject *_wrap_star_unreliable_get(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *resultobj = 0;
-  star *arg1 = (star *) 0 ;
-  void *argp1 = 0 ;
-  int res1 = 0 ;
-  PyObject * obj0 = 0 ;
-  int result;
-  
-  if (!PyArg_ParseTuple(args,(char *)"O:star_unreliable_get",&obj0)) SWIG_fail;
-  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_star, 0 |  0 );
-  if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "star_unreliable_get" "', argument " "1"" of type '" "star *""'"); 
-  }
-  arg1 = reinterpret_cast< star * >(argp1);
-  result = (int) ((arg1)->unreliable);
-  resultobj = SWIG_From_int(static_cast< int >(result));
-  return resultobj;
-fail:
-  return NULL;
-}
-
-
-SWIGINTERN PyObject *_wrap_star_sigma_sq_set(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *resultobj = 0;
-  star *arg1 = (star *) 0 ;
-  float arg2 ;
-  void *argp1 = 0 ;
-  int res1 = 0 ;
-  float val2 ;
-  int ecode2 = 0 ;
-  PyObject * obj0 = 0 ;
-  PyObject * obj1 = 0 ;
-  
-  if (!PyArg_ParseTuple(args,(char *)"OO:star_sigma_sq_set",&obj0,&obj1)) SWIG_fail;
-  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_star, 0 |  0 );
-  if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "star_sigma_sq_set" "', argument " "1"" of type '" "star *""'"); 
-  }
-  arg1 = reinterpret_cast< star * >(argp1);
-  ecode2 = SWIG_AsVal_float(obj1, &val2);
-  if (!SWIG_IsOK(ecode2)) {
-    SWIG_exception_fail(SWIG_ArgError(ecode2), "in method '" "star_sigma_sq_set" "', argument " "2"" of type '" "float""'");
-  } 
-  arg2 = static_cast< float >(val2);
-  if (arg1) (arg1)->sigma_sq = arg2;
-  resultobj = SWIG_Py_Void();
-  return resultobj;
-fail:
-  return NULL;
-}
-
-
-SWIGINTERN PyObject *_wrap_star_sigma_sq_get(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *resultobj = 0;
-  star *arg1 = (star *) 0 ;
-  void *argp1 = 0 ;
-  int res1 = 0 ;
-  PyObject * obj0 = 0 ;
-  float result;
-  
-  if (!PyArg_ParseTuple(args,(char *)"O:star_sigma_sq_get",&obj0)) SWIG_fail;
-  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_star, 0 |  0 );
-  if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "star_sigma_sq_get" "', argument " "1"" of type '" "star *""'"); 
-  }
-  arg1 = reinterpret_cast< star * >(argp1);
-  result = (float) ((arg1)->sigma_sq);
-  resultobj = SWIG_From_float(static_cast< float >(result));
   return resultobj;
 fail:
   return NULL;
@@ -4636,7 +4503,410 @@ fail:
 }
 
 
-SWIGINTERN PyObject *_wrap_star_dist_arcsec(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+SWIGINTERN PyObject *_wrap_star_unreliable_set(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  star *arg1 = (star *) 0 ;
+  int arg2 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  int val2 ;
+  int ecode2 = 0 ;
+  PyObject * obj0 = 0 ;
+  PyObject * obj1 = 0 ;
+  
+  if (!PyArg_ParseTuple(args,(char *)"OO:star_unreliable_set",&obj0,&obj1)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_star, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "star_unreliable_set" "', argument " "1"" of type '" "star *""'"); 
+  }
+  arg1 = reinterpret_cast< star * >(argp1);
+  ecode2 = SWIG_AsVal_int(obj1, &val2);
+  if (!SWIG_IsOK(ecode2)) {
+    SWIG_exception_fail(SWIG_ArgError(ecode2), "in method '" "star_unreliable_set" "', argument " "2"" of type '" "int""'");
+  } 
+  arg2 = static_cast< int >(val2);
+  if (arg1) (arg1)->unreliable = arg2;
+  resultobj = SWIG_Py_Void();
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_star_unreliable_get(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  star *arg1 = (star *) 0 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  PyObject * obj0 = 0 ;
+  int result;
+  
+  if (!PyArg_ParseTuple(args,(char *)"O:star_unreliable_get",&obj0)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_star, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "star_unreliable_get" "', argument " "1"" of type '" "star *""'"); 
+  }
+  arg1 = reinterpret_cast< star * >(argp1);
+  result = (int) ((arg1)->unreliable);
+  resultobj = SWIG_From_int(static_cast< int >(result));
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_star_star_idx_set(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  star *arg1 = (star *) 0 ;
+  int arg2 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  int val2 ;
+  int ecode2 = 0 ;
+  PyObject * obj0 = 0 ;
+  PyObject * obj1 = 0 ;
+  
+  if (!PyArg_ParseTuple(args,(char *)"OO:star_star_idx_set",&obj0,&obj1)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_star, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "star_star_idx_set" "', argument " "1"" of type '" "star *""'"); 
+  }
+  arg1 = reinterpret_cast< star * >(argp1);
+  ecode2 = SWIG_AsVal_int(obj1, &val2);
+  if (!SWIG_IsOK(ecode2)) {
+    SWIG_exception_fail(SWIG_ArgError(ecode2), "in method '" "star_star_idx_set" "', argument " "2"" of type '" "int""'");
+  } 
+  arg2 = static_cast< int >(val2);
+  if (arg1) (arg1)->star_idx = arg2;
+  resultobj = SWIG_Py_Void();
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_star_star_idx_get(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  star *arg1 = (star *) 0 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  PyObject * obj0 = 0 ;
+  int result;
+  
+  if (!PyArg_ParseTuple(args,(char *)"O:star_star_idx_get",&obj0)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_star, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "star_star_idx_get" "', argument " "1"" of type '" "star *""'"); 
+  }
+  arg1 = reinterpret_cast< star * >(argp1);
+  result = (int) ((arg1)->star_idx);
+  resultobj = SWIG_From_int(static_cast< int >(result));
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_star_sigma_sq_set(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  star *arg1 = (star *) 0 ;
+  float arg2 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  float val2 ;
+  int ecode2 = 0 ;
+  PyObject * obj0 = 0 ;
+  PyObject * obj1 = 0 ;
+  
+  if (!PyArg_ParseTuple(args,(char *)"OO:star_sigma_sq_set",&obj0,&obj1)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_star, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "star_sigma_sq_set" "', argument " "1"" of type '" "star *""'"); 
+  }
+  arg1 = reinterpret_cast< star * >(argp1);
+  ecode2 = SWIG_AsVal_float(obj1, &val2);
+  if (!SWIG_IsOK(ecode2)) {
+    SWIG_exception_fail(SWIG_ArgError(ecode2), "in method '" "star_sigma_sq_set" "', argument " "2"" of type '" "float""'");
+  } 
+  arg2 = static_cast< float >(val2);
+  if (arg1) (arg1)->sigma_sq = arg2;
+  resultobj = SWIG_Py_Void();
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_star_sigma_sq_get(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  star *arg1 = (star *) 0 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  PyObject * obj0 = 0 ;
+  float result;
+  
+  if (!PyArg_ParseTuple(args,(char *)"O:star_sigma_sq_get",&obj0)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_star, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "star_sigma_sq_get" "', argument " "1"" of type '" "star *""'"); 
+  }
+  arg1 = reinterpret_cast< star * >(argp1);
+  result = (float) ((arg1)->sigma_sq);
+  resultobj = SWIG_From_float(static_cast< float >(result));
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_new_star__SWIG_0(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  float arg1 ;
+  float arg2 ;
+  float arg3 ;
+  float arg4 ;
+  int arg5 ;
+  float val1 ;
+  int ecode1 = 0 ;
+  float val2 ;
+  int ecode2 = 0 ;
+  float val3 ;
+  int ecode3 = 0 ;
+  float val4 ;
+  int ecode4 = 0 ;
+  int val5 ;
+  int ecode5 = 0 ;
+  PyObject * obj0 = 0 ;
+  PyObject * obj1 = 0 ;
+  PyObject * obj2 = 0 ;
+  PyObject * obj3 = 0 ;
+  PyObject * obj4 = 0 ;
+  star *result = 0 ;
+  
+  if (!PyArg_ParseTuple(args,(char *)"OOOOO:new_star",&obj0,&obj1,&obj2,&obj3,&obj4)) SWIG_fail;
+  ecode1 = SWIG_AsVal_float(obj0, &val1);
+  if (!SWIG_IsOK(ecode1)) {
+    SWIG_exception_fail(SWIG_ArgError(ecode1), "in method '" "new_star" "', argument " "1"" of type '" "float""'");
+  } 
+  arg1 = static_cast< float >(val1);
+  ecode2 = SWIG_AsVal_float(obj1, &val2);
+  if (!SWIG_IsOK(ecode2)) {
+    SWIG_exception_fail(SWIG_ArgError(ecode2), "in method '" "new_star" "', argument " "2"" of type '" "float""'");
+  } 
+  arg2 = static_cast< float >(val2);
+  ecode3 = SWIG_AsVal_float(obj2, &val3);
+  if (!SWIG_IsOK(ecode3)) {
+    SWIG_exception_fail(SWIG_ArgError(ecode3), "in method '" "new_star" "', argument " "3"" of type '" "float""'");
+  } 
+  arg3 = static_cast< float >(val3);
+  ecode4 = SWIG_AsVal_float(obj3, &val4);
+  if (!SWIG_IsOK(ecode4)) {
+    SWIG_exception_fail(SWIG_ArgError(ecode4), "in method '" "new_star" "', argument " "4"" of type '" "float""'");
+  } 
+  arg4 = static_cast< float >(val4);
+  ecode5 = SWIG_AsVal_int(obj4, &val5);
+  if (!SWIG_IsOK(ecode5)) {
+    SWIG_exception_fail(SWIG_ArgError(ecode5), "in method '" "new_star" "', argument " "5"" of type '" "int""'");
+  } 
+  arg5 = static_cast< int >(val5);
+  result = (star *)new star(arg1,arg2,arg3,arg4,arg5);
+  resultobj = SWIG_NewPointerObj(SWIG_as_voidptr(result), SWIGTYPE_p_star, SWIG_POINTER_NEW |  0 );
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_new_star__SWIG_1(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  float arg1 ;
+  float arg2 ;
+  float arg3 ;
+  int arg4 ;
+  float val1 ;
+  int ecode1 = 0 ;
+  float val2 ;
+  int ecode2 = 0 ;
+  float val3 ;
+  int ecode3 = 0 ;
+  int val4 ;
+  int ecode4 = 0 ;
+  PyObject * obj0 = 0 ;
+  PyObject * obj1 = 0 ;
+  PyObject * obj2 = 0 ;
+  PyObject * obj3 = 0 ;
+  star *result = 0 ;
+  
+  if (!PyArg_ParseTuple(args,(char *)"OOOO:new_star",&obj0,&obj1,&obj2,&obj3)) SWIG_fail;
+  ecode1 = SWIG_AsVal_float(obj0, &val1);
+  if (!SWIG_IsOK(ecode1)) {
+    SWIG_exception_fail(SWIG_ArgError(ecode1), "in method '" "new_star" "', argument " "1"" of type '" "float""'");
+  } 
+  arg1 = static_cast< float >(val1);
+  ecode2 = SWIG_AsVal_float(obj1, &val2);
+  if (!SWIG_IsOK(ecode2)) {
+    SWIG_exception_fail(SWIG_ArgError(ecode2), "in method '" "new_star" "', argument " "2"" of type '" "float""'");
+  } 
+  arg2 = static_cast< float >(val2);
+  ecode3 = SWIG_AsVal_float(obj2, &val3);
+  if (!SWIG_IsOK(ecode3)) {
+    SWIG_exception_fail(SWIG_ArgError(ecode3), "in method '" "new_star" "', argument " "3"" of type '" "float""'");
+  } 
+  arg3 = static_cast< float >(val3);
+  ecode4 = SWIG_AsVal_int(obj3, &val4);
+  if (!SWIG_IsOK(ecode4)) {
+    SWIG_exception_fail(SWIG_ArgError(ecode4), "in method '" "new_star" "', argument " "4"" of type '" "int""'");
+  } 
+  arg4 = static_cast< int >(val4);
+  result = (star *)new star(arg1,arg2,arg3,arg4);
+  resultobj = SWIG_NewPointerObj(SWIG_as_voidptr(result), SWIGTYPE_p_star, SWIG_POINTER_NEW |  0 );
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_new_star(PyObject *self, PyObject *args) {
+  Py_ssize_t argc;
+  PyObject *argv[6] = {
+    0
+  };
+  Py_ssize_t ii;
+  
+  if (!PyTuple_Check(args)) SWIG_fail;
+  argc = args ? PyObject_Length(args) : 0;
+  for (ii = 0; (ii < 5) && (ii < argc); ii++) {
+    argv[ii] = PyTuple_GET_ITEM(args,ii);
+  }
+  if (argc == 4) {
+    int _v;
+    {
+      int res = SWIG_AsVal_float(argv[0], NULL);
+      _v = SWIG_CheckState(res);
+    }
+    if (_v) {
+      {
+        int res = SWIG_AsVal_float(argv[1], NULL);
+        _v = SWIG_CheckState(res);
+      }
+      if (_v) {
+        {
+          int res = SWIG_AsVal_float(argv[2], NULL);
+          _v = SWIG_CheckState(res);
+        }
+        if (_v) {
+          {
+            int res = SWIG_AsVal_int(argv[3], NULL);
+            _v = SWIG_CheckState(res);
+          }
+          if (_v) {
+            return _wrap_new_star__SWIG_1(self, args);
+          }
+        }
+      }
+    }
+  }
+  if (argc == 5) {
+    int _v;
+    {
+      int res = SWIG_AsVal_float(argv[0], NULL);
+      _v = SWIG_CheckState(res);
+    }
+    if (_v) {
+      {
+        int res = SWIG_AsVal_float(argv[1], NULL);
+        _v = SWIG_CheckState(res);
+      }
+      if (_v) {
+        {
+          int res = SWIG_AsVal_float(argv[2], NULL);
+          _v = SWIG_CheckState(res);
+        }
+        if (_v) {
+          {
+            int res = SWIG_AsVal_float(argv[3], NULL);
+            _v = SWIG_CheckState(res);
+          }
+          if (_v) {
+            {
+              int res = SWIG_AsVal_int(argv[4], NULL);
+              _v = SWIG_CheckState(res);
+            }
+            if (_v) {
+              return _wrap_new_star__SWIG_0(self, args);
+            }
+          }
+        }
+      }
+    }
+  }
+  
+fail:
+  SWIG_SetErrorMsg(PyExc_NotImplementedError,"Wrong number or type of arguments for overloaded function 'new_star'.\n"
+    "  Possible C/C++ prototypes are:\n"
+    "    star::star(float,float,float,float,int)\n"
+    "    star::star(float,float,float,int)\n");
+  return 0;
+}
+
+
+SWIGINTERN PyObject *_wrap_star_hash(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  star *arg1 = (star *) 0 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  PyObject * obj0 = 0 ;
+  unsigned long result;
+  
+  if (!PyArg_ParseTuple(args,(char *)"O:star_hash",&obj0)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_star, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "star_hash" "', argument " "1"" of type '" "star *""'"); 
+  }
+  arg1 = reinterpret_cast< star * >(argp1);
+  result = (unsigned long)(arg1)->hash();
+  resultobj = SWIG_From_unsigned_SS_long(static_cast< unsigned long >(result));
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_star___eq__(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  star *arg1 = (star *) 0 ;
+  star *arg2 = 0 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  void *argp2 = 0 ;
+  int res2 = 0 ;
+  PyObject * obj0 = 0 ;
+  PyObject * obj1 = 0 ;
+  bool result;
+  
+  if (!PyArg_ParseTuple(args,(char *)"OO:star___eq__",&obj0,&obj1)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_star, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "star___eq__" "', argument " "1"" of type '" "star *""'"); 
+  }
+  arg1 = reinterpret_cast< star * >(argp1);
+  res2 = SWIG_ConvertPtr(obj1, &argp2, SWIGTYPE_p_star,  0 );
+  if (!SWIG_IsOK(res2)) {
+    SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "star___eq__" "', argument " "2"" of type '" "star &""'"); 
+  }
+  if (!argp2) {
+    SWIG_exception_fail(SWIG_ValueError, "invalid null reference " "in method '" "star___eq__" "', argument " "2"" of type '" "star &""'"); 
+  }
+  arg2 = reinterpret_cast< star * >(argp2);
+  result = (bool)(arg1)->operator ==(*arg2);
+  resultobj = SWIG_From_bool(static_cast< bool >(result));
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_star___mul__(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0;
   star *arg1 = (star *) 0 ;
   star *arg2 = 0 ;
@@ -4648,21 +4918,21 @@ SWIGINTERN PyObject *_wrap_star_dist_arcsec(PyObject *SWIGUNUSEDPARM(self), PyOb
   PyObject * obj1 = 0 ;
   float result;
   
-  if (!PyArg_ParseTuple(args,(char *)"OO:star_dist_arcsec",&obj0,&obj1)) SWIG_fail;
+  if (!PyArg_ParseTuple(args,(char *)"OO:star___mul__",&obj0,&obj1)) SWIG_fail;
   res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_star, 0 |  0 );
   if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "star_dist_arcsec" "', argument " "1"" of type '" "star const *""'"); 
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "star___mul__" "', argument " "1"" of type '" "star const *""'"); 
   }
   arg1 = reinterpret_cast< star * >(argp1);
   res2 = SWIG_ConvertPtr(obj1, &argp2, SWIGTYPE_p_star,  0  | 0);
   if (!SWIG_IsOK(res2)) {
-    SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "star_dist_arcsec" "', argument " "2"" of type '" "star const &""'"); 
+    SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "star___mul__" "', argument " "2"" of type '" "star const &""'"); 
   }
   if (!argp2) {
-    SWIG_exception_fail(SWIG_ValueError, "invalid null reference " "in method '" "star_dist_arcsec" "', argument " "2"" of type '" "star const &""'"); 
+    SWIG_exception_fail(SWIG_ValueError, "invalid null reference " "in method '" "star___mul__" "', argument " "2"" of type '" "star const &""'"); 
   }
   arg2 = reinterpret_cast< star * >(argp2);
-  result = (float)((star const *)arg1)->dist_arcsec((star const &)*arg2);
+  result = (float)((star const *)arg1)->operator *((star const &)*arg2);
   resultobj = SWIG_From_float(static_cast< float >(result));
   return resultobj;
 fail:
@@ -4699,19 +4969,6 @@ SWIGINTERN PyObject *_wrap_star_DBG_(PyObject *SWIGUNUSEDPARM(self), PyObject *a
   return resultobj;
 fail:
   if (alloc2 == SWIG_NEWOBJ) delete[] buf2;
-  return NULL;
-}
-
-
-SWIGINTERN PyObject *_wrap_new_star(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *resultobj = 0;
-  star *result = 0 ;
-  
-  if (!PyArg_ParseTuple(args,(char *)":new_star")) SWIG_fail;
-  result = (star *)new star();
-  resultobj = SWIG_NewPointerObj(SWIG_as_voidptr(result), SWIGTYPE_p_star, SWIG_POINTER_NEW |  0 );
-  return resultobj;
-fail:
   return NULL;
 }
 
@@ -5144,58 +5401,6 @@ fail:
 }
 
 
-SWIGINTERN PyObject *_wrap_star_db_max_variance_set(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *resultobj = 0;
-  star_db *arg1 = (star_db *) 0 ;
-  float arg2 ;
-  void *argp1 = 0 ;
-  int res1 = 0 ;
-  float val2 ;
-  int ecode2 = 0 ;
-  PyObject * obj0 = 0 ;
-  PyObject * obj1 = 0 ;
-  
-  if (!PyArg_ParseTuple(args,(char *)"OO:star_db_max_variance_set",&obj0,&obj1)) SWIG_fail;
-  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_star_db, 0 |  0 );
-  if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "star_db_max_variance_set" "', argument " "1"" of type '" "star_db *""'"); 
-  }
-  arg1 = reinterpret_cast< star_db * >(argp1);
-  ecode2 = SWIG_AsVal_float(obj1, &val2);
-  if (!SWIG_IsOK(ecode2)) {
-    SWIG_exception_fail(SWIG_ArgError(ecode2), "in method '" "star_db_max_variance_set" "', argument " "2"" of type '" "float""'");
-  } 
-  arg2 = static_cast< float >(val2);
-  if (arg1) (arg1)->max_variance = arg2;
-  resultobj = SWIG_Py_Void();
-  return resultobj;
-fail:
-  return NULL;
-}
-
-
-SWIGINTERN PyObject *_wrap_star_db_max_variance_get(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *resultobj = 0;
-  star_db *arg1 = (star_db *) 0 ;
-  void *argp1 = 0 ;
-  int res1 = 0 ;
-  PyObject * obj0 = 0 ;
-  float result;
-  
-  if (!PyArg_ParseTuple(args,(char *)"O:star_db_max_variance_get",&obj0)) SWIG_fail;
-  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_star_db, 0 |  0 );
-  if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "star_db_max_variance_get" "', argument " "1"" of type '" "star_db *""'"); 
-  }
-  arg1 = reinterpret_cast< star_db * >(argp1);
-  result = (float) ((arg1)->max_variance);
-  resultobj = SWIG_From_float(static_cast< float >(result));
-  return resultobj;
-fail:
-  return NULL;
-}
-
-
 SWIGINTERN PyObject *_wrap_star_db_kdsorted_set(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0;
   star_db *arg1 = (star_db *) 0 ;
@@ -5248,6 +5453,58 @@ fail:
 }
 
 
+SWIGINTERN PyObject *_wrap_star_db_max_variance_set(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  star_db *arg1 = (star_db *) 0 ;
+  float arg2 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  float val2 ;
+  int ecode2 = 0 ;
+  PyObject * obj0 = 0 ;
+  PyObject * obj1 = 0 ;
+  
+  if (!PyArg_ParseTuple(args,(char *)"OO:star_db_max_variance_set",&obj0,&obj1)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_star_db, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "star_db_max_variance_set" "', argument " "1"" of type '" "star_db *""'"); 
+  }
+  arg1 = reinterpret_cast< star_db * >(argp1);
+  ecode2 = SWIG_AsVal_float(obj1, &val2);
+  if (!SWIG_IsOK(ecode2)) {
+    SWIG_exception_fail(SWIG_ArgError(ecode2), "in method '" "star_db_max_variance_set" "', argument " "2"" of type '" "float""'");
+  } 
+  arg2 = static_cast< float >(val2);
+  if (arg1) (arg1)->max_variance = arg2;
+  resultobj = SWIG_Py_Void();
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_star_db_max_variance_get(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  star_db *arg1 = (star_db *) 0 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  PyObject * obj0 = 0 ;
+  float result;
+  
+  if (!PyArg_ParseTuple(args,(char *)"O:star_db_max_variance_get",&obj0)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_star_db, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "star_db_max_variance_get" "', argument " "1"" of type '" "star_db *""'"); 
+  }
+  arg1 = reinterpret_cast< star_db * >(argp1);
+  result = (float) ((arg1)->max_variance);
+  resultobj = SWIG_From_float(static_cast< float >(result));
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
 SWIGINTERN PyObject *_wrap_new_star_db(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0;
   star_db *result = 0 ;
@@ -5276,6 +5533,28 @@ SWIGINTERN PyObject *_wrap_delete_star_db(PyObject *SWIGUNUSEDPARM(self), PyObje
   arg1 = reinterpret_cast< star_db * >(argp1);
   delete arg1;
   resultobj = SWIG_Py_Void();
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_star_db_size(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  star_db *arg1 = (star_db *) 0 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  PyObject * obj0 = 0 ;
+  int result;
+  
+  if (!PyArg_ParseTuple(args,(char *)"O:star_db_size",&obj0)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_star_db, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "star_db_size" "', argument " "1"" of type '" "star_db *""'"); 
+  }
+  arg1 = reinterpret_cast< star_db * >(argp1);
+  result = (int)(arg1)->size();
+  resultobj = SWIG_From_int(static_cast< int >(result));
   return resultobj;
 fail:
   return NULL;
@@ -5366,223 +5645,6 @@ fail:
 }
 
 
-SWIGINTERN PyObject *_wrap_star_db_add_star__SWIG_0(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *resultobj = 0;
-  star_db *arg1 = (star_db *) 0 ;
-  float arg2 ;
-  float arg3 ;
-  float arg4 ;
-  float arg5 ;
-  int arg6 ;
-  void *argp1 = 0 ;
-  int res1 = 0 ;
-  float val2 ;
-  int ecode2 = 0 ;
-  float val3 ;
-  int ecode3 = 0 ;
-  float val4 ;
-  int ecode4 = 0 ;
-  float val5 ;
-  int ecode5 = 0 ;
-  int val6 ;
-  int ecode6 = 0 ;
-  PyObject * obj0 = 0 ;
-  PyObject * obj1 = 0 ;
-  PyObject * obj2 = 0 ;
-  PyObject * obj3 = 0 ;
-  PyObject * obj4 = 0 ;
-  PyObject * obj5 = 0 ;
-  
-  if (!PyArg_ParseTuple(args,(char *)"OOOOOO:star_db_add_star",&obj0,&obj1,&obj2,&obj3,&obj4,&obj5)) SWIG_fail;
-  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_star_db, 0 |  0 );
-  if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "star_db_add_star" "', argument " "1"" of type '" "star_db *""'"); 
-  }
-  arg1 = reinterpret_cast< star_db * >(argp1);
-  ecode2 = SWIG_AsVal_float(obj1, &val2);
-  if (!SWIG_IsOK(ecode2)) {
-    SWIG_exception_fail(SWIG_ArgError(ecode2), "in method '" "star_db_add_star" "', argument " "2"" of type '" "float""'");
-  } 
-  arg2 = static_cast< float >(val2);
-  ecode3 = SWIG_AsVal_float(obj2, &val3);
-  if (!SWIG_IsOK(ecode3)) {
-    SWIG_exception_fail(SWIG_ArgError(ecode3), "in method '" "star_db_add_star" "', argument " "3"" of type '" "float""'");
-  } 
-  arg3 = static_cast< float >(val3);
-  ecode4 = SWIG_AsVal_float(obj3, &val4);
-  if (!SWIG_IsOK(ecode4)) {
-    SWIG_exception_fail(SWIG_ArgError(ecode4), "in method '" "star_db_add_star" "', argument " "4"" of type '" "float""'");
-  } 
-  arg4 = static_cast< float >(val4);
-  ecode5 = SWIG_AsVal_float(obj4, &val5);
-  if (!SWIG_IsOK(ecode5)) {
-    SWIG_exception_fail(SWIG_ArgError(ecode5), "in method '" "star_db_add_star" "', argument " "5"" of type '" "float""'");
-  } 
-  arg5 = static_cast< float >(val5);
-  ecode6 = SWIG_AsVal_int(obj5, &val6);
-  if (!SWIG_IsOK(ecode6)) {
-    SWIG_exception_fail(SWIG_ArgError(ecode6), "in method '" "star_db_add_star" "', argument " "6"" of type '" "int""'");
-  } 
-  arg6 = static_cast< int >(val6);
-  (arg1)->add_star(arg2,arg3,arg4,arg5,arg6);
-  resultobj = SWIG_Py_Void();
-  return resultobj;
-fail:
-  return NULL;
-}
-
-
-SWIGINTERN PyObject *_wrap_star_db_add_star__SWIG_1(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *resultobj = 0;
-  star_db *arg1 = (star_db *) 0 ;
-  float arg2 ;
-  float arg3 ;
-  float arg4 ;
-  int arg5 ;
-  void *argp1 = 0 ;
-  int res1 = 0 ;
-  float val2 ;
-  int ecode2 = 0 ;
-  float val3 ;
-  int ecode3 = 0 ;
-  float val4 ;
-  int ecode4 = 0 ;
-  int val5 ;
-  int ecode5 = 0 ;
-  PyObject * obj0 = 0 ;
-  PyObject * obj1 = 0 ;
-  PyObject * obj2 = 0 ;
-  PyObject * obj3 = 0 ;
-  PyObject * obj4 = 0 ;
-  
-  if (!PyArg_ParseTuple(args,(char *)"OOOOO:star_db_add_star",&obj0,&obj1,&obj2,&obj3,&obj4)) SWIG_fail;
-  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_star_db, 0 |  0 );
-  if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "star_db_add_star" "', argument " "1"" of type '" "star_db *""'"); 
-  }
-  arg1 = reinterpret_cast< star_db * >(argp1);
-  ecode2 = SWIG_AsVal_float(obj1, &val2);
-  if (!SWIG_IsOK(ecode2)) {
-    SWIG_exception_fail(SWIG_ArgError(ecode2), "in method '" "star_db_add_star" "', argument " "2"" of type '" "float""'");
-  } 
-  arg2 = static_cast< float >(val2);
-  ecode3 = SWIG_AsVal_float(obj2, &val3);
-  if (!SWIG_IsOK(ecode3)) {
-    SWIG_exception_fail(SWIG_ArgError(ecode3), "in method '" "star_db_add_star" "', argument " "3"" of type '" "float""'");
-  } 
-  arg3 = static_cast< float >(val3);
-  ecode4 = SWIG_AsVal_float(obj3, &val4);
-  if (!SWIG_IsOK(ecode4)) {
-    SWIG_exception_fail(SWIG_ArgError(ecode4), "in method '" "star_db_add_star" "', argument " "4"" of type '" "float""'");
-  } 
-  arg4 = static_cast< float >(val4);
-  ecode5 = SWIG_AsVal_int(obj4, &val5);
-  if (!SWIG_IsOK(ecode5)) {
-    SWIG_exception_fail(SWIG_ArgError(ecode5), "in method '" "star_db_add_star" "', argument " "5"" of type '" "int""'");
-  } 
-  arg5 = static_cast< int >(val5);
-  (arg1)->add_star(arg2,arg3,arg4,arg5);
-  resultobj = SWIG_Py_Void();
-  return resultobj;
-fail:
-  return NULL;
-}
-
-
-SWIGINTERN PyObject *_wrap_star_db_add_star(PyObject *self, PyObject *args) {
-  Py_ssize_t argc;
-  PyObject *argv[7] = {
-    0
-  };
-  Py_ssize_t ii;
-  
-  if (!PyTuple_Check(args)) SWIG_fail;
-  argc = args ? PyObject_Length(args) : 0;
-  for (ii = 0; (ii < 6) && (ii < argc); ii++) {
-    argv[ii] = PyTuple_GET_ITEM(args,ii);
-  }
-  if (argc == 5) {
-    int _v;
-    void *vptr = 0;
-    int res = SWIG_ConvertPtr(argv[0], &vptr, SWIGTYPE_p_star_db, 0);
-    _v = SWIG_CheckState(res);
-    if (_v) {
-      {
-        int res = SWIG_AsVal_float(argv[1], NULL);
-        _v = SWIG_CheckState(res);
-      }
-      if (_v) {
-        {
-          int res = SWIG_AsVal_float(argv[2], NULL);
-          _v = SWIG_CheckState(res);
-        }
-        if (_v) {
-          {
-            int res = SWIG_AsVal_float(argv[3], NULL);
-            _v = SWIG_CheckState(res);
-          }
-          if (_v) {
-            {
-              int res = SWIG_AsVal_int(argv[4], NULL);
-              _v = SWIG_CheckState(res);
-            }
-            if (_v) {
-              return _wrap_star_db_add_star__SWIG_1(self, args);
-            }
-          }
-        }
-      }
-    }
-  }
-  if (argc == 6) {
-    int _v;
-    void *vptr = 0;
-    int res = SWIG_ConvertPtr(argv[0], &vptr, SWIGTYPE_p_star_db, 0);
-    _v = SWIG_CheckState(res);
-    if (_v) {
-      {
-        int res = SWIG_AsVal_float(argv[1], NULL);
-        _v = SWIG_CheckState(res);
-      }
-      if (_v) {
-        {
-          int res = SWIG_AsVal_float(argv[2], NULL);
-          _v = SWIG_CheckState(res);
-        }
-        if (_v) {
-          {
-            int res = SWIG_AsVal_float(argv[3], NULL);
-            _v = SWIG_CheckState(res);
-          }
-          if (_v) {
-            {
-              int res = SWIG_AsVal_float(argv[4], NULL);
-              _v = SWIG_CheckState(res);
-            }
-            if (_v) {
-              {
-                int res = SWIG_AsVal_int(argv[5], NULL);
-                _v = SWIG_CheckState(res);
-              }
-              if (_v) {
-                return _wrap_star_db_add_star__SWIG_0(self, args);
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-  
-fail:
-  SWIG_SetErrorMsg(PyExc_NotImplementedError,"Wrong number or type of arguments for overloaded function 'star_db_add_star'.\n"
-    "  Possible C/C++ prototypes are:\n"
-    "    star_db::add_star(float,float,float,float,int)\n"
-    "    star_db::add_star(float,float,float,int)\n");
-  return 0;
-}
-
-
 SWIGINTERN PyObject *_wrap_star_db_load_catalog(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0;
   star_db *arg1 = (star_db *) 0 ;
@@ -5625,6 +5687,162 @@ fail:
 }
 
 
+SWIGINTERN PyObject *_wrap_star_db_kdsort(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  star_db *arg1 = (star_db *) 0 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  PyObject * obj0 = 0 ;
+  
+  if (!PyArg_ParseTuple(args,(char *)"O:star_db_kdsort",&obj0)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_star_db, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "star_db_kdsort" "', argument " "1"" of type '" "star_db *""'"); 
+  }
+  arg1 = reinterpret_cast< star_db * >(argp1);
+  (arg1)->kdsort();
+  resultobj = SWIG_Py_Void();
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_star_db_sort(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  star_db *arg1 = (star_db *) 0 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  PyObject * obj0 = 0 ;
+  
+  if (!PyArg_ParseTuple(args,(char *)"O:star_db_sort",&obj0)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_star_db, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "star_db_sort" "', argument " "1"" of type '" "star_db *""'"); 
+  }
+  arg1 = reinterpret_cast< star_db * >(argp1);
+  (arg1)->sort();
+  resultobj = SWIG_Py_Void();
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_star_db___iadd____SWIG_0(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  star_db *arg1 = (star_db *) 0 ;
+  star *arg2 = (star *) 0 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  void *argp2 = 0 ;
+  int res2 = 0 ;
+  PyObject * obj0 = 0 ;
+  PyObject * obj1 = 0 ;
+  star_db *result = 0 ;
+  
+  if (!PyArg_ParseTuple(args,(char *)"OO:star_db___iadd__",&obj0,&obj1)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_star_db, SWIG_POINTER_DISOWN |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "star_db___iadd__" "', argument " "1"" of type '" "star_db *""'"); 
+  }
+  arg1 = reinterpret_cast< star_db * >(argp1);
+  res2 = SWIG_ConvertPtr(obj1, &argp2,SWIGTYPE_p_star, 0 |  0 );
+  if (!SWIG_IsOK(res2)) {
+    SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "star_db___iadd__" "', argument " "2"" of type '" "star const *""'"); 
+  }
+  arg2 = reinterpret_cast< star * >(argp2);
+  result = (star_db *)(arg1)->operator +=((star const *)arg2);
+  resultobj = SWIG_NewPointerObj(SWIG_as_voidptr(result), SWIGTYPE_p_star_db, SWIG_POINTER_OWN |  0 );
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_star_db___iadd____SWIG_1(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  star_db *arg1 = (star_db *) 0 ;
+  star *arg2 = 0 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  void *argp2 = 0 ;
+  int res2 = 0 ;
+  PyObject * obj0 = 0 ;
+  PyObject * obj1 = 0 ;
+  star_db *result = 0 ;
+  
+  if (!PyArg_ParseTuple(args,(char *)"OO:star_db___iadd__",&obj0,&obj1)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_star_db, SWIG_POINTER_DISOWN |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "star_db___iadd__" "', argument " "1"" of type '" "star_db *""'"); 
+  }
+  arg1 = reinterpret_cast< star_db * >(argp1);
+  res2 = SWIG_ConvertPtr(obj1, &argp2, SWIGTYPE_p_star,  0  | 0);
+  if (!SWIG_IsOK(res2)) {
+    SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "star_db___iadd__" "', argument " "2"" of type '" "star const &""'"); 
+  }
+  if (!argp2) {
+    SWIG_exception_fail(SWIG_ValueError, "invalid null reference " "in method '" "star_db___iadd__" "', argument " "2"" of type '" "star const &""'"); 
+  }
+  arg2 = reinterpret_cast< star * >(argp2);
+  result = (star_db *)(arg1)->operator +=((star const &)*arg2);
+  resultobj = SWIG_NewPointerObj(SWIG_as_voidptr(result), SWIGTYPE_p_star_db, SWIG_POINTER_OWN |  0 );
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_star_db___iadd__(PyObject *self, PyObject *args) {
+  Py_ssize_t argc;
+  PyObject *argv[3] = {
+    0
+  };
+  Py_ssize_t ii;
+  
+  if (!PyTuple_Check(args)) SWIG_fail;
+  argc = args ? PyObject_Length(args) : 0;
+  for (ii = 0; (ii < 2) && (ii < argc); ii++) {
+    argv[ii] = PyTuple_GET_ITEM(args,ii);
+  }
+  if (argc == 2) {
+    int _v;
+    void *vptr = 0;
+    int res = SWIG_ConvertPtr(argv[0], &vptr, SWIGTYPE_p_star_db, 0);
+    _v = SWIG_CheckState(res);
+    if (_v) {
+      void *vptr = 0;
+      int res = SWIG_ConvertPtr(argv[1], &vptr, SWIGTYPE_p_star, 0);
+      _v = SWIG_CheckState(res);
+      if (_v) {
+        return _wrap_star_db___iadd____SWIG_0(self, args);
+      }
+    }
+  }
+  if (argc == 2) {
+    int _v;
+    void *vptr = 0;
+    int res = SWIG_ConvertPtr(argv[0], &vptr, SWIGTYPE_p_star_db, 0);
+    _v = SWIG_CheckState(res);
+    if (_v) {
+      int res = SWIG_ConvertPtr(argv[1], 0, SWIGTYPE_p_star, 0);
+      _v = SWIG_CheckState(res);
+      if (_v) {
+        return _wrap_star_db___iadd____SWIG_1(self, args);
+      }
+    }
+  }
+  
+fail:
+  SWIG_SetErrorMsg(PyExc_NotImplementedError,"Wrong number or type of arguments for overloaded function 'star_db___iadd__'.\n"
+    "  Possible C/C++ prototypes are:\n"
+    "    star_db::operator +=(star const *)\n"
+    "    star_db::operator +=(star const &)\n");
+  return 0;
+}
+
+
 SWIGINTERN PyObject *_wrap_star_db_DBG_(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0;
   star_db *arg1 = (star_db *) 0 ;
@@ -5664,58 +5882,6 @@ SWIGINTERN PyObject *star_db_swigregister(PyObject *SWIGUNUSEDPARM(self), PyObje
   SWIG_TypeNewClientData(SWIGTYPE_p_star_db, SWIG_NewClientData(obj));
   return SWIG_Py_Void();
 }
-
-SWIGINTERN PyObject *_wrap_star_fov_stars_set(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *resultobj = 0;
-  star_fov *arg1 = (star_fov *) 0 ;
-  star_db *arg2 = (star_db *) 0 ;
-  void *argp1 = 0 ;
-  int res1 = 0 ;
-  void *argp2 = 0 ;
-  int res2 = 0 ;
-  PyObject * obj0 = 0 ;
-  PyObject * obj1 = 0 ;
-  
-  if (!PyArg_ParseTuple(args,(char *)"OO:star_fov_stars_set",&obj0,&obj1)) SWIG_fail;
-  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_star_fov, 0 |  0 );
-  if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "star_fov_stars_set" "', argument " "1"" of type '" "star_fov *""'"); 
-  }
-  arg1 = reinterpret_cast< star_fov * >(argp1);
-  res2 = SWIG_ConvertPtr(obj1, &argp2,SWIGTYPE_p_star_db, SWIG_POINTER_DISOWN |  0 );
-  if (!SWIG_IsOK(res2)) {
-    SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "star_fov_stars_set" "', argument " "2"" of type '" "star_db *""'"); 
-  }
-  arg2 = reinterpret_cast< star_db * >(argp2);
-  if (arg1) (arg1)->stars = arg2;
-  resultobj = SWIG_Py_Void();
-  return resultobj;
-fail:
-  return NULL;
-}
-
-
-SWIGINTERN PyObject *_wrap_star_fov_stars_get(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *resultobj = 0;
-  star_fov *arg1 = (star_fov *) 0 ;
-  void *argp1 = 0 ;
-  int res1 = 0 ;
-  PyObject * obj0 = 0 ;
-  star_db *result = 0 ;
-  
-  if (!PyArg_ParseTuple(args,(char *)"O:star_fov_stars_get",&obj0)) SWIG_fail;
-  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_star_fov, 0 |  0 );
-  if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "star_fov_stars_get" "', argument " "1"" of type '" "star_fov *""'"); 
-  }
-  arg1 = reinterpret_cast< star_fov * >(argp1);
-  result = (star_db *) ((arg1)->stars);
-  resultobj = SWIG_NewPointerObj(SWIG_as_voidptr(result), SWIGTYPE_p_star_db, 0 |  0 );
-  return resultobj;
-fail:
-  return NULL;
-}
-
 
 SWIGINTERN PyObject *_wrap_star_fov_mask_set(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0;
@@ -5763,110 +5929,6 @@ SWIGINTERN PyObject *_wrap_star_fov_mask_get(PyObject *SWIGUNUSEDPARM(self), PyO
   arg1 = reinterpret_cast< star_fov * >(argp1);
   result = (int *) ((arg1)->mask);
   resultobj = SWIG_NewPointerObj(SWIG_as_voidptr(result), SWIGTYPE_p_int, 0 |  0 );
-  return resultobj;
-fail:
-  return NULL;
-}
-
-
-SWIGINTERN PyObject *_wrap_star_fov_collision_set(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *resultobj = 0;
-  star_fov *arg1 = (star_fov *) 0 ;
-  int *arg2 = (int *) 0 ;
-  void *argp1 = 0 ;
-  int res1 = 0 ;
-  void *argp2 = 0 ;
-  int res2 = 0 ;
-  PyObject * obj0 = 0 ;
-  PyObject * obj1 = 0 ;
-  
-  if (!PyArg_ParseTuple(args,(char *)"OO:star_fov_collision_set",&obj0,&obj1)) SWIG_fail;
-  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_star_fov, 0 |  0 );
-  if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "star_fov_collision_set" "', argument " "1"" of type '" "star_fov *""'"); 
-  }
-  arg1 = reinterpret_cast< star_fov * >(argp1);
-  res2 = SWIG_ConvertPtr(obj1, &argp2,SWIGTYPE_p_int, SWIG_POINTER_DISOWN |  0 );
-  if (!SWIG_IsOK(res2)) {
-    SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "star_fov_collision_set" "', argument " "2"" of type '" "int *""'"); 
-  }
-  arg2 = reinterpret_cast< int * >(argp2);
-  if (arg1) (arg1)->collision = arg2;
-  resultobj = SWIG_Py_Void();
-  return resultobj;
-fail:
-  return NULL;
-}
-
-
-SWIGINTERN PyObject *_wrap_star_fov_collision_get(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *resultobj = 0;
-  star_fov *arg1 = (star_fov *) 0 ;
-  void *argp1 = 0 ;
-  int res1 = 0 ;
-  PyObject * obj0 = 0 ;
-  int *result = 0 ;
-  
-  if (!PyArg_ParseTuple(args,(char *)"O:star_fov_collision_get",&obj0)) SWIG_fail;
-  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_star_fov, 0 |  0 );
-  if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "star_fov_collision_get" "', argument " "1"" of type '" "star_fov *""'"); 
-  }
-  arg1 = reinterpret_cast< star_fov * >(argp1);
-  result = (int *) ((arg1)->collision);
-  resultobj = SWIG_NewPointerObj(SWIG_as_voidptr(result), SWIGTYPE_p_int, 0 |  0 );
-  return resultobj;
-fail:
-  return NULL;
-}
-
-
-SWIGINTERN PyObject *_wrap_star_fov_collision_size_set(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *resultobj = 0;
-  star_fov *arg1 = (star_fov *) 0 ;
-  int arg2 ;
-  void *argp1 = 0 ;
-  int res1 = 0 ;
-  int val2 ;
-  int ecode2 = 0 ;
-  PyObject * obj0 = 0 ;
-  PyObject * obj1 = 0 ;
-  
-  if (!PyArg_ParseTuple(args,(char *)"OO:star_fov_collision_size_set",&obj0,&obj1)) SWIG_fail;
-  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_star_fov, 0 |  0 );
-  if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "star_fov_collision_size_set" "', argument " "1"" of type '" "star_fov *""'"); 
-  }
-  arg1 = reinterpret_cast< star_fov * >(argp1);
-  ecode2 = SWIG_AsVal_int(obj1, &val2);
-  if (!SWIG_IsOK(ecode2)) {
-    SWIG_exception_fail(SWIG_ArgError(ecode2), "in method '" "star_fov_collision_size_set" "', argument " "2"" of type '" "int""'");
-  } 
-  arg2 = static_cast< int >(val2);
-  if (arg1) (arg1)->collision_size = arg2;
-  resultobj = SWIG_Py_Void();
-  return resultobj;
-fail:
-  return NULL;
-}
-
-
-SWIGINTERN PyObject *_wrap_star_fov_collision_size_get(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *resultobj = 0;
-  star_fov *arg1 = (star_fov *) 0 ;
-  void *argp1 = 0 ;
-  int res1 = 0 ;
-  PyObject * obj0 = 0 ;
-  int result;
-  
-  if (!PyArg_ParseTuple(args,(char *)"O:star_fov_collision_size_get",&obj0)) SWIG_fail;
-  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_star_fov, 0 |  0 );
-  if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "star_fov_collision_size_get" "', argument " "1"" of type '" "star_fov *""'"); 
-  }
-  arg1 = reinterpret_cast< star_fov * >(argp1);
-  result = (int) ((arg1)->collision_size);
-  resultobj = SWIG_From_int(static_cast< int >(result));
   return resultobj;
 fail:
   return NULL;
@@ -6393,162 +6455,6 @@ fail:
 }
 
 
-SWIGINTERN PyObject *_wrap_star_query_kdresults_maxsize_set(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *resultobj = 0;
-  star_query *arg1 = (star_query *) 0 ;
-  int arg2 ;
-  void *argp1 = 0 ;
-  int res1 = 0 ;
-  int val2 ;
-  int ecode2 = 0 ;
-  PyObject * obj0 = 0 ;
-  PyObject * obj1 = 0 ;
-  
-  if (!PyArg_ParseTuple(args,(char *)"OO:star_query_kdresults_maxsize_set",&obj0,&obj1)) SWIG_fail;
-  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_star_query, 0 |  0 );
-  if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "star_query_kdresults_maxsize_set" "', argument " "1"" of type '" "star_query *""'"); 
-  }
-  arg1 = reinterpret_cast< star_query * >(argp1);
-  ecode2 = SWIG_AsVal_int(obj1, &val2);
-  if (!SWIG_IsOK(ecode2)) {
-    SWIG_exception_fail(SWIG_ArgError(ecode2), "in method '" "star_query_kdresults_maxsize_set" "', argument " "2"" of type '" "int""'");
-  } 
-  arg2 = static_cast< int >(val2);
-  if (arg1) (arg1)->kdresults_maxsize = arg2;
-  resultobj = SWIG_Py_Void();
-  return resultobj;
-fail:
-  return NULL;
-}
-
-
-SWIGINTERN PyObject *_wrap_star_query_kdresults_maxsize_get(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *resultobj = 0;
-  star_query *arg1 = (star_query *) 0 ;
-  void *argp1 = 0 ;
-  int res1 = 0 ;
-  PyObject * obj0 = 0 ;
-  int result;
-  
-  if (!PyArg_ParseTuple(args,(char *)"O:star_query_kdresults_maxsize_get",&obj0)) SWIG_fail;
-  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_star_query, 0 |  0 );
-  if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "star_query_kdresults_maxsize_get" "', argument " "1"" of type '" "star_query *""'"); 
-  }
-  arg1 = reinterpret_cast< star_query * >(argp1);
-  result = (int) ((arg1)->kdresults_maxsize);
-  resultobj = SWIG_From_int(static_cast< int >(result));
-  return resultobj;
-fail:
-  return NULL;
-}
-
-
-SWIGINTERN PyObject *_wrap_star_query_kdbucket_size_set(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *resultobj = 0;
-  star_query *arg1 = (star_query *) 0 ;
-  int arg2 ;
-  void *argp1 = 0 ;
-  int res1 = 0 ;
-  int val2 ;
-  int ecode2 = 0 ;
-  PyObject * obj0 = 0 ;
-  PyObject * obj1 = 0 ;
-  
-  if (!PyArg_ParseTuple(args,(char *)"OO:star_query_kdbucket_size_set",&obj0,&obj1)) SWIG_fail;
-  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_star_query, 0 |  0 );
-  if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "star_query_kdbucket_size_set" "', argument " "1"" of type '" "star_query *""'"); 
-  }
-  arg1 = reinterpret_cast< star_query * >(argp1);
-  ecode2 = SWIG_AsVal_int(obj1, &val2);
-  if (!SWIG_IsOK(ecode2)) {
-    SWIG_exception_fail(SWIG_ArgError(ecode2), "in method '" "star_query_kdbucket_size_set" "', argument " "2"" of type '" "int""'");
-  } 
-  arg2 = static_cast< int >(val2);
-  if (arg1) (arg1)->kdbucket_size = arg2;
-  resultobj = SWIG_Py_Void();
-  return resultobj;
-fail:
-  return NULL;
-}
-
-
-SWIGINTERN PyObject *_wrap_star_query_kdbucket_size_get(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *resultobj = 0;
-  star_query *arg1 = (star_query *) 0 ;
-  void *argp1 = 0 ;
-  int res1 = 0 ;
-  PyObject * obj0 = 0 ;
-  int result;
-  
-  if (!PyArg_ParseTuple(args,(char *)"O:star_query_kdbucket_size_get",&obj0)) SWIG_fail;
-  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_star_query, 0 |  0 );
-  if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "star_query_kdbucket_size_get" "', argument " "1"" of type '" "star_query *""'"); 
-  }
-  arg1 = reinterpret_cast< star_query * >(argp1);
-  result = (int) ((arg1)->kdbucket_size);
-  resultobj = SWIG_From_int(static_cast< int >(result));
-  return resultobj;
-fail:
-  return NULL;
-}
-
-
-SWIGINTERN PyObject *_wrap_star_query_stars_set(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *resultobj = 0;
-  star_query *arg1 = (star_query *) 0 ;
-  star_db *arg2 = (star_db *) 0 ;
-  void *argp1 = 0 ;
-  int res1 = 0 ;
-  void *argp2 = 0 ;
-  int res2 = 0 ;
-  PyObject * obj0 = 0 ;
-  PyObject * obj1 = 0 ;
-  
-  if (!PyArg_ParseTuple(args,(char *)"OO:star_query_stars_set",&obj0,&obj1)) SWIG_fail;
-  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_star_query, 0 |  0 );
-  if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "star_query_stars_set" "', argument " "1"" of type '" "star_query *""'"); 
-  }
-  arg1 = reinterpret_cast< star_query * >(argp1);
-  res2 = SWIG_ConvertPtr(obj1, &argp2,SWIGTYPE_p_star_db, SWIG_POINTER_DISOWN |  0 );
-  if (!SWIG_IsOK(res2)) {
-    SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "star_query_stars_set" "', argument " "2"" of type '" "star_db *""'"); 
-  }
-  arg2 = reinterpret_cast< star_db * >(argp2);
-  if (arg1) (arg1)->stars = arg2;
-  resultobj = SWIG_Py_Void();
-  return resultobj;
-fail:
-  return NULL;
-}
-
-
-SWIGINTERN PyObject *_wrap_star_query_stars_get(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *resultobj = 0;
-  star_query *arg1 = (star_query *) 0 ;
-  void *argp1 = 0 ;
-  int res1 = 0 ;
-  PyObject * obj0 = 0 ;
-  star_db *result = 0 ;
-  
-  if (!PyArg_ParseTuple(args,(char *)"O:star_query_stars_get",&obj0)) SWIG_fail;
-  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_star_query, 0 |  0 );
-  if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "star_query_stars_get" "', argument " "1"" of type '" "star_query *""'"); 
-  }
-  arg1 = reinterpret_cast< star_query * >(argp1);
-  result = (star_db *) ((arg1)->stars);
-  resultobj = SWIG_NewPointerObj(SWIG_as_voidptr(result), SWIGTYPE_p_star_db, 0 |  0 );
-  return resultobj;
-fail:
-  return NULL;
-}
-
-
 SWIGINTERN PyObject *_wrap_new_star_query(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0;
   star_db *arg1 = (star_db *) 0 ;
@@ -6585,144 +6491,6 @@ SWIGINTERN PyObject *_wrap_delete_star_query(PyObject *SWIGUNUSEDPARM(self), PyO
   }
   arg1 = reinterpret_cast< star_query * >(argp1);
   delete arg1;
-  resultobj = SWIG_Py_Void();
-  return resultobj;
-fail:
-  return NULL;
-}
-
-
-SWIGINTERN PyObject *_wrap_star_query_kdsort(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *resultobj = 0;
-  star_query *arg1 = (star_query *) 0 ;
-  void *argp1 = 0 ;
-  int res1 = 0 ;
-  PyObject * obj0 = 0 ;
-  
-  if (!PyArg_ParseTuple(args,(char *)"O:star_query_kdsort",&obj0)) SWIG_fail;
-  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_star_query, 0 |  0 );
-  if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "star_query_kdsort" "', argument " "1"" of type '" "star_query *""'"); 
-  }
-  arg1 = reinterpret_cast< star_query * >(argp1);
-  (arg1)->kdsort();
-  resultobj = SWIG_Py_Void();
-  return resultobj;
-fail:
-  return NULL;
-}
-
-
-SWIGINTERN PyObject *_wrap_star_query_kdsort_x(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *resultobj = 0;
-  star_query *arg1 = (star_query *) 0 ;
-  int arg2 ;
-  int arg3 ;
-  void *argp1 = 0 ;
-  int res1 = 0 ;
-  int val2 ;
-  int ecode2 = 0 ;
-  int val3 ;
-  int ecode3 = 0 ;
-  PyObject * obj0 = 0 ;
-  PyObject * obj1 = 0 ;
-  PyObject * obj2 = 0 ;
-  
-  if (!PyArg_ParseTuple(args,(char *)"OOO:star_query_kdsort_x",&obj0,&obj1,&obj2)) SWIG_fail;
-  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_star_query, 0 |  0 );
-  if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "star_query_kdsort_x" "', argument " "1"" of type '" "star_query *""'"); 
-  }
-  arg1 = reinterpret_cast< star_query * >(argp1);
-  ecode2 = SWIG_AsVal_int(obj1, &val2);
-  if (!SWIG_IsOK(ecode2)) {
-    SWIG_exception_fail(SWIG_ArgError(ecode2), "in method '" "star_query_kdsort_x" "', argument " "2"" of type '" "int""'");
-  } 
-  arg2 = static_cast< int >(val2);
-  ecode3 = SWIG_AsVal_int(obj2, &val3);
-  if (!SWIG_IsOK(ecode3)) {
-    SWIG_exception_fail(SWIG_ArgError(ecode3), "in method '" "star_query_kdsort_x" "', argument " "3"" of type '" "int""'");
-  } 
-  arg3 = static_cast< int >(val3);
-  (arg1)->kdsort_x(arg2,arg3);
-  resultobj = SWIG_Py_Void();
-  return resultobj;
-fail:
-  return NULL;
-}
-
-
-SWIGINTERN PyObject *_wrap_star_query_kdsort_y(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *resultobj = 0;
-  star_query *arg1 = (star_query *) 0 ;
-  int arg2 ;
-  int arg3 ;
-  void *argp1 = 0 ;
-  int res1 = 0 ;
-  int val2 ;
-  int ecode2 = 0 ;
-  int val3 ;
-  int ecode3 = 0 ;
-  PyObject * obj0 = 0 ;
-  PyObject * obj1 = 0 ;
-  PyObject * obj2 = 0 ;
-  
-  if (!PyArg_ParseTuple(args,(char *)"OOO:star_query_kdsort_y",&obj0,&obj1,&obj2)) SWIG_fail;
-  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_star_query, 0 |  0 );
-  if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "star_query_kdsort_y" "', argument " "1"" of type '" "star_query *""'"); 
-  }
-  arg1 = reinterpret_cast< star_query * >(argp1);
-  ecode2 = SWIG_AsVal_int(obj1, &val2);
-  if (!SWIG_IsOK(ecode2)) {
-    SWIG_exception_fail(SWIG_ArgError(ecode2), "in method '" "star_query_kdsort_y" "', argument " "2"" of type '" "int""'");
-  } 
-  arg2 = static_cast< int >(val2);
-  ecode3 = SWIG_AsVal_int(obj2, &val3);
-  if (!SWIG_IsOK(ecode3)) {
-    SWIG_exception_fail(SWIG_ArgError(ecode3), "in method '" "star_query_kdsort_y" "', argument " "3"" of type '" "int""'");
-  } 
-  arg3 = static_cast< int >(val3);
-  (arg1)->kdsort_y(arg2,arg3);
-  resultobj = SWIG_Py_Void();
-  return resultobj;
-fail:
-  return NULL;
-}
-
-
-SWIGINTERN PyObject *_wrap_star_query_kdsort_z(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *resultobj = 0;
-  star_query *arg1 = (star_query *) 0 ;
-  int arg2 ;
-  int arg3 ;
-  void *argp1 = 0 ;
-  int res1 = 0 ;
-  int val2 ;
-  int ecode2 = 0 ;
-  int val3 ;
-  int ecode3 = 0 ;
-  PyObject * obj0 = 0 ;
-  PyObject * obj1 = 0 ;
-  PyObject * obj2 = 0 ;
-  
-  if (!PyArg_ParseTuple(args,(char *)"OOO:star_query_kdsort_z",&obj0,&obj1,&obj2)) SWIG_fail;
-  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_star_query, 0 |  0 );
-  if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "star_query_kdsort_z" "', argument " "1"" of type '" "star_query *""'"); 
-  }
-  arg1 = reinterpret_cast< star_query * >(argp1);
-  ecode2 = SWIG_AsVal_int(obj1, &val2);
-  if (!SWIG_IsOK(ecode2)) {
-    SWIG_exception_fail(SWIG_ArgError(ecode2), "in method '" "star_query_kdsort_z" "', argument " "2"" of type '" "int""'");
-  } 
-  arg2 = static_cast< int >(val2);
-  ecode3 = SWIG_AsVal_int(obj2, &val3);
-  if (!SWIG_IsOK(ecode3)) {
-    SWIG_exception_fail(SWIG_ArgError(ecode3), "in method '" "star_query_kdsort_z" "', argument " "3"" of type '" "int""'");
-  } 
-  arg3 = static_cast< int >(val3);
-  (arg1)->kdsort_z(arg2,arg3);
   resultobj = SWIG_Py_Void();
   return resultobj;
 fail:
@@ -8655,162 +8423,6 @@ SWIGINTERN PyObject *constellation_db_swigregister(PyObject *SWIGUNUSEDPARM(self
   return SWIG_Py_Void();
 }
 
-SWIGINTERN PyObject *_wrap_match_result_db_set(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *resultobj = 0;
-  match_result *arg1 = (match_result *) 0 ;
-  constellation_db *arg2 = (constellation_db *) 0 ;
-  void *argp1 = 0 ;
-  int res1 = 0 ;
-  void *argp2 = 0 ;
-  int res2 = 0 ;
-  PyObject * obj0 = 0 ;
-  PyObject * obj1 = 0 ;
-  
-  if (!PyArg_ParseTuple(args,(char *)"OO:match_result_db_set",&obj0,&obj1)) SWIG_fail;
-  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_match_result, 0 |  0 );
-  if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "match_result_db_set" "', argument " "1"" of type '" "match_result *""'"); 
-  }
-  arg1 = reinterpret_cast< match_result * >(argp1);
-  res2 = SWIG_ConvertPtr(obj1, &argp2,SWIGTYPE_p_constellation_db, SWIG_POINTER_DISOWN |  0 );
-  if (!SWIG_IsOK(res2)) {
-    SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "match_result_db_set" "', argument " "2"" of type '" "constellation_db *""'"); 
-  }
-  arg2 = reinterpret_cast< constellation_db * >(argp2);
-  if (arg1) (arg1)->db = arg2;
-  resultobj = SWIG_Py_Void();
-  return resultobj;
-fail:
-  return NULL;
-}
-
-
-SWIGINTERN PyObject *_wrap_match_result_db_get(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *resultobj = 0;
-  match_result *arg1 = (match_result *) 0 ;
-  void *argp1 = 0 ;
-  int res1 = 0 ;
-  PyObject * obj0 = 0 ;
-  constellation_db *result = 0 ;
-  
-  if (!PyArg_ParseTuple(args,(char *)"O:match_result_db_get",&obj0)) SWIG_fail;
-  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_match_result, 0 |  0 );
-  if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "match_result_db_get" "', argument " "1"" of type '" "match_result *""'"); 
-  }
-  arg1 = reinterpret_cast< match_result * >(argp1);
-  result = (constellation_db *) ((arg1)->db);
-  resultobj = SWIG_NewPointerObj(SWIG_as_voidptr(result), SWIGTYPE_p_constellation_db, 0 |  0 );
-  return resultobj;
-fail:
-  return NULL;
-}
-
-
-SWIGINTERN PyObject *_wrap_match_result_img_set(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *resultobj = 0;
-  match_result *arg1 = (match_result *) 0 ;
-  constellation_db *arg2 = (constellation_db *) 0 ;
-  void *argp1 = 0 ;
-  int res1 = 0 ;
-  void *argp2 = 0 ;
-  int res2 = 0 ;
-  PyObject * obj0 = 0 ;
-  PyObject * obj1 = 0 ;
-  
-  if (!PyArg_ParseTuple(args,(char *)"OO:match_result_img_set",&obj0,&obj1)) SWIG_fail;
-  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_match_result, 0 |  0 );
-  if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "match_result_img_set" "', argument " "1"" of type '" "match_result *""'"); 
-  }
-  arg1 = reinterpret_cast< match_result * >(argp1);
-  res2 = SWIG_ConvertPtr(obj1, &argp2,SWIGTYPE_p_constellation_db, SWIG_POINTER_DISOWN |  0 );
-  if (!SWIG_IsOK(res2)) {
-    SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "match_result_img_set" "', argument " "2"" of type '" "constellation_db *""'"); 
-  }
-  arg2 = reinterpret_cast< constellation_db * >(argp2);
-  if (arg1) (arg1)->img = arg2;
-  resultobj = SWIG_Py_Void();
-  return resultobj;
-fail:
-  return NULL;
-}
-
-
-SWIGINTERN PyObject *_wrap_match_result_img_get(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *resultobj = 0;
-  match_result *arg1 = (match_result *) 0 ;
-  void *argp1 = 0 ;
-  int res1 = 0 ;
-  PyObject * obj0 = 0 ;
-  constellation_db *result = 0 ;
-  
-  if (!PyArg_ParseTuple(args,(char *)"O:match_result_img_get",&obj0)) SWIG_fail;
-  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_match_result, 0 |  0 );
-  if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "match_result_img_get" "', argument " "1"" of type '" "match_result *""'"); 
-  }
-  arg1 = reinterpret_cast< match_result * >(argp1);
-  result = (constellation_db *) ((arg1)->img);
-  resultobj = SWIG_NewPointerObj(SWIG_as_voidptr(result), SWIGTYPE_p_constellation_db, 0 |  0 );
-  return resultobj;
-fail:
-  return NULL;
-}
-
-
-SWIGINTERN PyObject *_wrap_match_result_db_const_set(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *resultobj = 0;
-  match_result *arg1 = (match_result *) 0 ;
-  constellation *arg2 = (constellation *) 0 ;
-  void *argp1 = 0 ;
-  int res1 = 0 ;
-  void *argp2 = 0 ;
-  int res2 = 0 ;
-  PyObject * obj0 = 0 ;
-  PyObject * obj1 = 0 ;
-  
-  if (!PyArg_ParseTuple(args,(char *)"OO:match_result_db_const_set",&obj0,&obj1)) SWIG_fail;
-  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_match_result, 0 |  0 );
-  if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "match_result_db_const_set" "', argument " "1"" of type '" "match_result *""'"); 
-  }
-  arg1 = reinterpret_cast< match_result * >(argp1);
-  res2 = SWIG_ConvertPtr(obj1, &argp2,SWIGTYPE_p_constellation, SWIG_POINTER_DISOWN |  0 );
-  if (!SWIG_IsOK(res2)) {
-    SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "match_result_db_const_set" "', argument " "2"" of type '" "constellation *""'"); 
-  }
-  arg2 = reinterpret_cast< constellation * >(argp2);
-  if (arg1) (arg1)->db_const = arg2;
-  resultobj = SWIG_Py_Void();
-  return resultobj;
-fail:
-  return NULL;
-}
-
-
-SWIGINTERN PyObject *_wrap_match_result_db_const_get(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *resultobj = 0;
-  match_result *arg1 = (match_result *) 0 ;
-  void *argp1 = 0 ;
-  int res1 = 0 ;
-  PyObject * obj0 = 0 ;
-  constellation *result = 0 ;
-  
-  if (!PyArg_ParseTuple(args,(char *)"O:match_result_db_const_get",&obj0)) SWIG_fail;
-  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_match_result, 0 |  0 );
-  if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "match_result_db_const_get" "', argument " "1"" of type '" "match_result *""'"); 
-  }
-  arg1 = reinterpret_cast< match_result * >(argp1);
-  result = (constellation *) ((arg1)->db_const);
-  resultobj = SWIG_NewPointerObj(SWIG_as_voidptr(result), SWIGTYPE_p_constellation, 0 |  0 );
-  return resultobj;
-fail:
-  return NULL;
-}
-
-
 SWIGINTERN PyObject *_wrap_match_result_img_mask_set(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0;
   match_result *arg1 = (match_result *) 0 ;
@@ -8857,58 +8469,6 @@ SWIGINTERN PyObject *_wrap_match_result_img_mask_get(PyObject *SWIGUNUSEDPARM(se
   arg1 = reinterpret_cast< match_result * >(argp1);
   result = (star_fov *) ((arg1)->img_mask);
   resultobj = SWIG_NewPointerObj(SWIG_as_voidptr(result), SWIGTYPE_p_star_fov, 0 |  0 );
-  return resultobj;
-fail:
-  return NULL;
-}
-
-
-SWIGINTERN PyObject *_wrap_match_result_match_set(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *resultobj = 0;
-  match_result *arg1 = (match_result *) 0 ;
-  constellation_pair *arg2 = (constellation_pair *) 0 ;
-  void *argp1 = 0 ;
-  int res1 = 0 ;
-  void *argp2 = 0 ;
-  int res2 = 0 ;
-  PyObject * obj0 = 0 ;
-  PyObject * obj1 = 0 ;
-  
-  if (!PyArg_ParseTuple(args,(char *)"OO:match_result_match_set",&obj0,&obj1)) SWIG_fail;
-  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_match_result, 0 |  0 );
-  if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "match_result_match_set" "', argument " "1"" of type '" "match_result *""'"); 
-  }
-  arg1 = reinterpret_cast< match_result * >(argp1);
-  res2 = SWIG_ConvertPtr(obj1, &argp2,SWIGTYPE_p_constellation_pair, 0 |  0 );
-  if (!SWIG_IsOK(res2)) {
-    SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "match_result_match_set" "', argument " "2"" of type '" "constellation_pair *""'"); 
-  }
-  arg2 = reinterpret_cast< constellation_pair * >(argp2);
-  if (arg1) (arg1)->match = *arg2;
-  resultobj = SWIG_Py_Void();
-  return resultobj;
-fail:
-  return NULL;
-}
-
-
-SWIGINTERN PyObject *_wrap_match_result_match_get(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *resultobj = 0;
-  match_result *arg1 = (match_result *) 0 ;
-  void *argp1 = 0 ;
-  int res1 = 0 ;
-  PyObject * obj0 = 0 ;
-  constellation_pair *result = 0 ;
-  
-  if (!PyArg_ParseTuple(args,(char *)"O:match_result_match_get",&obj0)) SWIG_fail;
-  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_match_result, 0 |  0 );
-  if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "match_result_match_get" "', argument " "1"" of type '" "match_result *""'"); 
-  }
-  arg1 = reinterpret_cast< match_result * >(argp1);
-  result = (constellation_pair *)& ((arg1)->match);
-  resultobj = SWIG_NewPointerObj(SWIG_as_voidptr(result), SWIGTYPE_p_constellation_pair, 0 |  0 );
   return resultobj;
 fail:
   return NULL;
@@ -9013,6 +8573,214 @@ SWIGINTERN PyObject *_wrap_match_result_map_size_get(PyObject *SWIGUNUSEDPARM(se
   arg1 = reinterpret_cast< match_result * >(argp1);
   result = (int) ((arg1)->map_size);
   resultobj = SWIG_From_int(static_cast< int >(result));
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_match_result_db_const_set(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  match_result *arg1 = (match_result *) 0 ;
+  constellation *arg2 = (constellation *) 0 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  void *argp2 = 0 ;
+  int res2 = 0 ;
+  PyObject * obj0 = 0 ;
+  PyObject * obj1 = 0 ;
+  
+  if (!PyArg_ParseTuple(args,(char *)"OO:match_result_db_const_set",&obj0,&obj1)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_match_result, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "match_result_db_const_set" "', argument " "1"" of type '" "match_result *""'"); 
+  }
+  arg1 = reinterpret_cast< match_result * >(argp1);
+  res2 = SWIG_ConvertPtr(obj1, &argp2,SWIGTYPE_p_constellation, SWIG_POINTER_DISOWN |  0 );
+  if (!SWIG_IsOK(res2)) {
+    SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "match_result_db_const_set" "', argument " "2"" of type '" "constellation *""'"); 
+  }
+  arg2 = reinterpret_cast< constellation * >(argp2);
+  if (arg1) (arg1)->db_const = arg2;
+  resultobj = SWIG_Py_Void();
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_match_result_db_const_get(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  match_result *arg1 = (match_result *) 0 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  PyObject * obj0 = 0 ;
+  constellation *result = 0 ;
+  
+  if (!PyArg_ParseTuple(args,(char *)"O:match_result_db_const_get",&obj0)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_match_result, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "match_result_db_const_get" "', argument " "1"" of type '" "match_result *""'"); 
+  }
+  arg1 = reinterpret_cast< match_result * >(argp1);
+  result = (constellation *) ((arg1)->db_const);
+  resultobj = SWIG_NewPointerObj(SWIG_as_voidptr(result), SWIGTYPE_p_constellation, 0 |  0 );
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_match_result_db_set(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  match_result *arg1 = (match_result *) 0 ;
+  constellation_db *arg2 = (constellation_db *) 0 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  void *argp2 = 0 ;
+  int res2 = 0 ;
+  PyObject * obj0 = 0 ;
+  PyObject * obj1 = 0 ;
+  
+  if (!PyArg_ParseTuple(args,(char *)"OO:match_result_db_set",&obj0,&obj1)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_match_result, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "match_result_db_set" "', argument " "1"" of type '" "match_result *""'"); 
+  }
+  arg1 = reinterpret_cast< match_result * >(argp1);
+  res2 = SWIG_ConvertPtr(obj1, &argp2,SWIGTYPE_p_constellation_db, SWIG_POINTER_DISOWN |  0 );
+  if (!SWIG_IsOK(res2)) {
+    SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "match_result_db_set" "', argument " "2"" of type '" "constellation_db *""'"); 
+  }
+  arg2 = reinterpret_cast< constellation_db * >(argp2);
+  if (arg1) (arg1)->db = arg2;
+  resultobj = SWIG_Py_Void();
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_match_result_db_get(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  match_result *arg1 = (match_result *) 0 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  PyObject * obj0 = 0 ;
+  constellation_db *result = 0 ;
+  
+  if (!PyArg_ParseTuple(args,(char *)"O:match_result_db_get",&obj0)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_match_result, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "match_result_db_get" "', argument " "1"" of type '" "match_result *""'"); 
+  }
+  arg1 = reinterpret_cast< match_result * >(argp1);
+  result = (constellation_db *) ((arg1)->db);
+  resultobj = SWIG_NewPointerObj(SWIG_as_voidptr(result), SWIGTYPE_p_constellation_db, 0 |  0 );
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_match_result_img_set(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  match_result *arg1 = (match_result *) 0 ;
+  constellation_db *arg2 = (constellation_db *) 0 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  void *argp2 = 0 ;
+  int res2 = 0 ;
+  PyObject * obj0 = 0 ;
+  PyObject * obj1 = 0 ;
+  
+  if (!PyArg_ParseTuple(args,(char *)"OO:match_result_img_set",&obj0,&obj1)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_match_result, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "match_result_img_set" "', argument " "1"" of type '" "match_result *""'"); 
+  }
+  arg1 = reinterpret_cast< match_result * >(argp1);
+  res2 = SWIG_ConvertPtr(obj1, &argp2,SWIGTYPE_p_constellation_db, SWIG_POINTER_DISOWN |  0 );
+  if (!SWIG_IsOK(res2)) {
+    SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "match_result_img_set" "', argument " "2"" of type '" "constellation_db *""'"); 
+  }
+  arg2 = reinterpret_cast< constellation_db * >(argp2);
+  if (arg1) (arg1)->img = arg2;
+  resultobj = SWIG_Py_Void();
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_match_result_img_get(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  match_result *arg1 = (match_result *) 0 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  PyObject * obj0 = 0 ;
+  constellation_db *result = 0 ;
+  
+  if (!PyArg_ParseTuple(args,(char *)"O:match_result_img_get",&obj0)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_match_result, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "match_result_img_get" "', argument " "1"" of type '" "match_result *""'"); 
+  }
+  arg1 = reinterpret_cast< match_result * >(argp1);
+  result = (constellation_db *) ((arg1)->img);
+  resultobj = SWIG_NewPointerObj(SWIG_as_voidptr(result), SWIGTYPE_p_constellation_db, 0 |  0 );
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_match_result_match_set(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  match_result *arg1 = (match_result *) 0 ;
+  constellation_pair *arg2 = (constellation_pair *) 0 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  void *argp2 = 0 ;
+  int res2 = 0 ;
+  PyObject * obj0 = 0 ;
+  PyObject * obj1 = 0 ;
+  
+  if (!PyArg_ParseTuple(args,(char *)"OO:match_result_match_set",&obj0,&obj1)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_match_result, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "match_result_match_set" "', argument " "1"" of type '" "match_result *""'"); 
+  }
+  arg1 = reinterpret_cast< match_result * >(argp1);
+  res2 = SWIG_ConvertPtr(obj1, &argp2,SWIGTYPE_p_constellation_pair, 0 |  0 );
+  if (!SWIG_IsOK(res2)) {
+    SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "match_result_match_set" "', argument " "2"" of type '" "constellation_pair *""'"); 
+  }
+  arg2 = reinterpret_cast< constellation_pair * >(argp2);
+  if (arg1) (arg1)->match = *arg2;
+  resultobj = SWIG_Py_Void();
+  return resultobj;
+fail:
+  return NULL;
+}
+
+
+SWIGINTERN PyObject *_wrap_match_result_match_get(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
+  PyObject *resultobj = 0;
+  match_result *arg1 = (match_result *) 0 ;
+  void *argp1 = 0 ;
+  int res1 = 0 ;
+  PyObject * obj0 = 0 ;
+  constellation_pair *result = 0 ;
+  
+  if (!PyArg_ParseTuple(args,(char *)"O:match_result_match_get",&obj0)) SWIG_fail;
+  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_match_result, 0 |  0 );
+  if (!SWIG_IsOK(res1)) {
+    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "match_result_match_get" "', argument " "1"" of type '" "match_result *""'"); 
+  }
+  arg1 = reinterpret_cast< match_result * >(argp1);
+  result = (constellation_pair *)& ((arg1)->match);
+  resultobj = SWIG_NewPointerObj(SWIG_as_voidptr(result), SWIGTYPE_p_constellation_pair, 0 |  0 );
   return resultobj;
 fail:
   return NULL;
@@ -9928,162 +9696,6 @@ fail:
 }
 
 
-SWIGINTERN PyObject *_wrap_db_match_c_pairs_set(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *resultobj = 0;
-  db_match *arg1 = (db_match *) 0 ;
-  constellation_pair *arg2 = (constellation_pair *) 0 ;
-  void *argp1 = 0 ;
-  int res1 = 0 ;
-  void *argp2 = 0 ;
-  int res2 = 0 ;
-  PyObject * obj0 = 0 ;
-  PyObject * obj1 = 0 ;
-  
-  if (!PyArg_ParseTuple(args,(char *)"OO:db_match_c_pairs_set",&obj0,&obj1)) SWIG_fail;
-  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_db_match, 0 |  0 );
-  if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "db_match_c_pairs_set" "', argument " "1"" of type '" "db_match *""'"); 
-  }
-  arg1 = reinterpret_cast< db_match * >(argp1);
-  res2 = SWIG_ConvertPtr(obj1, &argp2,SWIGTYPE_p_constellation_pair, SWIG_POINTER_DISOWN |  0 );
-  if (!SWIG_IsOK(res2)) {
-    SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "db_match_c_pairs_set" "', argument " "2"" of type '" "constellation_pair *""'"); 
-  }
-  arg2 = reinterpret_cast< constellation_pair * >(argp2);
-  if (arg1) (arg1)->c_pairs = arg2;
-  resultobj = SWIG_Py_Void();
-  return resultobj;
-fail:
-  return NULL;
-}
-
-
-SWIGINTERN PyObject *_wrap_db_match_c_pairs_get(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *resultobj = 0;
-  db_match *arg1 = (db_match *) 0 ;
-  void *argp1 = 0 ;
-  int res1 = 0 ;
-  PyObject * obj0 = 0 ;
-  constellation_pair *result = 0 ;
-  
-  if (!PyArg_ParseTuple(args,(char *)"O:db_match_c_pairs_get",&obj0)) SWIG_fail;
-  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_db_match, 0 |  0 );
-  if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "db_match_c_pairs_get" "', argument " "1"" of type '" "db_match *""'"); 
-  }
-  arg1 = reinterpret_cast< db_match * >(argp1);
-  result = (constellation_pair *) ((arg1)->c_pairs);
-  resultobj = SWIG_NewPointerObj(SWIG_as_voidptr(result), SWIGTYPE_p_constellation_pair, 0 |  0 );
-  return resultobj;
-fail:
-  return NULL;
-}
-
-
-SWIGINTERN PyObject *_wrap_db_match_c_pairs_size_set(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *resultobj = 0;
-  db_match *arg1 = (db_match *) 0 ;
-  int arg2 ;
-  void *argp1 = 0 ;
-  int res1 = 0 ;
-  int val2 ;
-  int ecode2 = 0 ;
-  PyObject * obj0 = 0 ;
-  PyObject * obj1 = 0 ;
-  
-  if (!PyArg_ParseTuple(args,(char *)"OO:db_match_c_pairs_size_set",&obj0,&obj1)) SWIG_fail;
-  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_db_match, 0 |  0 );
-  if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "db_match_c_pairs_size_set" "', argument " "1"" of type '" "db_match *""'"); 
-  }
-  arg1 = reinterpret_cast< db_match * >(argp1);
-  ecode2 = SWIG_AsVal_int(obj1, &val2);
-  if (!SWIG_IsOK(ecode2)) {
-    SWIG_exception_fail(SWIG_ArgError(ecode2), "in method '" "db_match_c_pairs_size_set" "', argument " "2"" of type '" "int""'");
-  } 
-  arg2 = static_cast< int >(val2);
-  if (arg1) (arg1)->c_pairs_size = arg2;
-  resultobj = SWIG_Py_Void();
-  return resultobj;
-fail:
-  return NULL;
-}
-
-
-SWIGINTERN PyObject *_wrap_db_match_c_pairs_size_get(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *resultobj = 0;
-  db_match *arg1 = (db_match *) 0 ;
-  void *argp1 = 0 ;
-  int res1 = 0 ;
-  PyObject * obj0 = 0 ;
-  int result;
-  
-  if (!PyArg_ParseTuple(args,(char *)"O:db_match_c_pairs_size_get",&obj0)) SWIG_fail;
-  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_db_match, 0 |  0 );
-  if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "db_match_c_pairs_size_get" "', argument " "1"" of type '" "db_match *""'"); 
-  }
-  arg1 = reinterpret_cast< db_match * >(argp1);
-  result = (int) ((arg1)->c_pairs_size);
-  resultobj = SWIG_From_int(static_cast< int >(result));
-  return resultobj;
-fail:
-  return NULL;
-}
-
-
-SWIGINTERN PyObject *_wrap_db_match_img_mask_set(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *resultobj = 0;
-  db_match *arg1 = (db_match *) 0 ;
-  star_fov *arg2 = (star_fov *) 0 ;
-  void *argp1 = 0 ;
-  int res1 = 0 ;
-  void *argp2 = 0 ;
-  int res2 = 0 ;
-  PyObject * obj0 = 0 ;
-  PyObject * obj1 = 0 ;
-  
-  if (!PyArg_ParseTuple(args,(char *)"OO:db_match_img_mask_set",&obj0,&obj1)) SWIG_fail;
-  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_db_match, 0 |  0 );
-  if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "db_match_img_mask_set" "', argument " "1"" of type '" "db_match *""'"); 
-  }
-  arg1 = reinterpret_cast< db_match * >(argp1);
-  res2 = SWIG_ConvertPtr(obj1, &argp2,SWIGTYPE_p_star_fov, SWIG_POINTER_DISOWN |  0 );
-  if (!SWIG_IsOK(res2)) {
-    SWIG_exception_fail(SWIG_ArgError(res2), "in method '" "db_match_img_mask_set" "', argument " "2"" of type '" "star_fov *""'"); 
-  }
-  arg2 = reinterpret_cast< star_fov * >(argp2);
-  if (arg1) (arg1)->img_mask = arg2;
-  resultobj = SWIG_Py_Void();
-  return resultobj;
-fail:
-  return NULL;
-}
-
-
-SWIGINTERN PyObject *_wrap_db_match_img_mask_get(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
-  PyObject *resultobj = 0;
-  db_match *arg1 = (db_match *) 0 ;
-  void *argp1 = 0 ;
-  int res1 = 0 ;
-  PyObject * obj0 = 0 ;
-  star_fov *result = 0 ;
-  
-  if (!PyArg_ParseTuple(args,(char *)"O:db_match_img_mask_get",&obj0)) SWIG_fail;
-  res1 = SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_db_match, 0 |  0 );
-  if (!SWIG_IsOK(res1)) {
-    SWIG_exception_fail(SWIG_ArgError(res1), "in method '" "db_match_img_mask_get" "', argument " "1"" of type '" "db_match *""'"); 
-  }
-  arg1 = reinterpret_cast< db_match * >(argp1);
-  result = (star_fov *) ((arg1)->img_mask);
-  resultobj = SWIG_NewPointerObj(SWIG_as_voidptr(result), SWIGTYPE_p_star_fov, 0 |  0 );
-  return resultobj;
-fail:
-  return NULL;
-}
-
-
 SWIGINTERN PyObject *_wrap_new_db_match(PyObject *SWIGUNUSEDPARM(self), PyObject *args) {
   PyObject *resultobj = 0;
   constellation_db *arg1 = (constellation_db *) 0 ;
@@ -10147,7 +9759,6 @@ static PyMethodDef SwigMethods[] = {
 	 { (char *)"SWIG_PyInstanceMethod_New", (PyCFunction)SWIG_PyInstanceMethod_New, METH_O, NULL},
 	 { (char *)"PI_swigconstant", PI_swigconstant, METH_VARARGS, NULL},
 	 { (char *)"TWOPI_swigconstant", TWOPI_swigconstant, METH_VARARGS, NULL},
-	 { (char *)"IMG_ROTATION_swigconstant", IMG_ROTATION_swigconstant, METH_VARARGS, NULL},
 	 { (char *)"load_config", _wrap_load_config, METH_VARARGS, NULL},
 	 { (char *)"star_x_set", _wrap_star_x_set, METH_VARARGS, NULL},
 	 { (char *)"star_x_get", _wrap_star_x_get, METH_VARARGS, NULL},
@@ -10157,21 +9768,23 @@ static PyMethodDef SwigMethods[] = {
 	 { (char *)"star_z_get", _wrap_star_z_get, METH_VARARGS, NULL},
 	 { (char *)"star_flux_set", _wrap_star_flux_set, METH_VARARGS, NULL},
 	 { (char *)"star_flux_get", _wrap_star_flux_get, METH_VARARGS, NULL},
-	 { (char *)"star_star_idx_set", _wrap_star_star_idx_set, METH_VARARGS, NULL},
-	 { (char *)"star_star_idx_get", _wrap_star_star_idx_get, METH_VARARGS, NULL},
 	 { (char *)"star_id_set", _wrap_star_id_set, METH_VARARGS, NULL},
 	 { (char *)"star_id_get", _wrap_star_id_get, METH_VARARGS, NULL},
-	 { (char *)"star_unreliable_set", _wrap_star_unreliable_set, METH_VARARGS, NULL},
-	 { (char *)"star_unreliable_get", _wrap_star_unreliable_get, METH_VARARGS, NULL},
-	 { (char *)"star_sigma_sq_set", _wrap_star_sigma_sq_set, METH_VARARGS, NULL},
-	 { (char *)"star_sigma_sq_get", _wrap_star_sigma_sq_get, METH_VARARGS, NULL},
 	 { (char *)"star_px_set", _wrap_star_px_set, METH_VARARGS, NULL},
 	 { (char *)"star_px_get", _wrap_star_px_get, METH_VARARGS, NULL},
 	 { (char *)"star_py_set", _wrap_star_py_set, METH_VARARGS, NULL},
 	 { (char *)"star_py_get", _wrap_star_py_get, METH_VARARGS, NULL},
-	 { (char *)"star_dist_arcsec", _wrap_star_dist_arcsec, METH_VARARGS, NULL},
-	 { (char *)"star_DBG_", _wrap_star_DBG_, METH_VARARGS, NULL},
+	 { (char *)"star_unreliable_set", _wrap_star_unreliable_set, METH_VARARGS, NULL},
+	 { (char *)"star_unreliable_get", _wrap_star_unreliable_get, METH_VARARGS, NULL},
+	 { (char *)"star_star_idx_set", _wrap_star_star_idx_set, METH_VARARGS, NULL},
+	 { (char *)"star_star_idx_get", _wrap_star_star_idx_get, METH_VARARGS, NULL},
+	 { (char *)"star_sigma_sq_set", _wrap_star_sigma_sq_set, METH_VARARGS, NULL},
+	 { (char *)"star_sigma_sq_get", _wrap_star_sigma_sq_get, METH_VARARGS, NULL},
 	 { (char *)"new_star", _wrap_new_star, METH_VARARGS, NULL},
+	 { (char *)"star_hash", _wrap_star_hash, METH_VARARGS, NULL},
+	 { (char *)"star___eq__", _wrap_star___eq__, METH_VARARGS, NULL},
+	 { (char *)"star___mul__", _wrap_star___mul__, METH_VARARGS, NULL},
+	 { (char *)"star_DBG_", _wrap_star_DBG_, METH_VARARGS, NULL},
 	 { (char *)"delete_star", _wrap_delete_star, METH_VARARGS, NULL},
 	 { (char *)"star_swigregister", star_swigregister, METH_VARARGS, NULL},
 	 { (char *)"star_gt_x", _wrap_star_gt_x, METH_VARARGS, NULL},
@@ -10186,27 +9799,24 @@ static PyMethodDef SwigMethods[] = {
 	 { (char *)"star_db_map_get", _wrap_star_db_map_get, METH_VARARGS, NULL},
 	 { (char *)"star_db_map_size_set", _wrap_star_db_map_size_set, METH_VARARGS, NULL},
 	 { (char *)"star_db_map_size_get", _wrap_star_db_map_size_get, METH_VARARGS, NULL},
-	 { (char *)"star_db_max_variance_set", _wrap_star_db_max_variance_set, METH_VARARGS, NULL},
-	 { (char *)"star_db_max_variance_get", _wrap_star_db_max_variance_get, METH_VARARGS, NULL},
 	 { (char *)"star_db_kdsorted_set", _wrap_star_db_kdsorted_set, METH_VARARGS, NULL},
 	 { (char *)"star_db_kdsorted_get", _wrap_star_db_kdsorted_get, METH_VARARGS, NULL},
+	 { (char *)"star_db_max_variance_set", _wrap_star_db_max_variance_set, METH_VARARGS, NULL},
+	 { (char *)"star_db_max_variance_get", _wrap_star_db_max_variance_get, METH_VARARGS, NULL},
 	 { (char *)"new_star_db", _wrap_new_star_db, METH_VARARGS, NULL},
 	 { (char *)"delete_star_db", _wrap_delete_star_db, METH_VARARGS, NULL},
+	 { (char *)"star_db_size", _wrap_star_db_size, METH_VARARGS, NULL},
 	 { (char *)"star_db_get_star", _wrap_star_db_get_star, METH_VARARGS, NULL},
 	 { (char *)"star_db_copy", _wrap_star_db_copy, METH_VARARGS, NULL},
 	 { (char *)"star_db_copy_n_brightest", _wrap_star_db_copy_n_brightest, METH_VARARGS, NULL},
-	 { (char *)"star_db_add_star", _wrap_star_db_add_star, METH_VARARGS, NULL},
 	 { (char *)"star_db_load_catalog", _wrap_star_db_load_catalog, METH_VARARGS, NULL},
+	 { (char *)"star_db_kdsort", _wrap_star_db_kdsort, METH_VARARGS, NULL},
+	 { (char *)"star_db_sort", _wrap_star_db_sort, METH_VARARGS, NULL},
+	 { (char *)"star_db___iadd__", _wrap_star_db___iadd__, METH_VARARGS, NULL},
 	 { (char *)"star_db_DBG_", _wrap_star_db_DBG_, METH_VARARGS, NULL},
 	 { (char *)"star_db_swigregister", star_db_swigregister, METH_VARARGS, NULL},
-	 { (char *)"star_fov_stars_set", _wrap_star_fov_stars_set, METH_VARARGS, NULL},
-	 { (char *)"star_fov_stars_get", _wrap_star_fov_stars_get, METH_VARARGS, NULL},
 	 { (char *)"star_fov_mask_set", _wrap_star_fov_mask_set, METH_VARARGS, NULL},
 	 { (char *)"star_fov_mask_get", _wrap_star_fov_mask_get, METH_VARARGS, NULL},
-	 { (char *)"star_fov_collision_set", _wrap_star_fov_collision_set, METH_VARARGS, NULL},
-	 { (char *)"star_fov_collision_get", _wrap_star_fov_collision_get, METH_VARARGS, NULL},
-	 { (char *)"star_fov_collision_size_set", _wrap_star_fov_collision_size_set, METH_VARARGS, NULL},
-	 { (char *)"star_fov_collision_size_get", _wrap_star_fov_collision_size_get, METH_VARARGS, NULL},
 	 { (char *)"star_fov_db_max_variance_set", _wrap_star_fov_db_max_variance_set, METH_VARARGS, NULL},
 	 { (char *)"star_fov_db_max_variance_get", _wrap_star_fov_db_max_variance_get, METH_VARARGS, NULL},
 	 { (char *)"star_fov_get_score", _wrap_star_fov_get_score, METH_VARARGS, NULL},
@@ -10220,18 +9830,8 @@ static PyMethodDef SwigMethods[] = {
 	 { (char *)"star_query_kdresults_get", _wrap_star_query_kdresults_get, METH_VARARGS, NULL},
 	 { (char *)"star_query_kdresults_size_set", _wrap_star_query_kdresults_size_set, METH_VARARGS, NULL},
 	 { (char *)"star_query_kdresults_size_get", _wrap_star_query_kdresults_size_get, METH_VARARGS, NULL},
-	 { (char *)"star_query_kdresults_maxsize_set", _wrap_star_query_kdresults_maxsize_set, METH_VARARGS, NULL},
-	 { (char *)"star_query_kdresults_maxsize_get", _wrap_star_query_kdresults_maxsize_get, METH_VARARGS, NULL},
-	 { (char *)"star_query_kdbucket_size_set", _wrap_star_query_kdbucket_size_set, METH_VARARGS, NULL},
-	 { (char *)"star_query_kdbucket_size_get", _wrap_star_query_kdbucket_size_get, METH_VARARGS, NULL},
-	 { (char *)"star_query_stars_set", _wrap_star_query_stars_set, METH_VARARGS, NULL},
-	 { (char *)"star_query_stars_get", _wrap_star_query_stars_get, METH_VARARGS, NULL},
 	 { (char *)"new_star_query", _wrap_new_star_query, METH_VARARGS, NULL},
 	 { (char *)"delete_star_query", _wrap_delete_star_query, METH_VARARGS, NULL},
-	 { (char *)"star_query_kdsort", _wrap_star_query_kdsort, METH_VARARGS, NULL},
-	 { (char *)"star_query_kdsort_x", _wrap_star_query_kdsort_x, METH_VARARGS, NULL},
-	 { (char *)"star_query_kdsort_y", _wrap_star_query_kdsort_y, METH_VARARGS, NULL},
-	 { (char *)"star_query_kdsort_z", _wrap_star_query_kdsort_z, METH_VARARGS, NULL},
 	 { (char *)"star_query_reset_kdmask", _wrap_star_query_reset_kdmask, METH_VARARGS, NULL},
 	 { (char *)"star_query_clear_kdresults", _wrap_star_query_clear_kdresults, METH_VARARGS, NULL},
 	 { (char *)"star_query_kdcheck", _wrap_star_query_kdcheck, METH_VARARGS, NULL},
@@ -10291,20 +9891,20 @@ static PyMethodDef SwigMethods[] = {
 	 { (char *)"delete_constellation_db", _wrap_delete_constellation_db, METH_VARARGS, NULL},
 	 { (char *)"constellation_db_DBG_", _wrap_constellation_db_DBG_, METH_VARARGS, NULL},
 	 { (char *)"constellation_db_swigregister", constellation_db_swigregister, METH_VARARGS, NULL},
-	 { (char *)"match_result_db_set", _wrap_match_result_db_set, METH_VARARGS, NULL},
-	 { (char *)"match_result_db_get", _wrap_match_result_db_get, METH_VARARGS, NULL},
-	 { (char *)"match_result_img_set", _wrap_match_result_img_set, METH_VARARGS, NULL},
-	 { (char *)"match_result_img_get", _wrap_match_result_img_get, METH_VARARGS, NULL},
-	 { (char *)"match_result_db_const_set", _wrap_match_result_db_const_set, METH_VARARGS, NULL},
-	 { (char *)"match_result_db_const_get", _wrap_match_result_db_const_get, METH_VARARGS, NULL},
 	 { (char *)"match_result_img_mask_set", _wrap_match_result_img_mask_set, METH_VARARGS, NULL},
 	 { (char *)"match_result_img_mask_get", _wrap_match_result_img_mask_get, METH_VARARGS, NULL},
-	 { (char *)"match_result_match_set", _wrap_match_result_match_set, METH_VARARGS, NULL},
-	 { (char *)"match_result_match_get", _wrap_match_result_match_get, METH_VARARGS, NULL},
 	 { (char *)"match_result_map_set", _wrap_match_result_map_set, METH_VARARGS, NULL},
 	 { (char *)"match_result_map_get", _wrap_match_result_map_get, METH_VARARGS, NULL},
 	 { (char *)"match_result_map_size_set", _wrap_match_result_map_size_set, METH_VARARGS, NULL},
 	 { (char *)"match_result_map_size_get", _wrap_match_result_map_size_get, METH_VARARGS, NULL},
+	 { (char *)"match_result_db_const_set", _wrap_match_result_db_const_set, METH_VARARGS, NULL},
+	 { (char *)"match_result_db_const_get", _wrap_match_result_db_const_get, METH_VARARGS, NULL},
+	 { (char *)"match_result_db_set", _wrap_match_result_db_set, METH_VARARGS, NULL},
+	 { (char *)"match_result_db_get", _wrap_match_result_db_get, METH_VARARGS, NULL},
+	 { (char *)"match_result_img_set", _wrap_match_result_img_set, METH_VARARGS, NULL},
+	 { (char *)"match_result_img_get", _wrap_match_result_img_get, METH_VARARGS, NULL},
+	 { (char *)"match_result_match_set", _wrap_match_result_match_set, METH_VARARGS, NULL},
+	 { (char *)"match_result_match_get", _wrap_match_result_match_get, METH_VARARGS, NULL},
 	 { (char *)"match_result_R11_set", _wrap_match_result_R11_set, METH_VARARGS, NULL},
 	 { (char *)"match_result_R11_get", _wrap_match_result_R11_get, METH_VARARGS, NULL},
 	 { (char *)"match_result_R12_set", _wrap_match_result_R12_set, METH_VARARGS, NULL},
@@ -10340,12 +9940,6 @@ static PyMethodDef SwigMethods[] = {
 	 { (char *)"db_match_p_match_get", _wrap_db_match_p_match_get, METH_VARARGS, NULL},
 	 { (char *)"db_match_winner_set", _wrap_db_match_winner_set, METH_VARARGS, NULL},
 	 { (char *)"db_match_winner_get", _wrap_db_match_winner_get, METH_VARARGS, NULL},
-	 { (char *)"db_match_c_pairs_set", _wrap_db_match_c_pairs_set, METH_VARARGS, NULL},
-	 { (char *)"db_match_c_pairs_get", _wrap_db_match_c_pairs_get, METH_VARARGS, NULL},
-	 { (char *)"db_match_c_pairs_size_set", _wrap_db_match_c_pairs_size_set, METH_VARARGS, NULL},
-	 { (char *)"db_match_c_pairs_size_get", _wrap_db_match_c_pairs_size_get, METH_VARARGS, NULL},
-	 { (char *)"db_match_img_mask_set", _wrap_db_match_img_mask_set, METH_VARARGS, NULL},
-	 { (char *)"db_match_img_mask_get", _wrap_db_match_img_mask_get, METH_VARARGS, NULL},
 	 { (char *)"new_db_match", _wrap_new_db_match, METH_VARARGS, NULL},
 	 { (char *)"delete_db_match", _wrap_delete_db_match, METH_VARARGS, NULL},
 	 { (char *)"db_match_swigregister", db_match_swigregister, METH_VARARGS, NULL},
@@ -11136,6 +10730,7 @@ SWIG_init(void) {
   SWIG_addvarlink(SWIG_globals(),(char*)"MATCH_VALUE",Swig_var_MATCH_VALUE_get, Swig_var_MATCH_VALUE_set);
   SWIG_addvarlink(SWIG_globals(),(char*)"PIXX_TANGENT",Swig_var_PIXX_TANGENT_get, Swig_var_PIXX_TANGENT_set);
   SWIG_addvarlink(SWIG_globals(),(char*)"PIXY_TANGENT",Swig_var_PIXY_TANGENT_get, Swig_var_PIXY_TANGENT_set);
+  SWIG_addvarlink(SWIG_globals(),(char*)"KDBUCKET_SIZE",Swig_var_KDBUCKET_SIZE_get, Swig_var_KDBUCKET_SIZE_set);
   SWIG_addvarlink(SWIG_globals(),(char*)"ENV_VARS_SIZE",Swig_var_ENV_VARS_SIZE_get, Swig_var_ENV_VARS_SIZE_set);
   SWIG_addvarlink(SWIG_globals(),(char*)"ENV_VARS",Swig_var_ENV_VARS_get, Swig_var_ENV_VARS_set);
 #if PY_VERSION_HEX >= 0x03000000

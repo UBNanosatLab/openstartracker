@@ -55,7 +55,7 @@ void star_id(double spikes[], int result[], size_t length)
 {	
 	star_db* img_stars=new star_db;
 	for(size_t i = 0; i < length; i++) {
-		img_stars->add_star(spikes[3*i]-IMG_X/2.0,-(spikes[3*i+1]-IMG_Y/2.0),BASE_FLUX*powf(10.0,-spikes[3*i+2]/2.5),-1);
+		*img_stars+=star(spikes[3*i]-IMG_X/2.0,-(spikes[3*i+1]-IMG_Y/2.0),BASE_FLUX*powf(10.0,-spikes[3*i+2]/2.5),-1);
 		result[i] = -1;
 	}
 	star_db* img_stars_n_brightest=img_stars->copy_n_brightest(MAX_FALSE_STARS+REQUIRED_STARS);
@@ -128,7 +128,7 @@ int main(int argc, char* argv[])
 			data[i] = atof(result);
 			result = strtok(NULL, ",");
 		}
-		int length = i / VECTOR_LENGTH;
+		unsigned int length = i / VECTOR_LENGTH;
 		clock_t start = clock();
 		star_id(data, results, length);
 		clock_t end = clock();

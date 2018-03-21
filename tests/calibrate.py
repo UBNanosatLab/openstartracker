@@ -101,11 +101,11 @@ if __name__ == '__main__':
 		solve_cmd="solve-field --skip-solved --cpulimit 60 "+image_name
 		print solve_cmd
 		system(solve_cmd)
-		print 'wcsinfo '+basename(image_name)+'.wcs  | tr [:lower:] [:upper:] | tr " " "=" | grep "=[0-9.-]*$" > '+basename(image_name)+'.solved'
-		system('wcsinfo '+basename(image_name)+'.wcs  | tr [:lower:] [:upper:] | tr " " "=" | grep "=[0-9.-]*$" > '+basename(image_name)+'.solved')
-		
-		hdulist=fits.open(basename(image_name)+".corr")
-		astrometry_results[image_names[n]]=np.array([[i['flux'],i['field_x'],i['field_y'],i['index_x'],i['index_y']]+angles2xyz(i['index_ra'],i['index_dec']) for i in hdulist[1].data])
+		if isfile(basename(image_name)+'.wcs'):
+			print 'wcsinfo '+basename(image_name)+'.wcs  | tr [:lower:] [:upper:] | tr " " "=" | grep "=[0-9.-]*$" > '+basename(image_name)+'.solved'
+			system('wcsinfo '+basename(image_name)+'.wcs  | tr [:lower:] [:upper:] | tr " " "=" | grep "=[0-9.-]*$" > '+basename(image_name)+'.solved')
+			hdulist=fits.open(basename(image_name)+".corr")
+			astrometry_results[image_names[n]]=np.array([[i['flux'],i['field_x'],i['field_y'],i['index_x'],i['index_y']]+angles2xyz(i['index_ra'],i['index_dec']) for i in hdulist[1].data])
 		
 	
 	#Use only values below the median for variance calculation.

@@ -5,14 +5,15 @@
 #include <float.h>
 
 struct  match_result {
-	constellation_db *db,*img;
-
-	constellation* db_const;
-
+//TODO:
+//private:
 	star_fov *img_mask;
-	constellation_pair match;
 	int *map; /* Usage: map[imgstar]=dbstar */
 	int map_size;
+	constellation* db_const;
+	constellation_db *db,*img;
+public:
+	constellation_pair match;
 	
 	//eci to body (body=R*eci)
 	float R11,R12,R13;
@@ -31,7 +32,7 @@ struct  match_result {
 		db=db_;
 		img=img_;
 		img_mask=img_mask_;
-		map_size=img->stars->map_size;
+		map_size=img->stars->size();
 		map=(int *)malloc(sizeof(int)*map_size);
 		match.totalscore=-FLT_MAX;
 		
@@ -104,12 +105,12 @@ struct  match_result {
 		}
 		for(int i=0;i<db->results->kdresults_size;i++) {
 			int o=db->results->kdresults[i];
-			star *s=&(db->stars->map[o]);
+			star *s=db->stars->get_star(o);
 			float x=s->x*R11+s->y*R21+s->z*R31;
 			float y=s->x*R12+s->y*R22+s->z*R32;
 			float z=s->x*R13+s->y*R23+s->z*R33;
-			float px=IMG_ROTATION*y/(x*PIXX_TANGENT);
-			float py=IMG_ROTATION*z/(x*PIXY_TANGENT);
+			float px=y/(x*PIXX_TANGENT);
+			float py=z/(x*PIXY_TANGENT);
 			
 			int nx=(int)(px+IMG_X/2.0f);
 			if (nx==-1) nx++;
@@ -155,37 +156,27 @@ struct  match_result {
 		}
 		return s;
 	}
-	
-	/* weighted_triad results */
 
-	/* see https://en.wikipedia.org/wiki/Triad_method */
-	/* and http://nghiaho.com/?page_id=846 */
-	/* returns match results */
-
-	/* when compiled, this section contains roughly 430 floating point operations */
-	/* according to https://www.karlrupp.net/2016/02/gemm-and-stream-results-on-intel-edison/ */
-	/* we can perform >250 MFLOPS with doubles, and >500 MFLOPS with floats */
-	
-/**
-* @brief weighted_triad results
-* see https://en.wikipedia.org/wiki/Triad_method 
-* and http://nghiaho.com/?page_id=846
-* 
-* when compiled, this section contains roughly 430 floating point operations
-* according to https://www.karlrupp.net/2016/02/gemm-and-stream-results-on-intel-edison
-* we can perform >250 MFLOPS with doubles, and >500 MFLOPS with floats
-*/
+	/**
+	* @brief weighted_triad results
+	* see https://en.wikipedia.org/wiki/Triad_method 
+	* and http://nghiaho.com/?page_id=846
+	* 
+	* when compiled, this section contains roughly 430 floating point operations
+	* according to https://www.karlrupp.net/2016/02/gemm-and-stream-results-on-intel-edison
+	* we can perform >250 MFLOPS with doubles, and >500 MFLOPS with floats
+	*/
 	void weighted_triad() {
-		star db_s1=db->stars->map[match.db_s1];
-		star db_s2=db->stars->map[match.db_s2];
-		star img_s1=img->stars->map[match.img_s1];
-		star img_s2=img->stars->map[match.img_s2];
+		star *db_s1=db->stars->get_star(match.db_s1);
+		star *db_s2=db->stars->get_star(match.db_s2);
+		star *img_s1=img->stars->get_star(match.img_s1);
+		star *img_s2=img->stars->get_star(match.img_s2);
 		
 		/* v=A*w */
-		float wa1=db_s1.x,wa2=db_s1.y,wa3=db_s1.z;
-		float wb1=db_s2.x,wb2=db_s2.y,wb3=db_s2.z;
-		float va1=img_s1.x,va2=img_s1.y,va3=img_s1.z;
-		float vb1=img_s2.x,vb2=img_s2.y,vb3=img_s2.z;
+		float wa1=db_s1->x,wa2=db_s1->y,wa3=db_s1->z;
+		float wb1=db_s2->x,wb2=db_s2->y,wb3=db_s2->z;
+		float va1=img_s1->x,va2=img_s1->y,va3=img_s1->z;
+		float vb1=img_s2->x,vb2=img_s2->y,vb3=img_s2->z;
 		float wc1=wa2*wb3 - wa3*wb2;
 		float wc2=wa3*wb1 - wa1*wb3;
 		float wc3=wa1*wb2 - wa2*wb1;
@@ -249,8 +240,8 @@ struct  match_result {
 		
 		/* use weights based on magnitude */
 		/* weighted triad */
-		float weightA=1.0/(db_s1.sigma_sq+img_s1.sigma_sq);
-		float weightB=1.0/(db_s2.sigma_sq+img_s2.sigma_sq);
+		float weightA=1.0/(db_s1->sigma_sq+img_s1->sigma_sq);
+		float weightB=1.0/(db_s2->sigma_sq+img_s2->sigma_sq);
 
 		float sumAB=weightA+weightB;
 		weightA/=sumAB;
@@ -303,9 +294,9 @@ struct  match_result {
 			DBG_PRINT("map[%d]=%d\n",i,map[i]);
 		}
 	}
-/**
-* @brief TODO
-*/
+	/**
+	* @brief TODO
+	*/
 	void print_ori() {
 		fprintf(stderr,"DEC=%f\n",fmod(360+asin(R31)* 180 / PI,360));
 		fprintf(stderr,"RA=%f\n",fmod(360+atan2(R21,R11)* 180 / PI,360));
@@ -314,25 +305,20 @@ struct  match_result {
 };
 
 struct db_match {
-	float p_match;
-	
-	match_result *winner;
+private:
 	constellation_pair *c_pairs;
 	int c_pairs_size;
 	star_fov *img_mask;
+public:
+	float p_match;
+	match_result *winner;
 	
-	#define ADD_SCORE\
-		m->compute_score();\
-		if (m->match.totalscore>winner->match.totalscore) {\
-			if (winner->match.totalscore!=-FLT_MAX) c_pairs[c_pairs_size++]=winner->match;\
-			m->copy_over(winner);\
-		} else c_pairs[c_pairs_size++]=m->match;
 		
-/**
-* @brief TODO
-* @param db
-* @param img
-*/
+	/**
+	* @brief TODO
+	* @param db
+	* @param img
+	*/
 	db_match(constellation_db *db, constellation_db *img) {
 		DBG_DB_MATCH_COUNT++;
 		DBG_PRINT("DBG_DB_MATCH_COUNT++ %d\n",DBG_DB_MATCH_COUNT);
@@ -342,7 +328,7 @@ struct db_match {
 		c_pairs_size=0;
 		p_match=0.0;
 //TODO - set size to 4 in python
-		if (db->stars->map_size<3||img->stars->map_size<3) return;
+		if (db->stars->size()<3||img->stars->size()<3) return;
 		img_mask = new star_fov(img->stars,db->stars->max_variance);
 		
 		//find stars
@@ -365,6 +351,14 @@ struct db_match {
 				m->init(db->map[o],img->map[n]);
 				m->weighted_triad();
 				m->search();
+
+				#define ADD_SCORE\
+					m->compute_score();\
+					if (m->match.totalscore>winner->match.totalscore) {\
+						if (winner->match.totalscore!=-FLT_MAX) c_pairs[c_pairs_size++]=winner->match;\
+						m->copy_over(winner);\
+					} else c_pairs[c_pairs_size++]=m->match;
+
 				ADD_SCORE
 				/* try both orderings of stars */
 				m->match.flip();

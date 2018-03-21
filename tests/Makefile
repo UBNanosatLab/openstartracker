@@ -1,6 +1,5 @@
 CC = g++
 
 all: $(OBJ)
-	$(CC) -Wall -Ofast -g test.c -o test -lm
-	#$(CC) -Wall -O0 -g test.c -o test -lm
+	$(CC) -std=c++11 -Wall  -Ofast -g -pg test.c -o test -lm
 

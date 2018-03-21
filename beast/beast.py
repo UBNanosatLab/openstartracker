@@ -97,9 +97,6 @@ PI = _beast.PI
 _beast.TWOPI_swigconstant(_beast)
 TWOPI = _beast.TWOPI
 
-_beast.IMG_ROTATION_swigconstant(_beast)
-IMG_ROTATION = _beast.IMG_ROTATION
-
 def load_config(filename):
     return _beast.load_config(filename)
 load_config = _beast.load_config
@@ -125,22 +122,10 @@ class star(_object):
     __swig_getmethods__["flux"] = _beast.star_flux_get
     if _newclass:
         flux = _swig_property(_beast.star_flux_get, _beast.star_flux_set)
-    __swig_setmethods__["star_idx"] = _beast.star_star_idx_set
-    __swig_getmethods__["star_idx"] = _beast.star_star_idx_get
-    if _newclass:
-        star_idx = _swig_property(_beast.star_star_idx_get, _beast.star_star_idx_set)
     __swig_setmethods__["id"] = _beast.star_id_set
     __swig_getmethods__["id"] = _beast.star_id_get
     if _newclass:
         id = _swig_property(_beast.star_id_get, _beast.star_id_set)
-    __swig_setmethods__["unreliable"] = _beast.star_unreliable_set
-    __swig_getmethods__["unreliable"] = _beast.star_unreliable_get
-    if _newclass:
-        unreliable = _swig_property(_beast.star_unreliable_get, _beast.star_unreliable_set)
-    __swig_setmethods__["sigma_sq"] = _beast.star_sigma_sq_set
-    __swig_getmethods__["sigma_sq"] = _beast.star_sigma_sq_get
-    if _newclass:
-        sigma_sq = _swig_property(_beast.star_sigma_sq_get, _beast.star_sigma_sq_set)
     __swig_setmethods__["px"] = _beast.star_px_set
     __swig_getmethods__["px"] = _beast.star_px_get
     if _newclass:
@@ -149,19 +134,37 @@ class star(_object):
     __swig_getmethods__["py"] = _beast.star_py_get
     if _newclass:
         py = _swig_property(_beast.star_py_get, _beast.star_py_set)
+    __swig_setmethods__["unreliable"] = _beast.star_unreliable_set
+    __swig_getmethods__["unreliable"] = _beast.star_unreliable_get
+    if _newclass:
+        unreliable = _swig_property(_beast.star_unreliable_get, _beast.star_unreliable_set)
+    __swig_setmethods__["star_idx"] = _beast.star_star_idx_set
+    __swig_getmethods__["star_idx"] = _beast.star_star_idx_get
+    if _newclass:
+        star_idx = _swig_property(_beast.star_star_idx_get, _beast.star_star_idx_set)
+    __swig_setmethods__["sigma_sq"] = _beast.star_sigma_sq_set
+    __swig_getmethods__["sigma_sq"] = _beast.star_sigma_sq_get
+    if _newclass:
+        sigma_sq = _swig_property(_beast.star_sigma_sq_get, _beast.star_sigma_sq_set)
 
-    def dist_arcsec(self, s):
-        return _beast.star_dist_arcsec(self, s)
-
-    def DBG_(self, s):
-        return _beast.star_DBG_(self, s)
-
-    def __init__(self):
-        this = _beast.new_star()
+    def __init__(self, *args):
+        this = _beast.new_star(*args)
         try:
             self.this.append(this)
         except Exception:
             self.this = this
+
+    def hash(self):
+        return _beast.star_hash(self)
+
+    def __eq__(self, s):
+        return _beast.star___eq__(self, s)
+
+    def __mul__(self, s):
+        return _beast.star___mul__(self, s)
+
+    def DBG_(self, s):
+        return _beast.star_DBG_(self, s)
     __swig_destroy__ = _beast.delete_star
     __del__ = lambda self: None
 star_swigregister = _beast.star_swigregister
@@ -214,14 +217,14 @@ class star_db(_object):
     __swig_getmethods__["map_size"] = _beast.star_db_map_size_get
     if _newclass:
         map_size = _swig_property(_beast.star_db_map_size_get, _beast.star_db_map_size_set)
-    __swig_setmethods__["max_variance"] = _beast.star_db_max_variance_set
-    __swig_getmethods__["max_variance"] = _beast.star_db_max_variance_get
-    if _newclass:
-        max_variance = _swig_property(_beast.star_db_max_variance_get, _beast.star_db_max_variance_set)
     __swig_setmethods__["kdsorted"] = _beast.star_db_kdsorted_set
     __swig_getmethods__["kdsorted"] = _beast.star_db_kdsorted_get
     if _newclass:
         kdsorted = _swig_property(_beast.star_db_kdsorted_get, _beast.star_db_kdsorted_set)
+    __swig_setmethods__["max_variance"] = _beast.star_db_max_variance_set
+    __swig_getmethods__["max_variance"] = _beast.star_db_max_variance_get
+    if _newclass:
+        max_variance = _swig_property(_beast.star_db_max_variance_get, _beast.star_db_max_variance_set)
 
     def __init__(self):
         this = _beast.new_star_db()
@@ -232,6 +235,9 @@ class star_db(_object):
     __swig_destroy__ = _beast.delete_star_db
     __del__ = lambda self: None
 
+    def size(self):
+        return _beast.star_db_size(self)
+
     def get_star(self, idx):
         return _beast.star_db_get_star(self, idx)
 
@@ -241,11 +247,17 @@ class star_db(_object):
     def copy_n_brightest(self, n):
         return _beast.star_db_copy_n_brightest(self, n)
 
-    def add_star(self, *args):
-        return _beast.star_db_add_star(self, *args)
-
     def load_catalog(self, catalog, year):
         return _beast.star_db_load_catalog(self, catalog, year)
+
+    def kdsort(self):
+        return _beast.star_db_kdsort(self)
+
+    def sort(self):
+        return _beast.star_db_sort(self)
+
+    def __iadd__(self, *args):
+        return _beast.star_db___iadd__(self, *args)
 
     def DBG_(self, s):
         return _beast.star_db_DBG_(self, s)
@@ -258,22 +270,10 @@ class star_fov(_object):
     __swig_getmethods__ = {}
     __getattr__ = lambda self, name: _swig_getattr(self, star_fov, name)
     __repr__ = _swig_repr
-    __swig_setmethods__["stars"] = _beast.star_fov_stars_set
-    __swig_getmethods__["stars"] = _beast.star_fov_stars_get
-    if _newclass:
-        stars = _swig_property(_beast.star_fov_stars_get, _beast.star_fov_stars_set)
     __swig_setmethods__["mask"] = _beast.star_fov_mask_set
     __swig_getmethods__["mask"] = _beast.star_fov_mask_get
     if _newclass:
         mask = _swig_property(_beast.star_fov_mask_get, _beast.star_fov_mask_set)
-    __swig_setmethods__["collision"] = _beast.star_fov_collision_set
-    __swig_getmethods__["collision"] = _beast.star_fov_collision_get
-    if _newclass:
-        collision = _swig_property(_beast.star_fov_collision_get, _beast.star_fov_collision_set)
-    __swig_setmethods__["collision_size"] = _beast.star_fov_collision_size_set
-    __swig_getmethods__["collision_size"] = _beast.star_fov_collision_size_get
-    if _newclass:
-        collision_size = _swig_property(_beast.star_fov_collision_size_get, _beast.star_fov_collision_size_set)
     __swig_setmethods__["db_max_variance"] = _beast.star_fov_db_max_variance_set
     __swig_getmethods__["db_max_variance"] = _beast.star_fov_db_max_variance_get
     if _newclass:
@@ -314,18 +314,6 @@ class star_query(_object):
     __swig_getmethods__["kdresults_size"] = _beast.star_query_kdresults_size_get
     if _newclass:
         kdresults_size = _swig_property(_beast.star_query_kdresults_size_get, _beast.star_query_kdresults_size_set)
-    __swig_setmethods__["kdresults_maxsize"] = _beast.star_query_kdresults_maxsize_set
-    __swig_getmethods__["kdresults_maxsize"] = _beast.star_query_kdresults_maxsize_get
-    if _newclass:
-        kdresults_maxsize = _swig_property(_beast.star_query_kdresults_maxsize_get, _beast.star_query_kdresults_maxsize_set)
-    __swig_setmethods__["kdbucket_size"] = _beast.star_query_kdbucket_size_set
-    __swig_getmethods__["kdbucket_size"] = _beast.star_query_kdbucket_size_get
-    if _newclass:
-        kdbucket_size = _swig_property(_beast.star_query_kdbucket_size_get, _beast.star_query_kdbucket_size_set)
-    __swig_setmethods__["stars"] = _beast.star_query_stars_set
-    __swig_getmethods__["stars"] = _beast.star_query_stars_get
-    if _newclass:
-        stars = _swig_property(_beast.star_query_stars_get, _beast.star_query_stars_set)
 
     def __init__(self, s):
         this = _beast.new_star_query(s)
@@ -335,18 +323,6 @@ class star_query(_object):
             self.this = this
     __swig_destroy__ = _beast.delete_star_query
     __del__ = lambda self: None
-
-    def kdsort(self):
-        return _beast.star_query_kdsort(self)
-
-    def kdsort_x(self, min, max):
-        return _beast.star_query_kdsort_x(self, min, max)
-
-    def kdsort_y(self, min, max):
-        return _beast.star_query_kdsort_y(self, min, max)
-
-    def kdsort_z(self, min, max):
-        return _beast.star_query_kdsort_z(self, min, max)
 
     def reset_kdmask(self):
         return _beast.star_query_reset_kdmask(self)
@@ -543,26 +519,10 @@ class match_result(_object):
     __swig_getmethods__ = {}
     __getattr__ = lambda self, name: _swig_getattr(self, match_result, name)
     __repr__ = _swig_repr
-    __swig_setmethods__["db"] = _beast.match_result_db_set
-    __swig_getmethods__["db"] = _beast.match_result_db_get
-    if _newclass:
-        db = _swig_property(_beast.match_result_db_get, _beast.match_result_db_set)
-    __swig_setmethods__["img"] = _beast.match_result_img_set
-    __swig_getmethods__["img"] = _beast.match_result_img_get
-    if _newclass:
-        img = _swig_property(_beast.match_result_img_get, _beast.match_result_img_set)
-    __swig_setmethods__["db_const"] = _beast.match_result_db_const_set
-    __swig_getmethods__["db_const"] = _beast.match_result_db_const_get
-    if _newclass:
-        db_const = _swig_property(_beast.match_result_db_const_get, _beast.match_result_db_const_set)
     __swig_setmethods__["img_mask"] = _beast.match_result_img_mask_set
     __swig_getmethods__["img_mask"] = _beast.match_result_img_mask_get
     if _newclass:
         img_mask = _swig_property(_beast.match_result_img_mask_get, _beast.match_result_img_mask_set)
-    __swig_setmethods__["match"] = _beast.match_result_match_set
-    __swig_getmethods__["match"] = _beast.match_result_match_get
-    if _newclass:
-        match = _swig_property(_beast.match_result_match_get, _beast.match_result_match_set)
     __swig_setmethods__["map"] = _beast.match_result_map_set
     __swig_getmethods__["map"] = _beast.match_result_map_get
     if _newclass:
@@ -571,6 +531,22 @@ class match_result(_object):
     __swig_getmethods__["map_size"] = _beast.match_result_map_size_get
     if _newclass:
         map_size = _swig_property(_beast.match_result_map_size_get, _beast.match_result_map_size_set)
+    __swig_setmethods__["db_const"] = _beast.match_result_db_const_set
+    __swig_getmethods__["db_const"] = _beast.match_result_db_const_get
+    if _newclass:
+        db_const = _swig_property(_beast.match_result_db_const_get, _beast.match_result_db_const_set)
+    __swig_setmethods__["db"] = _beast.match_result_db_set
+    __swig_getmethods__["db"] = _beast.match_result_db_get
+    if _newclass:
+        db = _swig_property(_beast.match_result_db_get, _beast.match_result_db_set)
+    __swig_setmethods__["img"] = _beast.match_result_img_set
+    __swig_getmethods__["img"] = _beast.match_result_img_get
+    if _newclass:
+        img = _swig_property(_beast.match_result_img_get, _beast.match_result_img_set)
+    __swig_setmethods__["match"] = _beast.match_result_match_set
+    __swig_getmethods__["match"] = _beast.match_result_match_get
+    if _newclass:
+        match = _swig_property(_beast.match_result_match_get, _beast.match_result_match_set)
     __swig_setmethods__["R11"] = _beast.match_result_R11_set
     __swig_getmethods__["R11"] = _beast.match_result_R11_get
     if _newclass:
@@ -663,18 +639,6 @@ class db_match(_object):
     __swig_getmethods__["winner"] = _beast.db_match_winner_get
     if _newclass:
         winner = _swig_property(_beast.db_match_winner_get, _beast.db_match_winner_set)
-    __swig_setmethods__["c_pairs"] = _beast.db_match_c_pairs_set
-    __swig_getmethods__["c_pairs"] = _beast.db_match_c_pairs_get
-    if _newclass:
-        c_pairs = _swig_property(_beast.db_match_c_pairs_get, _beast.db_match_c_pairs_set)
-    __swig_setmethods__["c_pairs_size"] = _beast.db_match_c_pairs_size_set
-    __swig_getmethods__["c_pairs_size"] = _beast.db_match_c_pairs_size_get
-    if _newclass:
-        c_pairs_size = _swig_property(_beast.db_match_c_pairs_size_get, _beast.db_match_c_pairs_size_set)
-    __swig_setmethods__["img_mask"] = _beast.db_match_img_mask_set
-    __swig_getmethods__["img_mask"] = _beast.db_match_img_mask_get
-    if _newclass:
-        img_mask = _swig_property(_beast.db_match_img_mask_get, _beast.db_match_img_mask_set)
 
     def __init__(self, db, img):
         this = _beast.new_db_match(db, img)
