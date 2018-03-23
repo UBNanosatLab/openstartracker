@@ -171,9 +171,6 @@ star_swigregister = _beast.star_swigregister
 star_swigregister(star)
 cvar = _beast.cvar
 
-_beast.KEEP_BITS_swigconstant(_beast)
-KEEP_BITS = _beast.KEEP_BITS
-
 
 def star_gt_x(s1, s2):
     return _beast.star_gt_x(s1, s2)

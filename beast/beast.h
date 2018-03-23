@@ -9,7 +9,7 @@ struct  match_result {
 //private:
 	star_fov *img_mask;
 	int *map; /* Usage: map[imgstar]=dbstar */
-	int map_size;
+	size_t map_size;
 	constellation* db_const;
 	constellation_db *db,*img;
 public:
@@ -33,7 +33,7 @@ public:
 		img=img_;
 		img_mask=img_mask_;
 		map_size=img->stars->size();
-		map=(int *)malloc(sizeof(int)*map_size);
+		map=(int *)malloc(sizeof(map[0])*map_size);
 		match.totalscore=-FLT_MAX;
 		
 	}
@@ -72,7 +72,7 @@ public:
 		c->R21=R21,c->R22=R22,c->R23=R23;
 		c->R31=R31,c->R32=R32,c->R33=R33;
 		
-		memcpy(c->map, map, sizeof(int)*map_size);
+		memcpy(c->map, map, sizeof(map[0])*map_size);
 	}
 /**
 * @brief TODO
@@ -99,11 +99,11 @@ public:
 		//TODO: figure out where 2*map_size came from
 		match.totalscore=log(1.0/(IMG_X*IMG_Y))*(2*map_size);
 		float* scores=(float *)malloc(sizeof(float)*map_size);
-		for (int i=0;i<map_size;i++) {
+		for (size_t i=0;i<map_size;i++) {
 			map[i]=-1;
 			scores[i]=0.0;
 		}
-		for(int i=0;i<db->results->kdresults_size;i++) {
+		for(size_t i=0;i<db->results->kdresults_size;i++) {
 			int o=db->results->kdresults[i];
 			star *s=db->stars->get_star(o);
 			float x=s->x*R11+s->y*R21+s->z*R31;
@@ -130,7 +130,7 @@ public:
 				}
 			}
 		}
-		for(int n=0;n<map_size;n++) {
+		for(size_t n=0;n<map_size;n++) {
 			match.totalscore+=scores[n];
 		}
 		free(scores);
@@ -146,7 +146,7 @@ public:
 		s->max_variance=db->stars->max_variance;
 		s->map=(star *)malloc(sizeof(s->map[0])*map_size);
 		memset(s->map,-1,sizeof(s->map[0])*map_size);
-		for(int n=0;n<map_size;n++) {
+		for(size_t n=0;n<map_size;n++) {
 			//catalog matching
 			int o=map[n];
 			if (o!=-1) {
@@ -289,9 +289,9 @@ public:
 		
 		db->DBG_("DB");
 		img->DBG_("IMG");
-		DBG_PRINT("map_size=%d\n", map_size);
-		for (int i=0; i<map_size; i++) {
-			DBG_PRINT("map[%d]=%d\n",i,map[i]);
+		DBG_PRINT("map_size=%lu\n", map_size);
+		for (size_t i=0; i<map_size; i++) {
+			DBG_PRINT("map[%lu]=%d\n",i,map[i]);
 		}
 	}
 	/**
@@ -307,7 +307,7 @@ public:
 struct db_match {
 private:
 	constellation_pair *c_pairs;
-	int c_pairs_size;
+	size_t c_pairs_size;
 	star_fov *img_mask;
 public:
 	float p_match;
@@ -334,7 +334,7 @@ public:
 		//find stars
 		match_result *m=new match_result(db, img, img_mask);
 		winner=new match_result(db, img, img_mask);
-		for (int n=0;n<img->map_size;n++) {
+		for (size_t n=0;n<img->map_size;n++) {
 			constellation lb=img->map[n];
 			constellation ub=img->map[n];
 			lb.p-=POS_ERR_SIGMA*PIXSCALE*sqrt(img->stars->map[lb.s1].sigma_sq+img->stars->map[lb.s2].sigma_sq+2*db->stars->max_variance);
@@ -373,7 +373,7 @@ public:
 		if (winner->match.totalscore!=-FLT_MAX) { //Did we even match?
 			//calculate p_match
 			p_match=1.0;
-			for (int idx=0; idx<c_pairs_size;idx++) {
+			for (size_t idx=0; idx<c_pairs_size;idx++) {
 				if (!winner->related(c_pairs[idx])){
 					p_match+=exp(c_pairs[idx].totalscore-winner->match.totalscore);
 				}

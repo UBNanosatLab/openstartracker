@@ -56,7 +56,7 @@ bool constellation_lt_p(const constellation &c1, const constellation &c2) {retur
 struct constellation_db {
 //TODO:
 //private:
-	int map_size;
+	size_t map_size;
 	constellation* map;
 
 	star_db* stars;
@@ -96,10 +96,10 @@ public:
 		} else {
 			results->kdmask_uniform_density(stars_per_fov);//2+DB_REDUNDANCY
 			std::set<constellation,constellation_lt> c_set;
-			for (int i=0;i<stars->size();i++) if (results->kdmask[i]==0) {
+			for (size_t i=0;i<stars->size();i++) if (results->kdmask[i]==0) {
 				results->kdsearch(stars->get_star(i)->x,stars->get_star(i)->y,stars->get_star(i)->z,MAXFOV,THRESH_FACTOR*IMAGE_VARIANCE);
 				constellation c;
-				for (int j=0;j<results->kdresults_size;j++) if (i!=results->kdresults[j] && stars->get_star(i)->flux>=stars->get_star(results->kdresults[j])->flux){
+				for (size_t j=0;j<results->kdresults_size;j++) if ((int)i!=results->kdresults[j] && stars->get_star(i)->flux>=stars->get_star(results->kdresults[j])->flux){
 					c.p=stars->get_star(i)[0]*stars->get_star(results->kdresults[j])[0];
 					c.s1=i;
 					c.s2=results->kdresults[j];
@@ -112,7 +112,7 @@ public:
 			map_size=c_set.size();
 			map=(constellation*)malloc(map_size*sizeof(map[0]));
 			std::set<constellation>::iterator it = c_set.begin();
-			for (int idx=0; idx<map_size;idx++,it++) {
+			for (size_t idx=0; idx<map_size;idx++,it++) {
 				map[idx]=*it;
 				map[idx].idx=idx;
 			}
@@ -129,8 +129,8 @@ public:
 		DBG_PRINT("%s\n",s);
 		stars->DBG_("STARS");
 		results->DBG_("RESULTS");
-		for (int i=0; i<map_size; i++) {
-			DBG_PRINT("%d:\t",i);
+		for (size_t i=0; i<map_size; i++) {
+			DBG_PRINT("%lu:\t",i);
 			map[i].DBG_("C");
 		}
 	}

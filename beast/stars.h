@@ -7,6 +7,7 @@
 #include <limits.h> //INT_MAX
 #include <algorithm> //sort, nth_element
 #include <unordered_set>
+#include <unordered_map>
 struct star {
 	float x;
 	float y;
@@ -72,56 +73,35 @@ struct star {
 
 
 
-	/** @brief optimal hash function which uses "smallest two" packing, which in 3D is equivalent to 
-	* specifying coordinates on a skybox. The upper 3 bits are used for specifying the "face" of the box
-	* The two coordinated are interleaved so that nearby stars will have nearby hashes
+	/** @brief hash function which interleaves values so that nearby stars will have nearby hashes
 	* this approach also  also allows you to truncate the hash when less precision is needed
 	* 
-	* for the magic numbers used for interleaving
-	* See: https://stackoverflow.com/questions/1024754/how-to-compute-a-3d-morton-number-interleave-the-bits-of-3-ints
+	* for the magic numbers used for interleaving, see:
+	* https://stackoverflow.com/questions/1024754/how-to-compute-a-3d-morton-number-interleave-the-bits-of-3-ints
 	*/
 	
-	#define INTERLEAVE_TWO(X)\
-		X &= 0x3fffffff;\
-		X=(X|X<<16)&0x3fff0000ffff;\
-		X=(X|X<< 8)&0x3f00ff00ff00ff;\
-		X=(X|X<< 4)&0x30f0f0f0f0f0f0f;\
-		X=(X|X<< 2)&0x333333333333333;\
-		X=(X|X<< 1)&0x555555555555555;
-
-	//percision limit for float. Good to ~ 1 arcsec
-	#define KEEP_BITS 48
+	#define INTERLEAVE_THREE(X)\
+		if (X > 0x1fffff) X=0x1fffff;\
+		if (X < 0) X=0;\
+		X = (X | X <<32) & 0x001f00000000ffff;\
+		X = (X | X <<16) & 0x001f0000ff0000ff;\
+		X = (X | X << 8) & 0x100f00f00f00f00f;\
+		X = (X | X << 4) & 0x10c30c30c30c30c3;\
+		X = (X | X << 2) & 0x1249249249249249;
 	
-	inline size_t hash() const {
-		//2^29*(sqrt(2)*X+1.0)
-		unsigned long h0=759250123*x+536870912;
-		unsigned long h1=759250123*y+536870912;
-		unsigned long h2=759250123*z+536870912;
-		unsigned long rv;
-		if (std::fabs(x)>std::max(std::fabs(y),std::fabs(z))) {
-			INTERLEAVE_TWO(h1)
-			INTERLEAVE_TWO(h2)
-			if (x>0)	rv=0l<<60|h1<<1|h2;
-			else 		rv=1l<<60|h1<<1|h2;
-		} else if (std::fabs(y)>std::max(std::fabs(x),std::fabs(z))) {
-			INTERLEAVE_TWO(h0)
-			INTERLEAVE_TWO(h2)
-			if (y>0)	rv=2l<<60|h0<<1|h2;
-			else		rv=3l<<60|h0<<1|h2;
-		} else {
-			INTERLEAVE_TWO(h0)
-			INTERLEAVE_TWO(h1)
-			if (z>0)	rv=4l<<60|h0<<1|h1;
-			else 		rv=5l<<60|h0<<1|h1;
-		}
-		//if we're on a 32 bit system, don't keep more bits than that!
-		return rv>>(64-((KEEP_BITS<8*sizeof(size_t))?KEEP_BITS:8*sizeof(size_t)));
+	size_t hash() const {
+		long h0=0x100000*(x+1.0);
+		long h1=0x100000*(y+1.0);
+		long h2=0x100000*(z+1.0);
+		INTERLEAVE_THREE(h0)
+		INTERLEAVE_THREE(h1)
+		INTERLEAVE_THREE(h2)
+		return h0<<2|h1<<1|h2;
 	}
-	#undef KEEP_BITS
-	#undef INTERLEAVE_TWO
+	#undef INTERLEAVE_THREE
 	
 	#define OP operator==
-	inline bool OP(const star& s) const {return hash()==s.hash();}
+	bool OP(const star& s) const {return hash()==s.hash();}
 	#undef OP
 	
 	/**
@@ -165,20 +145,11 @@ bool star_lt_y(const star &s1, const star &s2) {return s1.y < s2.y;}
 bool star_lt_z(const star &s1, const star &s2) {return s1.z < s2.z;}
 bool star_lt_flux(const star &s1, const star &s2) {return s1.flux < s2.flux;}
 
-namespace std {
-	template<>
-	struct hash<star> {
-		size_t operator()(const star& s) const {
-			return s.hash();
-		}
-	};
-}
-
 struct star_db {
 //TODO:
 //private:
 	star *map;
-	int map_size;
+	size_t map_size;
 private:
 	
 	/** You may be looking at the most compact kd-tree in existence
@@ -220,7 +191,7 @@ public:
 		DBG_PRINT("DBG_STAR_DB_COUNT-- %d\n",DBG_STAR_DB_COUNT);
 		free(map);
 	}
-	inline int size() {return map_size;}
+	size_t size() {return map_size;}
 	star* get_star(int idx) {return map_size>0?&map[idx%map_size]:NULL;}
 
 	star_db* copy() {
@@ -230,11 +201,11 @@ public:
 		memcpy(s->map,map,sizeof(map[0])*map_size);
 		return s;
 	}
-	star_db* copy_n_brightest(int n) {
+	star_db* copy_n_brightest(size_t n) {
 		star_db* s = this->copy();
 		s->map_size=std::min(n,map_size);
 		std::nth_element(s->map,s->map+s->map_size,s->map+map_size,star_gt_flux);
-		for (int i=0;i<s->map_size;i++) s->map[i].star_idx=i;
+		for (size_t i=0;i<s->map_size;i++) s->map[i].star_idx=i;
 		s->map=(star*)realloc(s->map,sizeof(s->map[0])*s->map_size);
 		return s;
 	}
@@ -259,11 +230,11 @@ public:
 		size_t len = 0;
 		
 		char* hip_record[78];
-		for(int i=0;i<map_size;i++){
+		for(size_t i=0;i<map_size;i++){
 			if ((read = getline(&line, &len, stream)) != -1) {
 				float yeardiff=year-1991.25;
 				hip_record[0]=strtok(line,"|");
-				for (unsigned int j=1;j<sizeof(hip_record)/sizeof(hip_record[0]);j++) hip_record[j] = strtok(NULL,"|");
+				for (size_t j=1;j<sizeof(hip_record)/sizeof(hip_record[0]);j++) hip_record[j] = strtok(NULL,"|");
 			
 				map[i].id=atoi(hip_record[1]);
 				map[i].star_idx=i;
@@ -313,12 +284,12 @@ public:
 	#undef OP
 	void DBG_(const char *s) {
 		DBG_PRINT("%s\n",s);
-		DBG_PRINT("star_db at %lu contains %d elements\n",(unsigned long)this,map_size);
-		DBG_PRINT("stars at %lu\n",(unsigned long)map);
+		DBG_PRINT("star_db at %lu contains %lu elements\n",(size_t)this,map_size);
+		DBG_PRINT("stars at %lu\n",(size_t)map);
 		DBG_PRINT("max_variance=%f\n",max_variance);
 		DBG_PRINT("kdsorted=%d\n",kdsorted);
-		for (int i=0; i<map_size; i++) {
-			DBG_PRINT("%d:\t",i);
+		for (size_t i=0; i<map_size; i++) {
+			DBG_PRINT("%lu:\t",i);
 			map[i].DBG_("star");
 		}
 	}
@@ -414,7 +385,7 @@ public:
 		mask=(int*)malloc(IMG_X*IMG_Y*sizeof(mask[0]));
 		memset(mask, -1, IMG_X*IMG_Y*sizeof(mask[0]));
 		/* generate image mask */
-		for (int id=0;id<stars->size();id++){
+		for (size_t id=0;id<stars->size();id++){
 			/* assume the dimmest possible star since we dont know the brightness of the other image */
 			float sigma_sq,maxdist_sq;
 			sigma_sq=stars->max_variance+db_max_variance;
@@ -466,9 +437,9 @@ struct star_query {
 	int8_t *kdmask;
 
 	int *kdresults;
-	int kdresults_size;
+	size_t kdresults_size;
 private:
-	int kdresults_maxsize;
+	size_t kdresults_maxsize;
 	star_db *stars;
 public:
 	/**
@@ -485,7 +456,7 @@ public:
 		
 		kdmask=(int8_t*)malloc(stars->size()*sizeof(kdmask[0]));
 		kdresults=(int*)malloc(stars->size()*sizeof(kdresults[0]));
-		for (int i=0;i<stars->size();i++) kdresults[i]=i;
+		for (size_t i=0;i<stars->size();i++) kdresults[i]=i;
 		reset_kdmask();
 	}
 	~star_query() {
@@ -592,7 +563,7 @@ public:
 	* @brief set mask for stars that are too bright,too close, highly variable, or unreliable
 	*/
 	void kdmask_filter_catalog() {
-		for (int i=0;i<stars->size();i++) {
+		for (size_t i=0;i<stars->size();i++) {
 			int8_t lastmask=kdmask[i];
 			kdsearch(stars->get_star(i)->x,stars->get_star(i)->y,stars->get_star(i)->z,DOUBLE_STAR_PX*PIXSCALE,THRESH_FACTOR*IMAGE_VARIANCE);
 			//TODO uncomment for real stars
@@ -613,14 +584,14 @@ public:
 		std::unordered_set<int> uniform_set;
 		int kdresults_maxsize_old=kdresults_maxsize;
 		kdresults_maxsize=min_stars_per_fov;
-		for (int i=0;i<stars->size();i++) if (kdmask[i]==0) {
+		for (size_t i=0;i<stars->size();i++) if (kdmask[i]==0) {
 			kdsearch(stars->get_star(i)->x,stars->get_star(i)->y,stars->get_star(i)->z,MINFOV/2,THRESH_FACTOR*IMAGE_VARIANCE);
-			for (int j=0;j<kdresults_size;j++) uniform_set.insert(kdresults[j]);
+			for (size_t j=0;j<kdresults_size;j++) uniform_set.insert(kdresults[j]);
 			clear_kdresults();
 		}
-		for (int i=0;i<stars->size();i++) kdmask[i]=1;
+		for (size_t i=0;i<stars->size();i++) kdmask[i]=1;
 		std::unordered_set<int>::iterator it = uniform_set.begin();
-		for (unsigned int i=0; i<uniform_set.size();i++,it++) kdmask[*it]=0;
+		for (size_t i=0; i<uniform_set.size();i++,it++) kdmask[*it]=0;
 		kdresults_maxsize=kdresults_maxsize_old;
 	}
 	/**
@@ -630,7 +601,7 @@ public:
 	star_db* from_kdmask() {
 		star_db* rd=new star_db;
 		rd->max_variance=stars->max_variance;
-		for (int i=0;i<stars->size();i++){
+		for (size_t i=0;i<stars->size();i++){
 			if (kdmask[i]==0) *rd+=stars->get_star(i);
 		}
 		return rd;
@@ -642,7 +613,7 @@ public:
 	star_db* from_kdresults() {
 		star_db* rd=new star_db;
 		rd->max_variance=stars->max_variance;
-		for (int i=0;i<kdresults_size;i++){
+		for (size_t i=0;i<kdresults_size;i++){
 			*rd+=stars->get_star(kdresults[i]);
 		}
 		return rd;
@@ -650,10 +621,10 @@ public:
 	
 	void DBG_(const char *s) {
 		DBG_PRINT("%s\n",s);
-		DBG_PRINT("kdmask at %lu\n",(unsigned long)kdmask);
-		DBG_PRINT("kdresults at %lu\n",(unsigned long)kdresults);
-		DBG_PRINT("kdresults_size=%d\n",kdresults_size);
-		DBG_PRINT("kdresults_maxsize=%d\n",kdresults_maxsize);
+		DBG_PRINT("kdmask at %lu\n",(size_t)kdmask);
+		DBG_PRINT("kdresults at %lu\n",(size_t)kdresults);
+		DBG_PRINT("kdresults_size=%lu\n",kdresults_size);
+		DBG_PRINT("kdresults_maxsize=%lu\n",kdresults_maxsize);
 		if (kdresults_size>0){
 			int i=0;
 			DBG_PRINT("kdmask[%d]=%d\n",i,kdmask[i]);
