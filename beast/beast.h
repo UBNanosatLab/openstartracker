@@ -5,27 +5,27 @@
 #include <float.h>
 
 struct  match_result {
-//TODO:
-//private:
-	star_fov *img_mask;
-	int *map; /* Usage: map[imgstar]=dbstar */
-	size_t map_size;
-	constellation* db_const;
-	constellation_db *db,*img;
-public:
+//TODO: private:
 	constellation_pair match;
 	
 	//eci to body (body=R*eci)
 	float R11,R12,R13;
 	float R21,R22,R23;
 	float R31,R32,R33;
+private:
+	star_fov *img_mask;
+	int *map; /* Usage: map[imgstar]=dbstar */
+	size_t map_size;
+	constellation* db_const;
+	constellation_db *db,*img;
+public:
 	
-/**
-* @brief TODO
-* @param db_
-* @param img_
-* @param img_mask_
-*/
+	/**
+	* @brief TODO
+	* @param db_
+	* @param img_
+	* @param img_mask_
+	*/
 	match_result(constellation_db *db_, constellation_db *img_, star_fov *img_mask_) {
 		DBG_MATCH_RESULT_COUNT++;
 		DBG_PRINT("DBG_MATCH_RESULT_COUNT++ %d\n",DBG_MATCH_RESULT_COUNT);
@@ -42,11 +42,12 @@ public:
 		DBG_PRINT("DBG_MATCH_RESULT_COUNT-- %d\n",DBG_MATCH_RESULT_COUNT);
 		free(map);
 	}
-/**
-* @brief TODO
-* @param db_const_
-* @param img_const_
-*/
+	size_t size() {return map_size;};
+	/**
+	* @brief TODO
+	* @param db_const_
+	* @param img_const_
+	*/
 	void init(constellation &db_const_, constellation &img_const_) {
 		db_const=&db_const_;
 		
@@ -56,10 +57,10 @@ public:
 		match.db_s2=db_const_.s2;
 	}
 	
-/**
-* @brief TODO
-* @param c
-*/
+	/**
+	* @brief TODO
+	* @param c
+	*/
 	void copy_over(match_result *c) {
 		assert(c->db==db);
 		assert(c->img==img);
@@ -74,27 +75,27 @@ public:
 		
 		memcpy(c->map, map, sizeof(map[0])*map_size);
 	}
-/**
-* @brief TODO
-* @param m
-* @return 
-*/
+	/**
+	* @brief TODO
+	* @param m
+	* @return 
+	*/
 	int related(constellation_pair &m) {
 		
 		if (match.totalscore==-FLT_MAX || m.totalscore==-FLT_MAX) return 0;
 		return (map[m.img_s1]==m.db_s1 && map[m.img_s2]==m.db_s2)?1:0;
 	}
-/**
-* @brief TODO
-*/
-	void search() {if (db->stars->kdsorted==1) db->results->kdsearch(R11,R21,R31,MAXFOV/2,THRESH_FACTOR*IMAGE_VARIANCE);}
-/**
-* @brief TODO
-*/
-	void clear_search() {if (db->stars->kdsorted==1) db->results->clear_kdresults();}
-/**
-* @brief TODO
-*/
+	/**
+	* @brief TODO
+	*/
+	void search() {if (db->stars->is_kdsorted()) db->results->kdsearch(R11,R21,R31,MAXFOV/2,THRESH_FACTOR*IMAGE_VARIANCE);}
+	/**
+	* @brief TODO
+	*/
+	void clear_search() {if (db->stars->is_kdsorted()) db->results->clear_kdresults();}
+	/**
+	* @brief TODO
+	*/
 	void compute_score() {
 		//TODO: figure out where 2*map_size came from
 		match.totalscore=log(1.0/(IMG_X*IMG_Y))*(2*map_size);
@@ -103,8 +104,8 @@ public:
 			map[i]=-1;
 			scores[i]=0.0;
 		}
-		for(size_t i=0;i<db->results->kdresults_size;i++) {
-			int o=db->results->kdresults[i];
+		for(size_t i=0;i<db->results->size();i++) {
+			int o=db->results->get_kdresults(i);
 			star *s=db->stars->get_star(o);
 			float x=s->x*R11+s->y*R21+s->z*R31;
 			float y=s->x*R12+s->y*R22+s->z*R32;
@@ -112,16 +113,7 @@ public:
 			float px=y/(x*PIXX_TANGENT);
 			float py=z/(x*PIXY_TANGENT);
 			
-			int nx=(int)(px+IMG_X/2.0f);
-			if (nx==-1) nx++;
-			else if (nx==IMG_X) nx--;
-
-			int ny=(int)(py+IMG_Y/2.0f);
-			if (ny==-1) ny++;
-			else if (ny==IMG_Y) ny--;
-			int n=-1;
-			if (nx>=0&&nx<IMG_X&&ny>=0&&ny<IMG_Y) n=img_mask->mask[nx+ny*IMG_X];
-			if (n<-1) n=img_mask->resolve_id(n,px,py);
+			int n=img_mask->get_id(px,py);
 			if (n>=0) {
 				float score = img_mask->get_score(n,px,py);
 				if (score>scores[n]){/* only match the closest star */
@@ -135,23 +127,20 @@ public:
 		}
 		free(scores);
 	}
-/**
-* @return matching stars from db, in order of star_idx
-*/
+	/**
+	* @return matching stars from db, in order of star_idx
+	*/
 	star_db* from_match() {
 		if (match.totalscore==-FLT_MAX) return NULL;
 		
-		star_db* s = new star_db;
-		s->map_size=map_size;
+		star_db* s = img->stars->copy();
 		s->max_variance=db->stars->max_variance;
-		s->map=(star *)malloc(sizeof(s->map[0])*map_size);
-		memset(s->map,-1,sizeof(s->map[0])*map_size);
 		for(size_t n=0;n<map_size;n++) {
 			//catalog matching
-			int o=map[n];
-			if (o!=-1) {
-				int img_star_idx=img->stars->map[n].star_idx;
-				s->map[img_star_idx]=db->stars->map[o];
+			if (map[n]!=-1) {
+				s->get_star(img->stars->get_star(n)->star_idx)[0]=db->stars->get_star(map[n])[0];
+			} else {
+				s->get_star(img->stars->get_star(n)->star_idx)->id=-1;
 			}
 		}
 		return s;
@@ -337,8 +326,8 @@ public:
 		for (size_t n=0;n<img->map_size;n++) {
 			constellation lb=img->map[n];
 			constellation ub=img->map[n];
-			lb.p-=POS_ERR_SIGMA*PIXSCALE*sqrt(img->stars->map[lb.s1].sigma_sq+img->stars->map[lb.s2].sigma_sq+2*db->stars->max_variance);
-			ub.p+=POS_ERR_SIGMA*PIXSCALE*sqrt(img->stars->map[ub.s1].sigma_sq+img->stars->map[ub.s2].sigma_sq+2*db->stars->max_variance);
+			lb.p-=POS_ERR_SIGMA*PIXSCALE*sqrt(img->stars->get_star(lb.s1)->sigma_sq+img->stars->get_star(lb.s2)->sigma_sq+2*db->stars->max_variance);
+			ub.p+=POS_ERR_SIGMA*PIXSCALE*sqrt(img->stars->get_star(ub.s1)->sigma_sq+img->stars->get_star(ub.s2)->sigma_sq+2*db->stars->max_variance);
 			constellation *lower=std::lower_bound (db->map, db->map+db->map_size, lb,constellation_lt_p);	
 			constellation *upper=std::upper_bound (db->map, db->map+db->map_size, ub,constellation_lt_p);
 			//rewind upper & do sanity checks

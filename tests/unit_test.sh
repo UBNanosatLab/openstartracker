@@ -66,9 +66,10 @@ fi
 if [[ $ESA_TEST == 1 ]]; then
 	make &&
 	time $@ ./test $TESTDIR/input.csv $TESTDIR/calibration.txt 1991.25 | tee $TESTDIR/result_real.csv &&
+	gprof test | gprof2dot -s | dot -Tpdf -o test.pdf &&
 	echo "camera coverage simulation percent:" &&
 	echo "100-`diff --suppress-common-lines --speed-large-files -y $TESTDIR/result.csv $TESTDIR/result_real.csv | wc -l`/1" | bc -l &&
-	python2.7 score.py $TESTDIR/result.csv $TESTDIR/result_real.csv
+	python2.7 score.py $TESTDIR/result.csv $TESTDIR/result_real.csv 
 fi
 
 if [[ $IMG_TEST == 1 ]]; then

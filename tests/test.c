@@ -71,7 +71,7 @@ void star_id(double spikes[], int result[], size_t length)
 		SQ_RESULTS->kdsearch(x,y,z,MAXFOV/2,THRESH_FACTOR*IMAGE_VARIANCE);
 		C_DB->results->kdsearch(x,y,z,MAXFOV/2,THRESH_FACTOR*IMAGE_VARIANCE);
 		star_db* near_stars=SQ_RESULTS->from_kdresults();
-		constellation_db* fov_db = new constellation_db(near_stars,C_DB->results->kdresults_size,1);
+		constellation_db* fov_db = new constellation_db(near_stars,C_DB->results->size(),1);
 		delete near_stars;
 		C_DB->results->clear_kdresults();
 		SQ_RESULTS->clear_kdresults();
@@ -79,7 +79,7 @@ void star_id(double spikes[], int result[], size_t length)
 		constellation_db * img=new constellation_db(img_stars,MAX_FALSE_STARS+2,1);
 		db_match* fov_match = new db_match(fov_db,img);
 		star_db* db_stars=fov_match->winner->from_match();
-		for(size_t i = 0; i < length; i++) result[i] = db_stars->map[i].id;
+		for(size_t i = 0; i < length; i++) result[i] = db_stars->get_star(i)->id;
 		delete img;
 		delete db_stars;
 		delete fov_db;

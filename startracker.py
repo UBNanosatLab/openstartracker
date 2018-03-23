@@ -179,7 +179,7 @@ class star_image:
 		#estimate density for constellation generation
 		C_DB.results.kdsearch(x,y,z,r,beast.cvar.THRESH_FACTOR*beast.cvar.IMAGE_VARIANCE)
 		fov_stars=SQ_RESULTS.from_kdresults()#REE
-		self.fov_db = beast.constellation_db(fov_stars,C_DB.results.kdresults_size,1)
+		self.fov_db = beast.constellation_db(fov_stars,C_DB.results.size(),1)
 		C_DB.results.clear_kdresults()
 		SQ_RESULTS.clear_kdresults()
 		
@@ -196,7 +196,7 @@ class star_image:
 		lis=beast.db_match(C_DB,img_const_n_brightest)
 		#TODO: uncomment once p_match is fixed
 		#if lis.p_match>P_MATCH_THRESH:
-		if lis.p_match>P_MATCH_THRESH and lis.winner.map_size>=beast.cvar.REQUIRED_STARS:
+		if lis.p_match>P_MATCH_THRESH and lis.winner.size()>=beast.cvar.REQUIRED_STARS:
 			x=lis.winner.R11
 			y=lis.winner.R21
 			z=lis.winner.R31
@@ -209,7 +209,7 @@ class star_image:
 		img_stars_from_lm=last_match.img_stars.copy()
 		w=last_match.match.winner
 		#convert the stars to ECI
-		for i in range(img_stars_from_lm.map_size):
+		for i in range(img_stars_from_lm.size()):
 			s=img_stars_from_lm.get_star(i)
 			x=s.x*w.R11+s.y*w.R12+s.z*w.R13
 			y=s.x*w.R21+s.y*w.R22+s.z*w.R23
@@ -240,9 +240,9 @@ class star_image:
 				return
 			else:
 				db=self.db_stars_from_lm
-		assert(db.map_size==im.map_size)
+		assert(db.size()==im.size())
 		star_out=[]
-		for i in range(db.map_size):
+		for i in range(db.size()):
 			s_im=im.get_star(i)
 			s_db=db.get_star(i)
 			if (s_db.id>=0):
@@ -308,12 +308,12 @@ def update_nonstars(current_image,source):
 	db=current_image.db_stars
 	db_lm=current_image.db_stars_from_lm
 	if (db!=None):
-		assert(db.map_size==im.map_size)
+		assert(db.size()==im.size())
 	if (db_lm!=None):
-		assert(db_lm.map_size==im.map_size)
-		for i in range(im.map_size):
+		assert(db_lm.size()==im.size())
+		for i in range(im.size()):
 			im.get_star(i).id=db_lm.get_star(i).id
-	for i in range(im.map_size):
+	for i in range(im.size()):
 		s_im=im.get_star(i)
 		#is this a star? if so remove from nonstars
 		if (db != None and db.get_star(i).id>=0):

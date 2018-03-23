@@ -146,11 +146,9 @@ bool star_lt_z(const star &s1, const star &s2) {return s1.z < s2.z;}
 bool star_lt_flux(const star &s1, const star &s2) {return s1.flux < s2.flux;}
 
 struct star_db {
-//TODO:
-//private:
+private:
 	star *map;
 	size_t map_size;
-private:
 	
 	/** You may be looking at the most compact kd-tree in existence
 	 *  It does not use pointers or indexes or leaf nodes or any extra memory
@@ -175,8 +173,8 @@ private:
 	void kdsort_y(int min, int max) {KDSORT_NEXT(star_lt_y,kdsort_z)}
 	void kdsort_z(int min, int max) {KDSORT_NEXT(star_lt_z,kdsort_x)}
 	#undef KDSORT_NEXT
+	uint8_t kdsorted;
 public:
-	int kdsorted;
 	float max_variance;
 	star_db() {
 		DBG_STAR_DB_COUNT++;
@@ -192,6 +190,7 @@ public:
 		free(map);
 	}
 	size_t size() {return map_size;}
+	uint8_t is_kdsorted() {return kdsorted;}
 	star* get_star(int idx) {return map_size>0?&map[idx%map_size]:NULL;}
 
 	star_db* copy() {
@@ -296,15 +295,35 @@ public:
 };
 
 struct star_fov {
-//TODO:
-//private:
-	int *mask;
 private:
+	int *mask;
 	star_db *stars;
 	int *collision;
 	int collision_size;
-public:
 	float db_max_variance;
+	/**
+	* @brief Get the id of the best match to the specified coordinates 
+	* Used to resolve collisions where the coordinates falls into the region of overlap between two stars
+	* Adds a bit of complexity in exchange for being able to break ties at
+	* the subpixel level, which can sometimes make a difference 
+	* 
+	* @param id - the id from the image map
+	* Any id <-1 is interpreted as an index in the collision buffer (starts at -2)
+	*
+	* @param px Pixel x minus camera center
+	* @param py Pixel y minus camera center
+	*
+	* @return The id of whichever star is the best match to the coordinates in question 
+	*/
+	int resolve_id(int id,float px,float py) {
+		if (id>=-1) return id;
+		//Any id <-1 is interpreted as an index in the collision buffer (starts at -2)
+		id=-id;
+		int id1=resolve_id(collision[id-2],px,py);
+		int id2=resolve_id(collision[id-1],px,py);
+		return (get_score(id1,px,py)>get_score(id2,px,py))?id1:id2;
+	}
+public:
 	
 	/**
 	* @brief TODO
@@ -348,27 +367,17 @@ public:
 		return (maxdist_sq-(dx*dx+dy*dy))/(2*sigma_sq);
 	}
 	
-	/**
-	* @brief Get the id of the best match to the specified coordinates 
-	* Used to resolve collisions where the coordinates falls into the region of overlap between two stars
-	* Adds a bit of complexity in exchange for being able to break ties at
-	* the subpixel level, which can sometimes make a difference 
-	* 
-	* @param id - the id from the image map
-	* Any id <-1 is interpreted as an index in the collision buffer (starts at -2)
-	*
-	* @param px Pixel x minus camera center
-	* @param py Pixel y minus camera center
-	*
-	* @return The id of whichever star is the best match to the coordinates in question 
-	*/
-	int resolve_id(int id,float px,float py) {
-		if (id>=-1) return id;
-		//Any id <-1 is interpreted as an index in the collision buffer (starts at -2)
-		id=-id;
-		int id1=resolve_id(collision[id-2],px,py);
-		int id2=resolve_id(collision[id-1],px,py);
-		return (get_score(id1,px,py)>get_score(id2,px,py))?id1:id2;
+	int get_id(float px, float py) {
+		int nx=(int)(px+IMG_X/2.0f);
+		if (nx==-1) nx++;
+		else if (nx==IMG_X) nx--;
+	
+		int ny=(int)(py+IMG_Y/2.0f);
+		if (ny==-1) ny++;
+		else if (ny==IMG_Y) ny--;
+		int id=-1;
+		if (nx>=0&&nx<IMG_X&&ny>=0&&ny<IMG_Y) id=mask[nx+ny*IMG_X];
+		return resolve_id(id,px,py);
 	}
 	/**
 	* @brief TODO
@@ -434,11 +443,10 @@ public:
 };
 
 struct star_query {
-	int8_t *kdmask;
-
-	int *kdresults;
-	size_t kdresults_size;
 private:
+	size_t *kdresults;
+	size_t kdresults_size;
+	int8_t *kdmask;
 	size_t kdresults_maxsize;
 	star_db *stars;
 public:
@@ -454,8 +462,8 @@ public:
 		kdresults_size=stars->size();
 		kdresults_maxsize=INT_MAX;
 		
-		kdmask=(int8_t*)malloc(stars->size()*sizeof(kdmask[0]));
-		kdresults=(int*)malloc(stars->size()*sizeof(kdresults[0]));
+		kdmask=(int8_t*)malloc((stars->size()+1)*sizeof(kdmask[0]));
+		kdresults=(size_t*)malloc((stars->size()+1)*sizeof(kdresults[0]));
 		for (size_t i=0;i<stars->size();i++) kdresults[i]=i;
 		reset_kdmask();
 	}
@@ -465,7 +473,9 @@ public:
 		free(kdresults);
 		free(kdmask);
 	}
-	
+	size_t size() {return kdresults_size;}
+	size_t get_kdresults(size_t i) {return kdresults[i];}
+	int8_t get_kdmask(size_t i) {return kdmask[i];}
 	/**
 	* @brief Clears kdmask, but does not reset kdresults. Slow.
 	*/
@@ -567,7 +577,7 @@ public:
 			int8_t lastmask=kdmask[i];
 			kdsearch(stars->get_star(i)->x,stars->get_star(i)->y,stars->get_star(i)->z,DOUBLE_STAR_PX*PIXSCALE,THRESH_FACTOR*IMAGE_VARIANCE);
 			//TODO uncomment for real stars
-			//if (kdresults_size>1||lastmask || stars->map[i].unreliable>0||stars->map[i].flux<THRESH_FACTOR*IMAGE_VARIANCE) {
+			//if (kdresults_size>1||lastmask || stars->get_star(i)->flux<THRESH_FACTOR*IMAGE_VARIANCE||stars->get_star(i)->unreliable>0) {
 			if (kdresults_size>1||lastmask || stars->get_star(i)->flux<THRESH_FACTOR*IMAGE_VARIANCE) {
 				kdmask[i]=1;
 				kdresults_size=0;
@@ -628,12 +638,12 @@ public:
 		if (kdresults_size>0){
 			int i=0;
 			DBG_PRINT("kdmask[%d]=%d\n",i,kdmask[i]);
-			DBG_PRINT("kdresults[%d]=%d\n",i,kdresults[i]);
+			DBG_PRINT("kdresults[%d]=%lu\n",i,kdresults[i]);
 			stars->get_star(kdresults[i])->DBG_("STARS");
 			DBG_PRINT(".\n.\n");
 			i=kdresults_size-1;
 			DBG_PRINT("kdmask[%d]=%d\n",i,kdmask[i]);
-			DBG_PRINT("kdresults[%d]=%d\n",i,kdresults[i]);
+			DBG_PRINT("kdresults[%d]=%lu\n",i,kdresults[i]);
 			stars->get_star(kdresults[i])->DBG_("STARS");
 		}
 	}

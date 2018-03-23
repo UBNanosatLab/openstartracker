@@ -6,23 +6,26 @@
 
 struct constellation {
 	float p;
-	int s1;
-	int s2;
+	size_t s1;
+	size_t s2;
 	int idx;
 	void DBG_(const char *s) {
 		DBG_PRINT("%s\t",s);
 		DBG_PRINT("p=%f ",p);
-		DBG_PRINT("s1=%d ",s1);
-		DBG_PRINT("s2=%d ",s2);
+		DBG_PRINT("s1=%lu ",s1);
+		DBG_PRINT("s2=%lu ",s2);
 		DBG_PRINT("idx=%d\n",idx);
 	}
 };
 
 struct  constellation_pair {
+
+//TODO: private:
 	float totalscore;
 	int db_s1,db_s2;
 	int img_s1,img_s2;
-	
+
+public:
 /**
 * @brief TODO
 */
@@ -54,13 +57,11 @@ bool constellation_lt_s2(const constellation &c1, const constellation &c2) {retu
 bool constellation_lt_p(const constellation &c1, const constellation &c2) {return c1.p < c2.p;}
 
 struct constellation_db {
-//TODO:
-//private:
-	size_t map_size;
-	constellation* map;
-
+//TODO: private:
 	star_db* stars;
 	star_query* results;
+	size_t map_size;
+	constellation* map;
 public:
 	/**
 	* @brief TODO
@@ -96,13 +97,13 @@ public:
 		} else {
 			results->kdmask_uniform_density(stars_per_fov);//2+DB_REDUNDANCY
 			std::set<constellation,constellation_lt> c_set;
-			for (size_t i=0;i<stars->size();i++) if (results->kdmask[i]==0) {
+			for (size_t i=0;i<stars->size();i++) if (results->get_kdmask(i)==0) {
 				results->kdsearch(stars->get_star(i)->x,stars->get_star(i)->y,stars->get_star(i)->z,MAXFOV,THRESH_FACTOR*IMAGE_VARIANCE);
 				constellation c;
-				for (size_t j=0;j<results->kdresults_size;j++) if ((int)i!=results->kdresults[j] && stars->get_star(i)->flux>=stars->get_star(results->kdresults[j])->flux){
-					c.p=stars->get_star(i)[0]*stars->get_star(results->kdresults[j])[0];
+				for (size_t j=0;j<results->size();j++) if (i!=results->get_kdresults(j) && stars->get_star(i)->flux>=stars->get_star(results->get_kdresults(j))->flux){
+					c.p=stars->get_star(i)[0]*stars->get_star(results->get_kdresults(j))[0];
 					c.s1=i;
-					c.s2=results->kdresults[j];
+					c.s2=results->get_kdresults(j);
 					c_set.insert(c);
 				}
 				results->clear_kdresults();
