@@ -235,9 +235,6 @@ class star_db(_object):
     def copy_n_brightest(self, n):
         return _beast.star_db_copy_n_brightest(self, n)
 
-    def sort_brightness(self):
-        return _beast.star_db_sort_brightness(self)
-
     def load_catalog(self, catalog, year):
         return _beast.star_db_load_catalog(self, catalog, year)
 
@@ -247,8 +244,11 @@ class star_db(_object):
     def __iadd__(self, *args):
         return _beast.star_db___iadd__(self, *args)
 
-    def __ior__(self, s):
-        return _beast.star_db___ior__(self, s)
+    def __sub__(self, s):
+        return _beast.star_db___sub__(self, s)
+
+    def __and__(self, s):
+        return _beast.star_db___and__(self, s)
 
     def DBG_(self, s):
         return _beast.star_db_DBG_(self, s)
@@ -285,6 +285,18 @@ class star_query(_object):
     __swig_getmethods__ = {}
     __getattr__ = lambda self, name: _swig_getattr(self, star_query, name)
     __repr__ = _swig_repr
+    __swig_setmethods__["map"] = _beast.star_query_map_set
+    __swig_getmethods__["map"] = _beast.star_query_map_get
+    if _newclass:
+        map = _swig_property(_beast.star_query_map_get, _beast.star_query_map_set)
+    __swig_setmethods__["map_size"] = _beast.star_query_map_size_set
+    __swig_getmethods__["map_size"] = _beast.star_query_map_size_get
+    if _newclass:
+        map_size = _swig_property(_beast.star_query_map_size_get, _beast.star_query_map_size_set)
+    __swig_setmethods__["kdresults"] = _beast.star_query_kdresults_set
+    __swig_getmethods__["kdresults"] = _beast.star_query_kdresults_get
+    if _newclass:
+        kdresults = _swig_property(_beast.star_query_kdresults_get, _beast.star_query_kdresults_set)
 
     def __init__(self, s):
         this = _beast.new_star_query(s)
@@ -295,11 +307,17 @@ class star_query(_object):
     __swig_destroy__ = _beast.delete_star_query
     __del__ = lambda self: None
 
+    def is_kdsorted(self):
+        return _beast.star_query_is_kdsorted(self)
+
+    def kdsort(self):
+        return _beast.star_query_kdsort(self)
+
+    def sort(self):
+        return _beast.star_query_sort(self)
+
     def r_size(self):
         return _beast.star_query_r_size(self)
-
-    def get_kdresults(self, i):
-        return _beast.star_query_get_kdresults(self, i)
 
     def get_kdmask(self, i):
         return _beast.star_query_get_kdmask(self, i)

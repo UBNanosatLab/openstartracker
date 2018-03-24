@@ -179,7 +179,7 @@ class star_image:
 		#estimate density for constellation generation
 		C_DB.results.kdsearch(x,y,z,r,beast.cvar.THRESH_FACTOR*beast.cvar.IMAGE_VARIANCE)
 		fov_stars=SQ_RESULTS.from_kdresults()#REE
-		self.fov_db = beast.constellation_db(fov_stars,C_DB.results.size(),1)
+		self.fov_db = beast.constellation_db(fov_stars,C_DB.results.r_size(),1)
 		C_DB.results.clear_kdresults()
 		SQ_RESULTS.clear_kdresults()
 		

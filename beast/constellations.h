@@ -77,8 +77,8 @@ public:
 
 		if (from_image) {
 			stars=s->copy();
-			stars->sort();
 			results=new star_query(stars);
+			results->sort();
 			map=NULL;
 			int ns=stars->size();/* number of stars to check */
 			if (ns>stars_per_fov) ns=stars_per_fov;//MAX_FALSE_STARS+2
@@ -88,9 +88,9 @@ public:
 			
 			int idx=0;
 			for (int j=1;j<ns;j++) for (int i=0;i<j;i++,idx++) {
-				map[idx].p=stars->get_star(i)[0]*stars->get_star(j)[0];
-				map[idx].s1=i;
-				map[idx].s2=j;
+				map[idx].p=results->map[i]*results->map[j];
+				map[idx].s1=results->map[i].star_idx;
+				map[idx].s2=results->map[j].star_idx;
 			}
 			std::sort(map, map+map_size,constellation_lt_p);
 			while (--idx>=0) map[idx].idx=idx;
@@ -99,13 +99,13 @@ public:
 			results=new star_query(stars);
 			results->kdmask_uniform_density(stars_per_fov);//2+DB_REDUNDANCY
 			std::set<constellation,constellation_lt> c_set;
-			for (size_t i=0;i<stars->size();i++) if (results->get_kdmask(i)==0) {
-				results->kdsearch(stars->get_star(i)->x,stars->get_star(i)->y,stars->get_star(i)->z,MAXFOV,THRESH_FACTOR*IMAGE_VARIANCE);
+			for (size_t i=0;i<results->map_size;i++) if (results->get_kdmask(i)==0) {
+				results->kdsearch(results->map[i].x,results->map[i].y,results->map[i].z,MAXFOV,THRESH_FACTOR*IMAGE_VARIANCE);
 				constellation c;
-				for (size_t j=0;j<results->r_size();j++) if (i!=results->get_kdresults(j) && stars->get_star(i)->flux>=stars->get_star(results->get_kdresults(j))->flux){
-					c.p=stars->get_star(i)[0]*stars->get_star(results->get_kdresults(j))[0];
-					c.s1=i;
-					c.s2=results->get_kdresults(j);
+				for (size_t j=0;j<results->r_size();j++) if (i!=results->kdresults[j] && results->map[i].flux>=results->map[results->kdresults[j]].flux){
+					c.p=results->map[i]*results->map[results->kdresults[j]];
+					c.s1=results->map[i].star_idx;
+					c.s2=results->map[results->kdresults[j]].star_idx;
 					c_set.insert(c);
 				}
 				results->clear_kdresults();

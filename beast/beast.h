@@ -88,11 +88,11 @@ public:
 	/**
 	* @brief TODO
 	*/
-	void search() {if (db->stars->is_kdsorted()) db->results->kdsearch(R11,R21,R31,MAXFOV/2,THRESH_FACTOR*IMAGE_VARIANCE);}
+	void search() {if (db->results->is_kdsorted()) db->results->kdsearch(R11,R21,R31,MAXFOV/2,THRESH_FACTOR*IMAGE_VARIANCE);}
 	/**
 	* @brief TODO
 	*/
-	void clear_search() {if (db->stars->is_kdsorted()) db->results->clear_kdresults();}
+	void clear_search() {if (db->results->is_kdsorted()) db->results->clear_kdresults();}
 	/**
 	* @brief TODO
 	*/
@@ -105,7 +105,7 @@ public:
 			scores[i]=0.0;
 		}
 		for(size_t i=0;i<db->results->r_size();i++) {
-			int o=db->results->get_kdresults(i);
+			int o=db->results->map[db->results->kdresults[i]].star_idx;
 			star *s=db->stars->get_star(o);
 			float x=s->x*R11+s->y*R21+s->z*R31;
 			float y=s->x*R12+s->y*R22+s->z*R32;
