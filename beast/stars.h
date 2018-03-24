@@ -76,7 +76,8 @@ struct star {
 
 
 
-	/** @brief hash function which interleaves values so that nearby stars will have nearby hashes
+	/**
+	* @brief hash function which interleaves values so that nearby stars will have nearby hashes
 	* this approach also  also allows you to truncate the hash when less precision is needed
 	* 
 	* for the magic numbers used for interleaving, see:
@@ -154,8 +155,21 @@ private:
 	std::map<int,size_t> star_idx_map;
 	std::multimap<float,size_t> flux_map;
 	size_t sz;
+
+	/**
+	 * @brief Transcribe a portion of the db between first and last
+	 * 
+	 * @param first an iterator to a map. key can be anything, but value must be a star hash 
+	 * @param last copy up to but not including the element pointed to by this iterator
+	 */
+	template<class T> star_db* copy(T first,T last) {
+		star_db* s = new star_db;
+		for (;first!=last;first++) (*s)+=hash_map[first->second];
+		return s;
+	}
 	
 public:
+	//TODO
 	float max_variance;
 	star_db() {
 		DBG_STAR_DB_COUNT++;
@@ -174,13 +188,13 @@ public:
 	 * @param idx the index of the star 
 	 */
 	star* get_star(int idx) {return size()>0?&(hash_map[star_idx_map[idx]]):NULL;}
-
-	template<class T> star_db* copy(T first,T last) {
-		star_db* s = new star_db;
-		for (;first!=last;first++) (*s)+=hash_map[first->second];
-		return s;
-	}
+	/**
+	* @brief make a copy of the star db
+	*/
 	star_db* copy() {return copy(star_idx_map.cbegin(),star_idx_map.cend());}
+	/**
+	* @brief make a copy of the n brightest elements in the star db
+	*/
 	star_db* copy_n_brightest(size_t n) {return copy(flux_map.crbegin(),std::next(flux_map.crbegin(),std::min(n,size())));}
 
 
@@ -188,7 +202,7 @@ public:
 	* @brief Load stars from hip_main.dat
 	*
 	* @param catalog path to hip_main.dat
-	* @param year Update to the specified year
+	* @param year Update star positions to the specified year
 	*/
 	void load_catalog(const char* catalog, float year) {
 		FILE *stream = fopen(catalog, "r");
@@ -225,6 +239,8 @@ public:
 		for (size_t i=0;i<s->size();i++) n+=count(s->get_star(i));
 		return n;
 	}
+	
+	///Philosophically inspired by python sets (and of course Trolley Problem Memes)
 	#define OP operator+=
 	star_db* OP(const star* s) {
 		if (count(s)==0) {
