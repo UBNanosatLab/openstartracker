@@ -104,7 +104,7 @@ public:
 			map[i]=-1;
 			scores[i]=0.0;
 		}
-		for(size_t i=0;i<db->results->size();i++) {
+		for(size_t i=0;i<db->results->r_size();i++) {
 			int o=db->results->get_kdresults(i);
 			star *s=db->stars->get_star(o);
 			float x=s->x*R11+s->y*R21+s->z*R31;

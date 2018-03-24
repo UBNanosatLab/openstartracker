@@ -226,9 +226,6 @@ class star_db(_object):
     def size(self):
         return _beast.star_db_size(self)
 
-    def is_kdsorted(self):
-        return _beast.star_db_is_kdsorted(self)
-
     def get_star(self, idx):
         return _beast.star_db_get_star(self, idx)
 
@@ -238,17 +235,20 @@ class star_db(_object):
     def copy_n_brightest(self, n):
         return _beast.star_db_copy_n_brightest(self, n)
 
+    def sort_brightness(self):
+        return _beast.star_db_sort_brightness(self)
+
     def load_catalog(self, catalog, year):
         return _beast.star_db_load_catalog(self, catalog, year)
 
-    def kdsort(self):
-        return _beast.star_db_kdsort(self)
-
-    def sort(self):
-        return _beast.star_db_sort(self)
+    def count(self, *args):
+        return _beast.star_db_count(self, *args)
 
     def __iadd__(self, *args):
         return _beast.star_db___iadd__(self, *args)
+
+    def __ior__(self, s):
+        return _beast.star_db___ior__(self, s)
 
     def DBG_(self, s):
         return _beast.star_db_DBG_(self, s)
@@ -295,8 +295,8 @@ class star_query(_object):
     __swig_destroy__ = _beast.delete_star_query
     __del__ = lambda self: None
 
-    def size(self):
-        return _beast.star_query_size(self)
+    def r_size(self):
+        return _beast.star_query_r_size(self)
 
     def get_kdresults(self, i):
         return _beast.star_query_get_kdresults(self, i)

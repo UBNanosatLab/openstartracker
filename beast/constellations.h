@@ -73,16 +73,16 @@ public:
 	constellation_db(star_db *s,int stars_per_fov, int from_image) {
 		DBG_CONSTELLATION_DB_COUNT++;
 		DBG_PRINT("DBG_CONSTELLATION_DB_COUNT++ %d\n",DBG_CONSTELLATION_DB_COUNT);
-		stars=s->copy();
-		results=new star_query(stars);
+
 
 		if (from_image) {
-			map=NULL;
+			stars=s->copy();
 			stars->sort();
+			results=new star_query(stars);
+			map=NULL;
 			int ns=stars->size();/* number of stars to check */
 			if (ns>stars_per_fov) ns=stars_per_fov;//MAX_FALSE_STARS+2
-			
-			stars=stars;
+
 			map_size=ns*(ns-1)/2;
 			map=(constellation*)malloc(map_size*sizeof(map[0]));
 			
@@ -95,12 +95,14 @@ public:
 			std::sort(map, map+map_size,constellation_lt_p);
 			while (--idx>=0) map[idx].idx=idx;
 		} else {
+			stars=s->copy();
+			results=new star_query(stars);
 			results->kdmask_uniform_density(stars_per_fov);//2+DB_REDUNDANCY
 			std::set<constellation,constellation_lt> c_set;
 			for (size_t i=0;i<stars->size();i++) if (results->get_kdmask(i)==0) {
 				results->kdsearch(stars->get_star(i)->x,stars->get_star(i)->y,stars->get_star(i)->z,MAXFOV,THRESH_FACTOR*IMAGE_VARIANCE);
 				constellation c;
-				for (size_t j=0;j<results->size();j++) if (i!=results->get_kdresults(j) && stars->get_star(i)->flux>=stars->get_star(results->get_kdresults(j))->flux){
+				for (size_t j=0;j<results->r_size();j++) if (i!=results->get_kdresults(j) && stars->get_star(i)->flux>=stars->get_star(results->get_kdresults(j))->flux){
 					c.p=stars->get_star(i)[0]*stars->get_star(results->get_kdresults(j))[0];
 					c.s1=i;
 					c.s2=results->get_kdresults(j);

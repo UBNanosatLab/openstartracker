@@ -7,7 +7,9 @@
 #include <limits.h> //INT_MAX
 #include <algorithm> //sort, nth_element
 #include <unordered_set>
+#include <map>
 #include <unordered_map>
+#include <iterator>     // std::next
 struct star {
 	float x;
 	float y;
@@ -31,6 +33,7 @@ struct star {
 	* @param flux Pixel brightness
 	* @param id User defined id
 	*/
+	star(){};
 	star(float x_, float y_, float z_, float flux_, int id_) {
 		x=x_;
 		y=y_;
@@ -147,6 +150,10 @@ bool star_lt_flux(const star &s1, const star &s2) {return s1.flux < s2.flux;}
 
 struct star_db {
 private:
+	std::unordered_map<size_t,star> hash_map;
+	std::map<int,size_t> star_idx_map;
+	std::multimap<float,size_t> flux_map;
+	//TODO remove
 	star *map;
 	size_t map_size;
 	
@@ -189,26 +196,30 @@ public:
 		DBG_PRINT("DBG_STAR_DB_COUNT-- %d\n",DBG_STAR_DB_COUNT);
 		free(map);
 	}
+	//TODO works but slow - WTF?
+	//size_t size() {return hash_map.size();}
 	size_t size() {return map_size;}
 	uint8_t is_kdsorted() {return kdsorted;}
+	/**
+	 * @brief returns stars in the order they were added
+	 * 
+	 * @param idx the index of the star 
+	 */
+	//TODO
+	//void set_kdsorted() {kdsorted=1;}
+	//star* get_star(int idx) {return size()>0?&(hash_map[star_idx_map[idx]]):NULL;}
 	star* get_star(int idx) {return map_size>0?&map[idx%map_size]:NULL;}
 
-	star_db* copy() {
+	template<class T> star_db* copy(T first,T last) {
 		star_db* s = new star_db;
-		*s = *this;
-		s->map=(star*) malloc(sizeof(map[0])*map_size);
-		memcpy(s->map,map,sizeof(map[0])*map_size);
+		for (;first!=last;first++) (*s)+=hash_map[first->second];
 		return s;
 	}
-	star_db* copy_n_brightest(size_t n) {
-		star_db* s = this->copy();
-		s->map_size=std::min(n,map_size);
-		std::nth_element(s->map,s->map+s->map_size,s->map+map_size,star_gt_flux);
-		for (size_t i=0;i<s->map_size;i++) s->map[i].star_idx=i;
-		s->map=(star*)realloc(s->map,sizeof(s->map[0])*s->map_size);
-		return s;
-	}
-	
+	star_db* copy() {return copy(star_idx_map.cbegin(),star_idx_map.cend());}
+	star_db* copy_n_brightest(size_t n) {return copy(flux_map.crbegin(),std::next(flux_map.crbegin(),std::min(n,size())));}
+	//star_db* sorted_by_brightness() {return copy(flux_map.crbegin(),flux_map.crend());}
+
+
 	/**
 	* @brief Load stars from hip_main.dat
 	*
@@ -218,45 +229,39 @@ public:
 	void load_catalog(const char* catalog, float year) {
 		FILE *stream = fopen(catalog, "r");
 		if (stream == NULL) exit(EXIT_FAILURE);
-		map_size=0;
-		while(!feof(stream)) if(fgetc(stream) == '\n') map_size++;
-		rewind(stream);
 		max_variance=POS_VARIANCE;
 		
-		map = (star*)realloc(map,map_size*sizeof(map[0]));
 		ssize_t read;
 		char *line = NULL;
 		size_t len = 0;
 		
 		char* hip_record[78];
-		for(size_t i=0;i<map_size;i++){
-			if ((read = getline(&line, &len, stream)) != -1) {
+		while ((read = getline(&line, &len, stream)) != -1){
 				float yeardiff=year-1991.25;
 				hip_record[0]=strtok(line,"|");
 				for (size_t j=1;j<sizeof(hip_record)/sizeof(hip_record[0]);j++) hip_record[j] = strtok(NULL,"|");
 			
-				map[i].id=atoi(hip_record[1]);
-				map[i].star_idx=i;
 				float MAG=atof(hip_record[5]);
-				map[i].flux=BASE_FLUX*powf(10.0,-MAG/2.5);
-				
 				float DEC=yeardiff*atof(hip_record[13])/3600000.0 + atof(hip_record[9]);
 				float cosdec=cos(PI*DEC/180.0);
 				float RA=yeardiff*atof(hip_record[12])/(cosdec*3600000.0) + atof(hip_record[8]);
-				map[i].x=cos(PI*RA/180.0)*cosdec;
-				map[i].y=sin(PI*RA/180.0)*cosdec;
-				map[i].z=sin(PI*DEC/180.0);
-				map[i].unreliable=((atoi(hip_record[29])==0||atoi(hip_record[29])==1)&&atoi(hip_record[6])!=3)?0:1;
-				map[i].px=map[i].y/(map[i].x*PIXX_TANGENT);
-				map[i].py=map[i].z/(map[i].x*PIXY_TANGENT);
-				map[i].sigma_sq=POS_VARIANCE;
-			}
+
+				star s = star(cos(PI*RA/180.0)*cosdec,sin(PI*RA/180.0)*cosdec,sin(PI*DEC/180.0),BASE_FLUX*powf(10.0,-MAG/2.5),atoi(hip_record[1]));
+				s.unreliable=((atoi(hip_record[29])==0||atoi(hip_record[29])==1)&&atoi(hip_record[6])!=3)?0:1;
+				(*this)+=s;
 		}
 		free(line);
 		fclose(stream);
 		
 	}
 
+	size_t count(const star* s) {return hash_map.count(s->hash());}
+	size_t count(star_db* s) {
+		size_t n=0;
+		for (size_t i=0;i<s->size();i++) n+=count(s->get_star(i));
+		return n;
+	}
+	//TODO
 	/**
 	* @brief kdsort the list in question.
 	*/
@@ -272,15 +277,31 @@ public:
 	}
 	#define OP operator+=
 	star_db* OP(const star* s) {
-		int n=map_size++;
-		if (n%16==0) map=(star*)realloc(map,(map_size+16)*sizeof(map[0]));
-		map[n]=*s;
-		if (max_variance<s->sigma_sq) max_variance=s->sigma_sq;
-		map[n].star_idx=n;
+		//TODO
+		if (count(s)==0) {
+			int n=size();
+			map_size++;
+			if (n%16==0) map=(star*)realloc(map,(map_size+16)*sizeof(map[0]));
+			map[n]=*s;
+			if (max_variance<s->sigma_sq) max_variance=s->sigma_sq;
+			map[n].star_idx=n;
+			star temp=s[0];
+			temp.star_idx=n;
+			hash_map[s->hash()]=temp;
+			flux_map.emplace(temp.flux,temp.hash());
+			star_idx_map.emplace(temp.star_idx,temp.hash());
+		}
 		return this;
 	}
 	star_db* OP(const star& s) { return *this+=&s;}
 	#undef OP
+	#define OP operator|=
+	star_db* OP(star_db* s) {
+		for (size_t i=0;i<s->size();i++) (*this)+=s->get_star(i);
+		return this;
+	}
+	#undef OP
+
 	void DBG_(const char *s) {
 		DBG_PRINT("%s\n",s);
 		DBG_PRINT("star_db at %lu contains %lu elements\n",(size_t)this,map_size);
@@ -444,11 +465,40 @@ public:
 
 struct star_query {
 private:
+	star *map;
+	size_t map_size;
+	uint8_t kdsorted;
+	
 	size_t *kdresults;
 	size_t kdresults_size;
 	int8_t *kdmask;
 	size_t kdresults_maxsize;
 	star_db *stars;
+		 
+	 /** You may be looking at the most compact kd-tree in existence
+	 *  It does not use pointers or indexes or leaf nodes or any extra memory
+	 *  Instead the list is kdsorted in place using std::nth_element()
+	 *  which is standard c++ implementation of quickselect.
+	 * 
+	 *  References:
+	 *  Numerical Recipies (ISBN: 9780521884075)
+	 *  https://en.wikipedia.org/wiki/Quickselect
+	 *  https://stackoverflow.com/questions/17021379/balancing-kd-tree-which-approach-is-more-efficient
+	 */
+	
+	#define KDSORT_NEXT(A,B)\
+		int mid=(min+max)/2;\
+		if (min+1<max) {\
+			std::nth_element(map+min,map+mid,map+max,A);\
+			if (mid-min>KDBUCKET_SIZE) B(min,mid);\
+			else std::sort(map+min, map+mid,star_gt_flux);\
+			if (max-(mid+1)>KDBUCKET_SIZE) B(mid+1,max);\
+			else std::sort(map+(mid+1), map+max,star_gt_flux);\
+		}
+	void kdsort_x(int min, int max) {KDSORT_NEXT(star_lt_x,kdsort_y)}
+	void kdsort_y(int min, int max) {KDSORT_NEXT(star_lt_y,kdsort_z)}
+	void kdsort_z(int min, int max) {KDSORT_NEXT(star_lt_z,kdsort_x)}
+	#undef KDSORT_NEXT
 public:
 	/**
 	* @brief  TODO
@@ -458,22 +508,42 @@ public:
 		DBG_STAR_QUERY_COUNT++;
 		DBG_PRINT("DBG_STAR_QUERY_COUNT++ %d\n",DBG_STAR_QUERY_COUNT);
 		stars=s;
-		
-		kdresults_size=stars->size();
+		map_size=stars->size();
+		kdsorted=0;
+		kdresults_size=map_size;
 		kdresults_maxsize=INT_MAX;
-		
-		kdmask=(int8_t*)malloc((stars->size()+1)*sizeof(kdmask[0]));
-		kdresults=(size_t*)malloc((stars->size()+1)*sizeof(kdresults[0]));
-		for (size_t i=0;i<stars->size();i++) kdresults[i]=i;
+
+		//TODO		
+		kdmask=(int8_t*)malloc((map_size+1)*sizeof(kdmask[0]));
+		kdresults=(size_t*)malloc((map_size+1)*sizeof(kdresults[0]));
+		map=(star*)malloc(map_size*sizeof(map[0]));
+		for (size_t i=0;i<map_size;i++){
+			map[i]=stars->get_star(i)[0];
+			kdresults[i]=i;
+		}
 		reset_kdmask();
 	}
 	~star_query() {
 		DBG_STAR_QUERY_COUNT--;
 		DBG_PRINT("DBG_STAR_QUERY_COUNT-- %d\n",DBG_STAR_QUERY_COUNT);
+		free(map);
 		free(kdresults);
 		free(kdmask);
 	}
-	size_t size() {return kdresults_size;}
+	/**
+	* @brief kdsort the list in question.
+	*/
+	void kdsort() {
+		if (kdsorted==0) {
+			kdsort_x(0,map_size);
+			kdsorted=1;
+		}
+	}
+	void sort() {
+		std::sort(map, map+map_size,star_gt_flux);
+		kdsorted=0;
+	}
+	size_t r_size() {return kdresults_size;}
 	size_t get_kdresults(size_t i) {return kdresults[i];}
 	int8_t get_kdmask(size_t i) {return kdmask[i];}
 	/**
@@ -492,7 +562,7 @@ public:
 			kdmask[kdresults[kdresults_size]]=0;
 		}
 	}
-	 
+
 	/**
 	* @brief TODO
 	*
@@ -544,6 +614,7 @@ public:
 	*/
 	void kdsearch(float x, float y, float z, float r, float min_flux, int min, int max, int dim) {
 		stars->kdsort();
+		kdsort();
 		float r_deg=r/3600.0;
 		float r_rad=r_deg*PI/180.0;
 		if (dim==0) kdsearch_x(x, y, z, 2*fabs(sin(r_rad/2.0)), min_flux,min,max);
@@ -577,7 +648,7 @@ public:
 			int8_t lastmask=kdmask[i];
 			kdsearch(stars->get_star(i)->x,stars->get_star(i)->y,stars->get_star(i)->z,DOUBLE_STAR_PX*PIXSCALE,THRESH_FACTOR*IMAGE_VARIANCE);
 			//TODO uncomment for real stars
-			//if (kdresults_size>1||lastmask || stars->get_star(i)->flux<THRESH_FACTOR*IMAGE_VARIANCE||stars->get_star(i)->unreliable>0) {
+			//if (kdresults_size>1||lastmask || map[i].flux<THRESH_FACTOR*IMAGE_VARIANCE||map[i].unreliable>0) {
 			if (kdresults_size>1||lastmask || stars->get_star(i)->flux<THRESH_FACTOR*IMAGE_VARIANCE) {
 				kdmask[i]=1;
 				kdresults_size=0;
