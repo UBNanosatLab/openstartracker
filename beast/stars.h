@@ -281,6 +281,8 @@ private:
 	int *collision;
 	int collision_size;
 	float db_max_variance;
+	float *s_px;
+	float *s_py;
 	/**
 	* @brief Get the id of the best match to the specified coordinates 
 	* Used to resolve collisions where the coordinates falls into the region of overlap between two stars
@@ -319,9 +321,8 @@ public:
 		sigma_sq=stars->max_variance+db_max_variance;
 		maxdist_sq=-sigma_sq*(log(sigma_sq)+MATCH_VALUE);
 		
-		star*s=stars->get_star(id);
-		float dx=px-s->px;
-		float dy=py-s->py;
+		float dx=px-s_px[id];
+		float dy=py-s_py[id];
 		if (dx<-0.5) dx+=1.0;/* use whichever corner of the pixel gives the best score */
 		if (dy<-0.5) dy+=1.0;
 		return (maxdist_sq-(dx*dx+dy*dy))/(2*sigma_sq);
@@ -339,9 +340,8 @@ public:
 	* @return 
 	*/
 	float get_score(int id,float px,float py,float sigma_sq,float maxdist_sq) {
-		star*s=stars->get_star(id);
-		float dx=px-s->px;
-		float dy=py-s->py;
+		float dx=px-s_px[id];
+		float dy=py-s_py[id];
 		if (dx<-0.5) dx+=1.0;/* use whichever corner of the pixel gives the best score */
 		if (dy<-0.5) dy+=1.0;
 		return (maxdist_sq-(dx*dx+dy*dy))/(2*sigma_sq);
@@ -371,6 +371,8 @@ public:
 		stars=s;
 		collision=NULL;
 		collision_size=0;
+		s_px=(float*)malloc(stars->size()*sizeof(s_px[0]));
+		s_py=(float*)malloc(stars->size()*sizeof(s_py[0]));
 		mask=(int*)malloc(IMG_X*IMG_Y*sizeof(mask[0]));
 		memset(mask, -1, IMG_X*IMG_Y*sizeof(mask[0]));
 		/* generate image mask */
@@ -380,12 +382,15 @@ public:
 			sigma_sq=stars->max_variance+db_max_variance;
 			maxdist_sq=-sigma_sq*(log(sigma_sq)+MATCH_VALUE);
 			float maxdist=sqrt(maxdist_sq);
-			star*s=stars->get_star(id);
+			s_px[id]=stars->get_star(id)->px;
+			s_py[id]=stars->get_star(id)->py;
 			
-			int xmin=s->px-maxdist-1;
-			int xmax=s->px+maxdist+1;
-			int ymin=s->py-maxdist-1;
-			int ymax=s->py+maxdist+1;
+			
+			
+			int xmin=s_px[id]-maxdist-1;
+			int xmax=s_px[id]+maxdist+1;
+			int ymin=s_py[id]-maxdist-1;
+			int ymax=s_py[id]+maxdist+1;
 			
 			if(xmax>IMG_X/2) xmax=IMG_X/2;
 			if(xmin<-IMG_X/2)xmin=-IMG_X/2;
@@ -417,6 +422,8 @@ public:
 	~star_fov() {
 		DBG_STAR_FOV_COUNT--;
 		DBG_PRINT("DBG_STAR_FOV_COUNT-- %d\n",DBG_STAR_FOV_COUNT);
+		free(s_px);
+		free(s_py);
 		free(mask);
 		free(collision);
 	}

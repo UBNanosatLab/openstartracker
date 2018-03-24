@@ -105,8 +105,8 @@ public:
 			scores[i]=0.0;
 		}
 		for(size_t i=0;i<db->results->r_size();i++) {
-			int o=db->results->map[db->results->kdresults[i]].star_idx;
-			star *s=db->stars->get_star(o);
+			star *s=&(db->results->map[db->results->kdresults[i]]);
+			int o=s->star_idx;
 			float x=s->x*R11+s->y*R21+s->z*R31;
 			float y=s->x*R12+s->y*R22+s->z*R32;
 			float z=s->x*R13+s->y*R23+s->z*R33;
