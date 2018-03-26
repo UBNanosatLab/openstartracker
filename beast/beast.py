@@ -100,6 +100,14 @@ TWOPI = _beast.TWOPI
 def load_config(filename):
     return _beast.load_config(filename)
 load_config = _beast.load_config
+
+def xyz_hash(x, y, z):
+    return _beast.xyz_hash(x, y, z)
+xyz_hash = _beast.xyz_hash
+
+def xyz_hash_mask(radians):
+    return _beast.xyz_hash_mask(radians)
+xyz_hash_mask = _beast.xyz_hash_mask
 class star(_object):
     __swig_setmethods__ = {}
     __setattr__ = lambda self, name, value: _swig_setattr(self, star, name, value)
@@ -146,6 +154,10 @@ class star(_object):
     __swig_getmethods__["sigma_sq"] = _beast.star_sigma_sq_get
     if _newclass:
         sigma_sq = _swig_property(_beast.star_sigma_sq_get, _beast.star_sigma_sq_set)
+    __swig_setmethods__["hash_val"] = _beast.star_hash_val_set
+    __swig_getmethods__["hash_val"] = _beast.star_hash_val_get
+    if _newclass:
+        hash_val = _swig_property(_beast.star_hash_val_get, _beast.star_hash_val_set)
 
     def __init__(self, *args):
         this = _beast.new_star(*args)
@@ -153,9 +165,6 @@ class star(_object):
             self.this.append(this)
         except Exception:
             self.this = this
-
-    def hash(self):
-        return _beast.star_hash(self)
 
     def __eq__(self, s):
         return _beast.star___eq__(self, s)
@@ -226,6 +235,15 @@ class star_db(_object):
     def size(self):
         return _beast.star_db_size(self)
 
+    def __iadd__(self, *args):
+        return _beast.star_db___iadd__(self, *args)
+
+    def __sub__(self, s):
+        return _beast.star_db___sub__(self, s)
+
+    def __and__(self, s):
+        return _beast.star_db___and__(self, s)
+
     def get_star(self, idx):
         return _beast.star_db_get_star(self, idx)
 
@@ -240,15 +258,6 @@ class star_db(_object):
 
     def count(self, *args):
         return _beast.star_db_count(self, *args)
-
-    def __iadd__(self, *args):
-        return _beast.star_db___iadd__(self, *args)
-
-    def __sub__(self, s):
-        return _beast.star_db___sub__(self, s)
-
-    def __and__(self, s):
-        return _beast.star_db___and__(self, s)
 
     def DBG_(self, s):
         return _beast.star_db_DBG_(self, s)
