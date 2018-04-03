@@ -1,4 +1,5 @@
 #!/bin/sh
+[ "$1" == "" ] && exit
 cd beast
 ./go&&
 cd ..&&
