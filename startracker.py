@@ -119,6 +119,8 @@ def print_ori(body2ECI):
 	DEC=np.degrees(np.arcsin(body2ECI[0,2]))
 	RA=np.degrees(np.arctan2(body2ECI[0,1],body2ECI[0,0]))
 	ORIENTATION=np.degrees(-np.arctan2(body2ECI[1,2],body2ECI[2,2]))
+	if ORIENTATION>180:
+		ORIENTATION=ORIENTATION-360
 
 	#rotation about the y axis (-90 to +90)
 	print >>sys.stderr, "DEC="+str(DEC)
