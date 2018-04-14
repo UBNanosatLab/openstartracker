@@ -100,14 +100,130 @@ TWOPI = _beast.TWOPI
 def load_config(filename):
     return _beast.load_config(filename)
 load_config = _beast.load_config
+class kdhash_2f(_object):
+    __swig_setmethods__ = {}
+    __setattr__ = lambda self, name, value: _swig_setattr(self, kdhash_2f, name, value)
+    __swig_getmethods__ = {}
+    __getattr__ = lambda self, name: _swig_getattr(self, kdhash_2f, name)
+    __repr__ = _swig_repr
+    __swig_getmethods__["hash"] = lambda x: _beast.kdhash_2f_hash
+    if _newclass:
+        hash = staticmethod(_beast.kdhash_2f_hash)
+    __swig_getmethods__["mask"] = lambda x: _beast.kdhash_2f_mask
+    if _newclass:
+        mask = staticmethod(_beast.kdhash_2f_mask)
 
-def xyz_hash(x, y, z):
-    return _beast.xyz_hash(x, y, z)
-xyz_hash = _beast.xyz_hash
+    def __init__(self):
+        this = _beast.new_kdhash_2f()
+        try:
+            self.this.append(this)
+        except Exception:
+            self.this = this
+    __swig_destroy__ = _beast.delete_kdhash_2f
+    __del__ = lambda self: None
+kdhash_2f_swigregister = _beast.kdhash_2f_swigregister
+kdhash_2f_swigregister(kdhash_2f)
+cvar = _beast.cvar
 
-def xyz_hash_mask(radians):
-    return _beast.xyz_hash_mask(radians)
-xyz_hash_mask = _beast.xyz_hash_mask
+_beast.DIAM_2F_swigconstant(_beast)
+DIAM_2F = _beast.DIAM_2F
+
+_beast.R_IN_2F_swigconstant(_beast)
+R_IN_2F = _beast.R_IN_2F
+
+_beast.R_OUT_2F_swigconstant(_beast)
+R_OUT_2F = _beast.R_OUT_2F
+
+def kdhash_2f_hash(x0, x1):
+    return _beast.kdhash_2f_hash(x0, x1)
+kdhash_2f_hash = _beast.kdhash_2f_hash
+
+def kdhash_2f_mask(radians):
+    return _beast.kdhash_2f_mask(radians)
+kdhash_2f_mask = _beast.kdhash_2f_mask
+
+class kdhash_3f(_object):
+    __swig_setmethods__ = {}
+    __setattr__ = lambda self, name, value: _swig_setattr(self, kdhash_3f, name, value)
+    __swig_getmethods__ = {}
+    __getattr__ = lambda self, name: _swig_getattr(self, kdhash_3f, name)
+    __repr__ = _swig_repr
+    __swig_getmethods__["hash"] = lambda x: _beast.kdhash_3f_hash
+    if _newclass:
+        hash = staticmethod(_beast.kdhash_3f_hash)
+    __swig_getmethods__["mask"] = lambda x: _beast.kdhash_3f_mask
+    if _newclass:
+        mask = staticmethod(_beast.kdhash_3f_mask)
+
+    def __init__(self):
+        this = _beast.new_kdhash_3f()
+        try:
+            self.this.append(this)
+        except Exception:
+            self.this = this
+    __swig_destroy__ = _beast.delete_kdhash_3f
+    __del__ = lambda self: None
+kdhash_3f_swigregister = _beast.kdhash_3f_swigregister
+kdhash_3f_swigregister(kdhash_3f)
+
+_beast.DIAM_3F_swigconstant(_beast)
+DIAM_3F = _beast.DIAM_3F
+
+_beast.R_IN_3F_swigconstant(_beast)
+R_IN_3F = _beast.R_IN_3F
+
+_beast.R_OUT_3F_swigconstant(_beast)
+R_OUT_3F = _beast.R_OUT_3F
+
+def kdhash_3f_hash(x0, x1, x2):
+    return _beast.kdhash_3f_hash(x0, x1, x2)
+kdhash_3f_hash = _beast.kdhash_3f_hash
+
+def kdhash_3f_mask(radians):
+    return _beast.kdhash_3f_mask(radians)
+kdhash_3f_mask = _beast.kdhash_3f_mask
+
+class kdhash_4f(_object):
+    __swig_setmethods__ = {}
+    __setattr__ = lambda self, name, value: _swig_setattr(self, kdhash_4f, name, value)
+    __swig_getmethods__ = {}
+    __getattr__ = lambda self, name: _swig_getattr(self, kdhash_4f, name)
+    __repr__ = _swig_repr
+    __swig_getmethods__["hash"] = lambda x: _beast.kdhash_4f_hash
+    if _newclass:
+        hash = staticmethod(_beast.kdhash_4f_hash)
+    __swig_getmethods__["mask"] = lambda x: _beast.kdhash_4f_mask
+    if _newclass:
+        mask = staticmethod(_beast.kdhash_4f_mask)
+
+    def __init__(self):
+        this = _beast.new_kdhash_4f()
+        try:
+            self.this.append(this)
+        except Exception:
+            self.this = this
+    __swig_destroy__ = _beast.delete_kdhash_4f
+    __del__ = lambda self: None
+kdhash_4f_swigregister = _beast.kdhash_4f_swigregister
+kdhash_4f_swigregister(kdhash_4f)
+
+_beast.DIAM_4F_swigconstant(_beast)
+DIAM_4F = _beast.DIAM_4F
+
+_beast.R_IN_4F_swigconstant(_beast)
+R_IN_4F = _beast.R_IN_4F
+
+_beast.R_OUT_4F_swigconstant(_beast)
+R_OUT_4F = _beast.R_OUT_4F
+
+def kdhash_4f_hash(x0, x1, x2, x3):
+    return _beast.kdhash_4f_hash(x0, x1, x2, x3)
+kdhash_4f_hash = _beast.kdhash_4f_hash
+
+def kdhash_4f_mask(radians):
+    return _beast.kdhash_4f_mask(radians)
+kdhash_4f_mask = _beast.kdhash_4f_mask
+
 class star(_object):
     __swig_setmethods__ = {}
     __setattr__ = lambda self, name, value: _swig_setattr(self, star, name, value)
@@ -178,7 +294,6 @@ class star(_object):
     __del__ = lambda self: None
 star_swigregister = _beast.star_swigregister
 star_swigregister(star)
-cvar = _beast.cvar
 
 
 def star_gt_x(s1, s2):
@@ -238,14 +353,20 @@ class star_db(_object):
     def __iadd__(self, *args):
         return _beast.star_db___iadd__(self, *args)
 
+    def OP(self, s):
+        return _beast.star_db_OP(self, s)
+
     def __sub__(self, s):
         return _beast.star_db___sub__(self, s)
 
     def __and__(self, s):
         return _beast.star_db___and__(self, s)
 
-    def get_star(self, idx):
-        return _beast.star_db_get_star(self, idx)
+    def get_star_by_hash(self, hash):
+        return _beast.star_db_get_star_by_hash(self, hash)
+
+    def get_star_by_idx(self, idx):
+        return _beast.star_db_get_star_by_idx(self, idx)
 
     def copy(self):
         return _beast.star_db_copy(self)
@@ -489,14 +610,14 @@ class constellation_db(_object):
     __swig_getmethods__ = {}
     __getattr__ = lambda self, name: _swig_getattr(self, constellation_db, name)
     __repr__ = _swig_repr
-    __swig_setmethods__["stars"] = _beast.constellation_db_stars_set
-    __swig_getmethods__["stars"] = _beast.constellation_db_stars_get
-    if _newclass:
-        stars = _swig_property(_beast.constellation_db_stars_get, _beast.constellation_db_stars_set)
     __swig_setmethods__["results"] = _beast.constellation_db_results_set
     __swig_getmethods__["results"] = _beast.constellation_db_results_get
     if _newclass:
         results = _swig_property(_beast.constellation_db_results_get, _beast.constellation_db_results_set)
+    __swig_setmethods__["stars"] = _beast.constellation_db_stars_set
+    __swig_getmethods__["stars"] = _beast.constellation_db_stars_get
+    if _newclass:
+        stars = _swig_property(_beast.constellation_db_stars_get, _beast.constellation_db_stars_set)
     __swig_setmethods__["map_size"] = _beast.constellation_db_map_size_set
     __swig_getmethods__["map_size"] = _beast.constellation_db_map_size_get
     if _newclass:
@@ -505,6 +626,18 @@ class constellation_db(_object):
     __swig_getmethods__["map"] = _beast.constellation_db_map_get
     if _newclass:
         map = _swig_property(_beast.constellation_db_map_get, _beast.constellation_db_map_set)
+
+    def kdsearch(self, x, y, z, r, min_flux):
+        return _beast.constellation_db_kdsearch(self, x, y, z, r, min_flux)
+
+    def clear_kdresults(self):
+        return _beast.constellation_db_clear_kdresults(self)
+
+    def r_size(self):
+        return _beast.constellation_db_r_size(self)
+
+    def from_kdresults(self):
+        return _beast.constellation_db_from_kdresults(self)
 
     def __init__(self, s, stars_per_fov, from_image):
         this = _beast.new_constellation_db(s, stars_per_fov, from_image)
@@ -588,14 +721,14 @@ class match_result(_object):
     def related(self, m):
         return _beast.match_result_related(self, m)
 
-    def search(self):
-        return _beast.match_result_search(self)
+    def search(self, star_hash_set):
+        return _beast.match_result_search(self, star_hash_set)
 
     def clear_search(self):
         return _beast.match_result_clear_search(self)
 
-    def compute_score(self):
-        return _beast.match_result_compute_score(self)
+    def compute_score(self, star_hash_set):
+        return _beast.match_result_compute_score(self, star_hash_set)
 
     def from_match(self):
         return _beast.match_result_from_match(self)

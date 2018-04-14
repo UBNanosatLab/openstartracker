@@ -57,12 +57,20 @@ bool constellation_lt_s2(const constellation &c1, const constellation &c2) {retu
 bool constellation_lt_p(const constellation &c1, const constellation &c2) {return c1.p < c2.p;}
 
 struct constellation_db {
-//TODO: private:
-	star_db* stars;
+private:
+public:
 	star_query* results;
+
+
+	star_db* stars;
 	size_t map_size;
 	constellation* map;
-public:
+	//Aliases for star_query functions
+	//TODO: remove
+	void kdsearch(float x, float y, float z, float r, float min_flux) {if (results->is_kdsorted()) results->kdsearch(x,y,z,r,min_flux);}
+	void clear_kdresults() {if (results->is_kdsorted()) results->clear_kdresults();}
+	size_t r_size() {return results->r_size();}
+	star_db* from_kdresults() {return results->from_kdresults();}
 	/**
 	* @brief TODO
 	*

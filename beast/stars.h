@@ -5,26 +5,67 @@
 
 #include <assert.h> //assert()
 #include <limits.h> //INT_MAX
+//stl for days
+#include <array> //sort, nth_element
 #include <algorithm> //sort, nth_element
 #include <set>
 #include <unordered_set>
 #include <map>
+#include <vector>
 #include <unordered_map>
 #include <iterator>     // std::next
 
+struct kdhash_2f {
+	#define DIAM_2F 0xffffffff
+	#define R_IN_2F (DIAM_2F/2)
+	#define R_OUT_2F (R_IN_2F+1)
+	#define INTERLEAVE_2F(X)\
+		if (X > DIAM_2F) X=DIAM_2F;\
+		if (X < 0) X=0;\
+		X = (X | X << 16) & 0xffff0000ffff;\
+		X = (X | X << 8) & 0xff00ff00ff00ff;\
+		X = (X | X << 4) & 0xf0f0f0f0f0f0f0f;\
+		X = (X | X << 2) & 0x3333333333333333;\
+		X = (X | X << 1) & 0x5555555555555555;
+	
+	/**
+	* @brief hash function which interleaves values so that nearby stars will have nearby hashes
+	* this approach also  also allows you to truncate the hash when less precision is needed
+	* 
+	* for the magic numbers used for interleaving, see:
+	* https://stackoverflow.com/questions/1024754/how-to-compute-a-3d-morton-number-interleave-the-bits-of-3-ints
+	*/
+	static size_t hash(float x0, float x1){
+		long h0=R_OUT_2F*(x0+1.0);
+		long h1=R_OUT_2F*(x1+1.0);
+		INTERLEAVE_2F(h0)
+		INTERLEAVE_2F(h1)
+		return h1<<1|h0;
+	}
+	/**
+	* @brief returns a mask which can be used to clamp the hash to a specified precision
+	* @param radians mask a range of this size, rounded up to the nearest power of two
+	*/
+	static size_t mask(float radians) {
+		long h0 = R_OUT_2F*radians;
+		if (h0 > R_IN_2F) h0=R_IN_2F;
+		if (h0 < 0) h0=0;
+		size_t mask=-1;
+		for (;h0;h0>>=1) mask<<=2;
+		return mask;
+	}
+	#undef INTERLEAVE_2F
+	#undef R_OUT_2F
+	#undef R_IN_2F
+	#undef DIAM_2F
+};
 
-//Sadness inducing bit twiddling stuff
-
-/**
-* @brief hash function which interleaves values so that nearby stars will have nearby hashes
-* this approach also  also allows you to truncate the hash when less precision is needed
-* 
-* for the magic numbers used for interleaving, see:
-* https://stackoverflow.com/questions/1024754/how-to-compute-a-3d-morton-number-interleave-the-bits-of-3-ints
-*/
-size_t xyz_hash(float x, float y,float z){
-	#define INTERLEAVE_THREE(X)\
-		if (X > 0x1fffff) X=0x1fffff;\
+struct kdhash_3f {
+	#define DIAM_3F 0x1fffff
+	#define R_IN_3F (DIAM_3F/2)
+	#define R_OUT_3F (R_IN_3F+1)
+	#define INTERLEAVE_3F(X)\
+		if (X > DIAM_3F) X=DIAM_3F;\
 		if (X < 0) X=0;\
 		X = (X | X <<32) & 0x001f00000000ffff;\
 		X = (X | X <<16) & 0x001f0000ff0000ff;\
@@ -32,28 +73,68 @@ size_t xyz_hash(float x, float y,float z){
 		X = (X | X << 4) & 0x10c30c30c30c30c3;\
 		X = (X | X << 2) & 0x1249249249249249;
 	
-	long h0=0x100000*(x+1.0);
-	long h1=0x100000*(y+1.0);
-	long h2=0x100000*(z+1.0);
-	INTERLEAVE_THREE(h0)
-	INTERLEAVE_THREE(h1)
-	INTERLEAVE_THREE(h2)
-	return h0<<2|h1<<1|h2;
+	static size_t hash(float x0, float x1, float x2){
+		long h0=R_OUT_3F*(x0+1.0);
+		long h1=R_OUT_3F*(x1+1.0);
+		long h2=R_OUT_3F*(x2+1.0);
+		INTERLEAVE_3F(h0)
+		INTERLEAVE_3F(h1)
+		INTERLEAVE_3F(h2)
+		return h2<<2|h1<<1|h0;
+	}
+
+	static size_t mask(float radians) {
+		long h0 = R_OUT_3F*radians;
+		if (h0 > R_IN_3F) h0=R_IN_3F;
+		if (h0 < 0) h0=0;
+		size_t mask=-1;
+		for (;h0;h0>>=1) mask<<=3;
+		return mask;
+	}
+	#undef INTERLEAVE_3F
+	#undef R_OUT_3F
+	#undef R_IN_3F
+	#undef DIAM_3F
+};
+
+struct kdhash_4f {
+	#define DIAM_4F 0xfffff
+	#define R_IN_4F (DIAM_4F/2)
+	#define R_OUT_4F (R_IN_4F+1)
+	#define INTERLEAVE_4F(X)\
+		if (X > DIAM_4F) X=DIAM_4F;\
+		if (X < 0) X=0;\
+		X = (X | X << 32) & 0xf800000007ff;\
+		X = (X | X << 16) & 0xf80007c0003f;\
+		X = (X | X << 8) & 0xc0380700c03807;\
+		X = (X | X << 4) & 0x843084308430843;\
+		X = (X | X << 2) & 0x909090909090909;\
+		X = (X | X << 1) & 0x1111111111111111;
 	
-	#undef INTERLEAVE_THREE
-}
-/**
-* @brief returns a mask which can be used to clamp the hash to a specified precision
-* @param radians mask a range of this size, rounded up to the nearest power of two
-*/
-size_t xyz_hash_mask(float radians) {
-	long h0 = 0x100000*radians;
-	if (h0 > 0xfffff) h0=0xfffff;
-	if (h0 < 0) h0=0;
-	size_t mask=-1;
-	for (;h0;h0>>=1) mask<<=3;
-	return mask;
-}
+	static size_t hash(float x0, float x1,float x2,float x3){
+		long h0=R_OUT_4F*(x0+1.0);
+		long h1=R_OUT_4F*(x1+1.0);
+		long h2=R_OUT_4F*(x2+1.0);
+		long h3=R_OUT_4F*(x3+1.0);
+		INTERLEAVE_4F(h0)
+		INTERLEAVE_4F(h1)
+		INTERLEAVE_4F(h2)
+		INTERLEAVE_4F(h3)
+		return h3<<3|h2<<2|h1<<1|h0;
+	}
+	static size_t mask(float radians) {
+		long h0 = R_OUT_4F*radians;
+		if (h0 > R_IN_4F) h0=R_IN_4F;
+		if (h0 < 0) h0=0;
+		size_t mask=-1;
+		for (;h0;h0>>=1) mask<<=4;
+		return mask;
+	}
+	#undef INTERLEAVE_4F
+	#undef R_OUT_4F
+	#undef R_IN_4F
+	#undef DIAM_4F
+};
 
 struct star {
 	float x;
@@ -92,7 +173,7 @@ struct star {
 		unreliable=0;
 		star_idx=-1;
 		sigma_sq=POS_VARIANCE;
-		hash_val=xyz_hash(x,y,z);
+		hash_val=kdhash_3f::hash(x,y,z);
 	}
 	
 	/**
@@ -118,7 +199,7 @@ struct star {
 		unreliable=0;
 		star_idx=-1;
 		sigma_sq=IMAGE_VARIANCE/flux;
-		hash_val=xyz_hash(x,y,z);
+		hash_val=kdhash_3f::hash(x,y,z);
 	}
 
 	#define OP operator==
@@ -137,9 +218,6 @@ struct star {
 		float c=y*s.z - s.y*z;
 		return (3600*180.0/PI)*asin(sqrt(a*a+b*b+c*c));
 	}
-	#undef OP
-	#define OP operator size_t
-	OP() const {return hash_val;}
 	#undef OP
 	/**
 	* @brief Print debug info
@@ -173,7 +251,7 @@ struct star_db {
 private:
 	std::unordered_map<size_t,star> hash_map;
 	std::set<size_t> hash_set;
-	std::map<int,size_t> star_idx_map;
+	std::vector<size_t> star_idx_vector;
 	std::multimap<float,size_t> flux_map;
 	size_t sz;
 
@@ -185,7 +263,7 @@ private:
 	 */
 	template<class T> star_db* copy(T first,T last) {
 		star_db* s = new star_db;
-		for (;first!=last;first++) (*s)+=hash_map[first->second];
+		for (;first!=last;first++) (*s)+=hash_map[*first];
 		return s;
 	}
 public:
@@ -204,31 +282,31 @@ public:
 	size_t size() {return sz;}
 	///Philosophically inspired by python sets
 	#define OP operator+=
+	star_db* OP(const star& s) { return *this+=&s;}
 	star_db* OP(const star* s) {
 		if (count(s)==0) {
 			if (max_variance<s->sigma_sq) max_variance=s->sigma_sq;
 			star temp=s[0];
 			temp.star_idx=size();
-			hash_map[temp]=temp;
-			hash_set.emplace(temp);
-			flux_map.emplace(temp.flux,temp);
-			star_idx_map.emplace(temp.star_idx,temp);
+			hash_map.emplace(temp.hash_val,temp);
+			hash_set.insert(temp.hash_val);
+			flux_map.emplace(temp.flux,temp.hash_val);
+			star_idx_vector.push_back(temp.hash_val);
 			sz++;
 		}
 		return this;
 	}
+	#undef OP
 	//TODO - faster to use insert?
 	star_db* OP(star_db* s) {
-		for (size_t i=0;i<s->size();i++) (*this)+=s->get_star(i);
+		for (size_t i=0;i<s->size();i++) (*this)+=s->get_star_by_idx(i);
 		return this;
 	}
-	star_db* OP(const star& s) { return *this+=&s;}
-	#undef OP
 	#define OP operator-
 	star_db* OP(star_db* s) {
 		star_db* r = new star_db;
-		for (auto it = star_idx_map.cbegin(); it != star_idx_map.cend(); ++it) {
-			if (s->hash_map.count(it->second)==0) *r+=hash_map[it->second];
+		for (auto it = star_idx_vector.cbegin(); it != star_idx_vector.cend(); ++it) {
+			if (s->hash_map.count(*it)==0) *r+=hash_map.at(*it);
 		}
 		return r;
 	}
@@ -236,8 +314,8 @@ public:
 	#define OP operator&
 	star_db* OP(star_db* s) {
 		star_db* r = new star_db;
-		for (auto it = star_idx_map.cbegin(); it != star_idx_map.cend(); ++it) {
-			if (s->hash_map.count(it->second)>0) *r+=hash_map[it->second];
+		for (auto it = star_idx_vector.cbegin(); it != star_idx_vector.cend(); ++it) {
+			if (s->hash_map.count(*it)>0) *r+=hash_map.at(*it);
 		}
 		return r;
 	}
@@ -247,30 +325,57 @@ public:
 	 * 
 	 * @param idx the index of the star 
 	 */
-	star* get_star(int idx) {return size()>0?&(hash_map[star_idx_map[idx]]):NULL;}
+	star* get_star_by_hash(size_t hash) {return &(hash_map.at(hash));}
+	/**
+	 * @brief returns stars in the order they were added
+	 * 
+	 * @param idx the index of the star 
+	 */
+	star* get_star_by_idx(int idx) {return get_star_by_hash(star_idx_vector[idx]);}
 	/**
 	* @brief make a copy of the star db
 	*/
-	star_db* copy() {return copy(star_idx_map.cbegin(),star_idx_map.cend());}
+	star_db* copy() {return copy(star_idx_vector.cbegin(),star_idx_vector.cend());}
 	/**
 	* @brief make a copy of the n brightest elements in the star db
 	*/
-	star_db* copy_n_brightest(size_t n) {return copy(flux_map.crbegin(),std::next(flux_map.crbegin(),std::min(n,size())));}
+	star_db* copy_n_brightest(size_t n) {
+		//return copy(flux_map.crbegin(),std::next(flux_map.crbegin(),std::min(n,size())));
+		star_db* s = new star_db;
+		auto first=flux_map.crbegin();
+		auto last=std::next(flux_map.crbegin(),std::min(n,size()));
+		for (;first!=last;first++) (*s)+=get_star_by_hash(first->second);
+		return s;
+	}
+	//std::array* n_brightest(T &hs,n) {
+	//	
+	//}
 	/**
 	* @brief return stars in the bounding volume around the specified star
-	* @param r minimum radius of the bounding volume (radians).
+	* @param r minimum radius of the bounding volume (arcseconds).
 	* 
 	*/
 	//TODO: group together by hash_lb,ub, n_brightest_search (maybe return a list?) 
 	template<class T> void search(T &hs, float x,float y,float z, float r, float min_flux) {
-		size_t mask=xyz_hash_mask(r);
+		r=r/3600.0;
+		r=r*PI/180.0;
+		r=2*fabs(sin(r/2.0));
+		size_t mask=kdhash_3f::mask(r);
 		for (int8_t dx=-1;dx<=1;dx++) for (int8_t dy=-1;dy<=1;dy++) for (int8_t dz=-1;dz<=1;dz++) {
-			size_t h=xyz_hash(x+dx*r,y+dy*r,z+dz*r);
+			size_t h=kdhash_3f::hash(x+dx*r,y+dy*r,z+dz*r);
 			auto first = hash_set.lower_bound(h&mask);
 			auto last = hash_set.upper_bound(h|(~mask));
-			star *s=&hash_map[*first];
-			for (;first!=last;first++) if (min_flux <= s->flux && s->x*s->x+s->y*s->y+s->z*s->z<=r*r) hs.insert(*first);
+			for (;first!=last;first++) {
+				star *s=get_star_by_hash(*first);
+				float dist_x=s->x-x;
+				float dist_y=s->y-y;
+				float dist_z=s->z-z;
+				if (dist_x*dist_x+dist_y*dist_y+dist_z*dist_z<=r*r) {
+					if (min_flux <= s->flux) hs.insert(*first);
+				}
+			}
 		}
+		//printf("%f\n",rat2/rat1);
 	}
 
 
@@ -309,10 +414,10 @@ public:
 		
 	}
 
-	size_t count(const star* s) {return hash_map.count(*s);}
+	size_t count(const star* s) {return hash_map.count(s->hash_val);}
 	size_t count(star_db* s) {
 		size_t n=0;
-		for (size_t i=0;i<s->size();i++) n+=count(s->get_star(i));
+		for (size_t i=0;i<s->size();i++) n+=count(s->get_star_by_idx(i));
 		return n;
 	}
 	
@@ -323,7 +428,7 @@ public:
 		DBG_PRINT("max_variance=%f\n",max_variance);
 		for (size_t i=0; i<size(); i++) {
 			DBG_PRINT("%lu:\t",i);
-			get_star(i)->DBG_("star");
+			get_star_by_idx(i)->DBG_("star");
 		}
 	}
 };
@@ -436,8 +541,8 @@ public:
 			sigma_sq=stars->max_variance+db_max_variance;
 			maxdist_sq=-sigma_sq*(log(sigma_sq)+MATCH_VALUE);
 			float maxdist=sqrt(maxdist_sq);
-			s_px[id]=stars->get_star(id)->px;
-			s_py[id]=stars->get_star(id)->py;
+			s_px[id]=stars->get_star_by_idx(id)->px;
+			s_py[id]=stars->get_star_by_idx(id)->py;
 			
 			int xmin=s_px[id]-maxdist-1;
 			int xmax=s_px[id]+maxdist+1;
@@ -535,7 +640,7 @@ public:
 		kdresults=(size_t*)malloc((map_size+1)*sizeof(kdresults[0]));
 		map=(star*)malloc(map_size*sizeof(map[0]));
 		for (size_t i=0;i<map_size;i++){
-			map[i]=stars->get_star(i)[0];
+			map[i]=stars->get_star_by_idx(i)[0];
 			kdresults[i]=i;
 		}
 		reset_kdmask();
@@ -635,8 +740,6 @@ public:
 		if (dim==0) kdsearch_x(x, y, z, 2*fabs(sin(r_rad/2.0)), min_flux,min,max);
 		else if (dim==1) kdsearch_y(x, y, z, 2*fabs(sin(r_rad/2.0)), min_flux,min,max);
 		else if (dim==2) kdsearch_z(x, y, z, 2*fabs(sin(r_rad/2.0)), min_flux,min,max);
-		//std::unordered_set<size_t> s;
-		//stars->search(s,x,y,z,r_rad,min_flux);
 	}
 	void kdsearch(float x, float y, float z, float r, float min_flux) {
 		kdsearch(x, y, z, r, min_flux,0,stars->size(),0);

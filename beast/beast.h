@@ -88,15 +88,23 @@ public:
 	/**
 	* @brief TODO
 	*/
-	void search() {if (db->results->is_kdsorted()) db->results->kdsearch(R11,R21,R31,MAXFOV/2,THRESH_FACTOR*IMAGE_VARIANCE);}
+	void search(std::unordered_set<size_t> &star_hash_set) {
+		star_hash_set.clear();
+		db->stars->search(star_hash_set,R11,R21,R31,MAXFOV/2,THRESH_FACTOR*IMAGE_VARIANCE);
+		//db->kdsearch(R11,R21,R31,MAXFOV/2,THRESH_FACTOR*IMAGE_VARIANCE);
+		//for(size_t i=0;i<db->r_size();i++) {
+		//	auto hash=db->results->map[db->results->kdresults[i]].hash_val;
+		//	star_hash_set.insert(hash);
+		//}
+	}
 	/**
 	* @brief TODO
 	*/
-	void clear_search() {if (db->results->is_kdsorted()) db->results->clear_kdresults();}
+	void clear_search() {db->clear_kdresults();}
 	/**
 	* @brief TODO
 	*/
-	void compute_score() {
+	void compute_score(std::unordered_set<size_t> &star_hash_set) {
 		//TODO: figure out where 2*map_size came from
 		match.totalscore=log(1.0/(IMG_X*IMG_Y))*(2*map_size);
 		float* scores=(float *)malloc(sizeof(float)*map_size);
@@ -104,8 +112,14 @@ public:
 			map[i]=-1;
 			scores[i]=0.0;
 		}
-		for(size_t i=0;i<db->results->r_size();i++) {
-			star *s=&(db->results->map[db->results->kdresults[i]]);
+		//star_db *temp=db->from_kdresults();
+		for (auto hash=star_hash_set.cbegin(); hash!=star_hash_set.cend(); ++hash) {
+		//for(size_t i=0;i<db->r_size();i++) {
+		//for(size_t i=0;i<temp->size();i++) {
+		//	star *s=&(db->results->map[db->results->kdresults[i]]);
+			//auto hash=db->results->map[db->results->kdresults[i]].hash_val;
+			star *s=db->stars->get_star_by_hash(*hash);
+			//star *s=temp->get_star(i);
 			int o=s->star_idx;
 			float x=s->x*R11+s->y*R21+s->z*R31;
 			float y=s->x*R12+s->y*R22+s->z*R32;
@@ -122,6 +136,7 @@ public:
 				}
 			}
 		}
+		
 		for(size_t n=0;n<map_size;n++) {
 			match.totalscore+=scores[n];
 		}
@@ -138,9 +153,9 @@ public:
 		for(size_t n=0;n<map_size;n++) {
 			//catalog matching
 			if (map[n]!=-1) {
-				s->get_star(img->stars->get_star(n)->star_idx)[0]=db->stars->get_star(map[n])[0];
+				s->get_star_by_idx(img->stars->get_star_by_idx(n)->star_idx)[0]=db->stars->get_star_by_idx(map[n])[0];
 			} else {
-				s->get_star(img->stars->get_star(n)->star_idx)->id=-1;
+				s->get_star_by_idx(img->stars->get_star_by_idx(n)->star_idx)->id=-1;
 			}
 		}
 		return s;
@@ -156,10 +171,10 @@ public:
 	* we can perform >250 MFLOPS with doubles, and >500 MFLOPS with floats
 	*/
 	void weighted_triad() {
-		star *db_s1=db->stars->get_star(match.db_s1);
-		star *db_s2=db->stars->get_star(match.db_s2);
-		star *img_s1=img->stars->get_star(match.img_s1);
-		star *img_s2=img->stars->get_star(match.img_s2);
+		star *db_s1=db->stars->get_star_by_idx(match.db_s1);
+		star *db_s2=db->stars->get_star_by_idx(match.db_s2);
+		star *img_s1=img->stars->get_star_by_idx(match.img_s1);
+		star *img_s2=img->stars->get_star_by_idx(match.img_s2);
 		
 		/* v=A*w */
 		float wa1=db_s1->x,wa2=db_s1->y,wa3=db_s1->z;
@@ -191,6 +206,7 @@ public:
 		float waXwc3=wa1*wc2 - wa2*wc1;
 		
 		/* some of these are unused */
+		
 		float A11=va1*wa1 + vaXvc1*waXwc1 + vc1*wc1;
 		/* float A12=va1*wa2 + vaXvc1*waXwc2 + vc1*wc2; */
 		/* float A13=va1*wa3 + vaXvc1*waXwc3 + vc1*wc3; */
@@ -215,7 +231,7 @@ public:
 		float wbXwc1=wb2*wc3 - wb3*wc2;
 		float wbXwc2=wb3*wc1 - wb1*wc3;
 		float wbXwc3=wb1*wc2 - wb2*wc1;
-
+		
 		/* some of these are unused */
 		float B11=vb1*wb1 + vbXvc1*wbXwc1 + vc1*wc1;
 		/* float B12=vb1*wb2 + vbXvc1*wbXwc2 + vc1*wc2; */
@@ -231,7 +247,7 @@ public:
 		/* weighted triad */
 		float weightA=1.0/(db_s1->sigma_sq+img_s1->sigma_sq);
 		float weightB=1.0/(db_s2->sigma_sq+img_s2->sigma_sq);
-
+		
 		float sumAB=weightA+weightB;
 		weightA/=sumAB;
 		weightB/=sumAB;
@@ -323,11 +339,12 @@ public:
 		//find stars
 		match_result *m=new match_result(db, img, img_mask);
 		winner=new match_result(db, img, img_mask);
+		std::unordered_set<size_t> star_hash_set;
 		for (size_t n=0;n<img->map_size;n++) {
 			constellation lb=img->map[n];
 			constellation ub=img->map[n];
-			lb.p-=POS_ERR_SIGMA*PIXSCALE*sqrt(img->stars->get_star(lb.s1)->sigma_sq+img->stars->get_star(lb.s2)->sigma_sq+2*db->stars->max_variance);
-			ub.p+=POS_ERR_SIGMA*PIXSCALE*sqrt(img->stars->get_star(ub.s1)->sigma_sq+img->stars->get_star(ub.s2)->sigma_sq+2*db->stars->max_variance);
+			lb.p-=POS_ERR_SIGMA*PIXSCALE*sqrt(img->stars->get_star_by_idx(lb.s1)->sigma_sq+img->stars->get_star_by_idx(lb.s2)->sigma_sq+2*db->stars->max_variance);
+			ub.p+=POS_ERR_SIGMA*PIXSCALE*sqrt(img->stars->get_star_by_idx(ub.s1)->sigma_sq+img->stars->get_star_by_idx(ub.s2)->sigma_sq+2*db->stars->max_variance);
 			constellation *lower=std::lower_bound (db->map, db->map+db->map_size, lb,constellation_lt_p);	
 			constellation *upper=std::upper_bound (db->map, db->map+db->map_size, ub,constellation_lt_p);
 			//rewind upper & do sanity checks
@@ -339,10 +356,10 @@ public:
 			for (int o=lower->idx;o<=upper->idx;o++) {
 				m->init(db->map[o],img->map[n]);
 				m->weighted_triad();
-				m->search();
+				m->search(star_hash_set);
 
 				#define ADD_SCORE\
-					m->compute_score();\
+					m->compute_score(star_hash_set);\
 					if (m->match.totalscore>winner->match.totalscore) {\
 						if (winner->match.totalscore!=-FLT_MAX) c_pairs[c_pairs_size++]=winner->match;\
 						m->copy_over(winner);\
