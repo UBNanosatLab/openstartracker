@@ -41,6 +41,7 @@ SQ_RESULTS.kdmask_filter_catalog()
 SQ_RESULTS.kdmask_uniform_density(beast.cvar.REQUIRED_STARS)
 S_FILTERED=SQ_RESULTS.from_kdmask()
 print "Generating DB" 
+#Two because we are looking at pairs of stars, plus however many extra we want
 C_DB=beast.constellation_db(S_FILTERED,2+beast.cvar.DB_REDUNDANCY,0)
 print "Ready"
 def a2q(A):
@@ -56,11 +57,6 @@ def q2a(q):
 	q=q/LA.norm(q)
 	return np.array([[q[0]**2-q[1]**2-q[2]**2+q[3]**2,2*(q[0]*q[1]+q[2]*q[3]),2*(q[0]*q[2]-q[1]*q[3])],[2*(q[0]*q[1]-q[2]*q[3]),-q[0]**2+q[1]**2-q[2]**2+q[3]**2,2*(q[1]*q[2]+q[0]*q[3])],[2*(q[0]*q[2]+q[1]*q[3]),2*(q[1]*q[2]-q[0]*q[3]),-q[0]**2-q[1]**2+q[2]**2+q[3]**2]])
 
-#A=prev_body2ECI
-#B=curr_body2ECI
-#t1=prev_updatetime
-#t2=curr_updatetime
-#t3=present_time
 def extrapolate_matrix(A,B,t1,t2,t3):
 	# Calculate error angles between A and B via small angle approximation
 	# of MRPs.

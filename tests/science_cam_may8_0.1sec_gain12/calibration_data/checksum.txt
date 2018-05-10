@@ -1,0 +1,10 @@
+d6ae09e1c266dd85733f64f0f6e65686  science_cam//samples/img0.png
+bf06ba6767aa787e15f3a4e7ae2163d1  science_cam//samples/img1.png
+de9b3bdf2d03744676b15ac6f0a36b83  science_cam//samples/img2.png
+29175cf8c404bb1441d8ddb7a12b2804  science_cam//samples/img3.png
+7890b1037fd21278478fd9abb94c52da  science_cam//samples/img4.png
+f6770c0575a41788b4ac7f99543639c0  science_cam//samples/img5.png
+ef108fbd4d817e0c11a406a55bc5cca2  science_cam//samples/img6.png
+fbc2f9e66265ec20860d53656e3c1b8f  science_cam//samples/img7.png
+e916e2d2bdc991111b766e1344e2f42d  science_cam//samples/img8.png
+63494c2078a8265c4c801d6312790ec5  science_cam//samples/img9.png

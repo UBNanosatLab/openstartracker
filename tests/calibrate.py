@@ -11,7 +11,7 @@ from scipy import spatial
 
 ## Environment variables:
 try: EXPOSURE_TIME = float(environ['EXPOSURE_TIME'])
-except KeyError: EXPOSURE_TIME = 0.03 # s
+except KeyError: EXPOSURE_TIME = 0.05 # s
 try: APERTURE = float(environ['APERTURE'])
 except KeyError: APERTURE = 60.7 # mm
 try: DOUBLE_STAR_PX = float(environ['DOUBLE_STAR_PX'])

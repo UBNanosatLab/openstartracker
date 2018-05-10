@@ -61,7 +61,6 @@ private:
 public:
 	star_query* results;
 
-
 	star_db* stars;
 	size_t map_size;
 	constellation* map;
@@ -78,7 +77,7 @@ public:
 	* @param stars_per_fov
 	* @param from_image
 	*/
-	constellation_db(star_db *s,int stars_per_fov, int from_image) {
+	constellation_db(star_db *s,const int stars_per_fov, const int from_image) {
 		DBG_CONSTELLATION_DB_COUNT++;
 		DBG_PRINT("DBG_CONSTELLATION_DB_COUNT++ %d\n",DBG_CONSTELLATION_DB_COUNT);
 

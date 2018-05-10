@@ -1,0 +1,10 @@
+182be4a617ad39719ac970332a995ccc  science_cam_may8_0.04sec_gain40//samples/img0.png
+679d05caee2371e5d877e5cd233212ce  science_cam_may8_0.04sec_gain40//samples/img1.png
+1c61281b74a31a98a257d117481e5ebc  science_cam_may8_0.04sec_gain40//samples/img2.png
+d116474c484f6468bc07333fb4fd5b08  science_cam_may8_0.04sec_gain40//samples/img3.png
+53ae3825eff0fa7c995b625f432b778b  science_cam_may8_0.04sec_gain40//samples/img4.png
+ffde3728cfa83f5454e576605819d335  science_cam_may8_0.04sec_gain40//samples/img5.png
+14572031eabf1cdef6ed643debc51544  science_cam_may8_0.04sec_gain40//samples/img6.png
+37595a937bbc668c7575f873140ebf11  science_cam_may8_0.04sec_gain40//samples/img7.png
+739b152b9bb7c82a990d321cc575453b  science_cam_may8_0.04sec_gain40//samples/img8.png
+b94f773b9371cd72359d9c473d4a3bc7  science_cam_may8_0.04sec_gain40//samples/img9.png

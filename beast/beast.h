@@ -88,23 +88,14 @@ public:
 	/**
 	* @brief TODO
 	*/
-	void search(std::unordered_set<size_t> &star_hash_set) {
+	void search(std::unordered_set<uint64_t> &star_hash_set) {
 		star_hash_set.clear();
 		db->stars->search(star_hash_set,R11,R21,R31,MAXFOV/2,THRESH_FACTOR*IMAGE_VARIANCE);
-		//db->kdsearch(R11,R21,R31,MAXFOV/2,THRESH_FACTOR*IMAGE_VARIANCE);
-		//for(size_t i=0;i<db->r_size();i++) {
-		//	auto hash=db->results->map[db->results->kdresults[i]].hash_val;
-		//	star_hash_set.insert(hash);
-		//}
 	}
 	/**
 	* @brief TODO
 	*/
-	void clear_search() {db->clear_kdresults();}
-	/**
-	* @brief TODO
-	*/
-	void compute_score(std::unordered_set<size_t> &star_hash_set) {
+	void compute_score(std::unordered_set<uint64_t> &star_hash_set) {
 		//TODO: figure out where 2*map_size came from
 		match.totalscore=log(1.0/(IMG_X*IMG_Y))*(2*map_size);
 		float* scores=(float *)malloc(sizeof(float)*map_size);
@@ -112,14 +103,8 @@ public:
 			map[i]=-1;
 			scores[i]=0.0;
 		}
-		//star_db *temp=db->from_kdresults();
 		for (auto hash=star_hash_set.cbegin(); hash!=star_hash_set.cend(); ++hash) {
-		//for(size_t i=0;i<db->r_size();i++) {
-		//for(size_t i=0;i<temp->size();i++) {
-		//	star *s=&(db->results->map[db->results->kdresults[i]]);
-			//auto hash=db->results->map[db->results->kdresults[i]].hash_val;
 			star *s=db->stars->get_star_by_hash(*hash);
-			//star *s=temp->get_star(i);
 			int o=s->star_idx;
 			float x=s->x*R11+s->y*R21+s->z*R31;
 			float y=s->x*R12+s->y*R22+s->z*R32;
@@ -332,14 +317,13 @@ public:
 		c_pairs=NULL;
 		c_pairs_size=0;
 		p_match=0.0;
-//TODO - set size to 4 in python
 		if (db->stars->size()<3||img->stars->size()<3) return;
 		img_mask = new star_fov(img->stars,db->stars->max_variance);
 		
 		//find stars
 		match_result *m=new match_result(db, img, img_mask);
 		winner=new match_result(db, img, img_mask);
-		std::unordered_set<size_t> star_hash_set;
+		std::unordered_set<uint64_t> star_hash_set;
 		for (size_t n=0;n<img->map_size;n++) {
 			constellation lb=img->map[n];
 			constellation ub=img->map[n];
@@ -370,7 +354,6 @@ public:
 				m->match.flip();
 				m->weighted_triad();
 				ADD_SCORE
-				m->clear_search();
 			}
 		}
 		delete m;
