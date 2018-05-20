@@ -125,15 +125,14 @@ if __name__ == '__main__':
 		if len(astrometry_results[i])>maxstars:
 			bestimage=i
 			maxstars=len(astrometry_results[i])
-	astrometry_results_all=np.vstack(astrometry_results.values())
+	astrometry_results_all=np.vstack(np.array(astrometry_results.values()))
 	
 	#find the dimmest star
 	dimmest_match = astrometry_results_all[np.argmax(astrometry_results_all[:,1]),:]
 
 	BASE_FLUX=dimmest_match[8]/pow(10.0,-dimmest_match[1]/2.5)
 	
-	db_img_dist=astrometry_results_all[:,9:11]-astrometry_results_all[:,11:13]
-	db_img_dist=np.sqrt(np.sum(db_img_dist*db_img_dist,axis=1))
+	db_img_dist=np.linalg.norm(astrometry_results_all[:,9:11]-astrometry_results_all[:,11:13],axis=1)
 	db_img_dist=db_img_dist-IMAGE_VARIANCE/(astrometry_results_all[:,8])
 	
 	POS_VARIANCE=np.mean(db_img_dist)
