@@ -360,6 +360,13 @@ public:
 		
 		//calculate map
 		if (winner->match.totalscore!=-FLT_MAX) { //Did we even match?
+			/**
+			 * normalize the posterior to find the probability that the best match is the correct one
+			 * this relies on three assumptions:
+			 * 1. The sample point is approximately the maximum likelihood
+			 * 2. The probability distribution around the sample points are all the same
+			 * 3. the probability outside of the range od sampled points is approximately zero
+			 */
 			//calculate p_match
 			p_match=1.0;
 			for (size_t idx=0; idx<c_pairs_size;idx++) {

@@ -132,7 +132,8 @@ if __name__ == '__main__':
 
 	BASE_FLUX=dimmest_match[8]/pow(10.0,-dimmest_match[1]/2.5)
 	
-	db_img_dist=np.linalg.norm(astrometry_results_all[:,9:11]-astrometry_results_all[:,11:13],axis=1)
+	db_img_dist=astrometry_results_all[:,9:11]-astrometry_results_all[:,11:13]
+	db_img_dist=np.sqrt(np.sum(db_img_dist*db_img_dist,axis=1))
 	db_img_dist=db_img_dist-IMAGE_VARIANCE/(astrometry_results_all[:,8])
 	
 	POS_VARIANCE=np.mean(db_img_dist)
