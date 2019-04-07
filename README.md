@@ -35,7 +35,7 @@ sudo wget http://data.astrometry.net/4100/index-4119.fits
 git clone https://github.com/UBNanosatLab/openstartracker.git
 
 cd openstartracker/tests
-./unit_test.sh -crei xmas
+./unit_test.sh -crei science_cam_may8_0.05sec_gain40
 ~~~~
 ##### To calibrate a new camera:
 ~~~~

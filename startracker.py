@@ -57,6 +57,11 @@ def q2a(q):
 	q=q/LA.norm(q)
 	return np.array([[q[0]**2-q[1]**2-q[2]**2+q[3]**2,2*(q[0]*q[1]+q[2]*q[3]),2*(q[0]*q[2]-q[1]*q[3])],[2*(q[0]*q[1]-q[2]*q[3]),-q[0]**2+q[1]**2-q[2]**2+q[3]**2,2*(q[1]*q[2]+q[0]*q[3])],[2*(q[0]*q[2]+q[1]*q[3]),2*(q[1]*q[2]-q[0]*q[3]),-q[0]**2-q[1]**2+q[2]**2+q[3]**2]])
 
+#A=prev_body2ECI
+#B=curr_body2ECI
+#t1=prev_updatetime
+#t2=curr_updatetime
+#t3=present_time
 def extrapolate_matrix(A,B,t1,t2,t3):
 	# Calculate error angles between A and B via small angle approximation
 	# of MRPs.
@@ -208,7 +213,7 @@ class star_image:
 		w=last_match.match.winner
 		#convert the stars to ECI
 		for i in range(img_stars_from_lm.size()):
-			s=img_stars_from_lm.get_star_by_idx(i)
+			s=img_stars_from_lm.get_star(i)
 			x=s.x*w.R11+s.y*w.R12+s.z*w.R13
 			y=s.x*w.R21+s.y*w.R22+s.z*w.R23
 			z=s.x*w.R31+s.y*w.R32+s.z*w.R33
@@ -241,8 +246,8 @@ class star_image:
 		assert(db.size()==im.size())
 		star_out=[]
 		for i in range(db.size()):
-			s_im=im.get_star_by_idx(i)
-			s_db=db.get_star_by_idx(i)
+			s_im=im.get_star(i)
+			s_db=db.get_star(i)
 			if (s_db.id>=0):
 				weight=1.0/(s_db.sigma_sq+s_im.sigma_sq)
 				temp=np.dot(bodyCorrection, np.array([[s_im.x],[s_im.y],[s_im.z]]))
@@ -261,13 +266,13 @@ class nonstar:
 		global NONSTARS,NONSTAR_NEXT_ID,NONSTAR_DATAFILENAME,NONSTAR_DATAFILE
 		self.id=NONSTAR_NEXT_ID
 		NONSTARS[self.id]=self
-		current_image.img_stars.get_star_by_idx(i).id=self.id
+		current_image.img_stars.get_star(i).id=self.id
 		NONSTAR_NEXT_ID+=1
 		self.data=[]
 		self.add_data(current_image,i,source)
 		
 	def add_data(self,current_image,i,source):
-		s_im=current_image.img_stars.get_star_by_idx(i)
+		s_im=current_image.img_stars.get_star(i)
 		s_db_x=0.0
 		s_db_y=0.0
 		s_db_z=0.0
@@ -310,11 +315,11 @@ def update_nonstars(current_image,source):
 	if (db_lm!=None):
 		assert(db_lm.size()==im.size())
 		for i in range(im.size()):
-			im.get_star_by_idx(i).id=db_lm.get_star_by_idx(i).id
+			im.get_star(i).id=db_lm.get_star(i).id
 	for i in range(im.size()):
-		s_im=im.get_star_by_idx(i)
+		s_im=im.get_star(i)
 		#is this a star? if so remove from nonstars
-		if (db != None and db.get_star_by_idx(i).id>=0):
+		if (db != None and db.get_star(i).id>=0):
 			if (s_im.id in NONSTARS):
 				del NONSTARS[s_im.id]
 			s_im.id=-1

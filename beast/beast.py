@@ -161,8 +161,8 @@ class star(_object):
     def __eq__(self, s):
         return _beast.star___eq__(self, s)
 
-    def __mul__(self, s):
-        return _beast.star___mul__(self, s)
+    def dist_arcsec(self, s):
+        return _beast.star_dist_arcsec(self, s)
 
     def DBG_(self, s):
         return _beast.star_DBG_(self, s)
@@ -242,8 +242,8 @@ class star_db(_object):
     def get_star_by_hash(self, hash):
         return _beast.star_db_get_star_by_hash(self, hash)
 
-    def get_star_by_idx(self, idx):
-        return _beast.star_db_get_star_by_idx(self, idx)
+    def get_star(self, idx):
+        return _beast.star_db_get_star(self, idx)
 
     def copy(self):
         return _beast.star_db_copy(self)
@@ -487,14 +487,14 @@ class constellation_db(_object):
     __swig_getmethods__ = {}
     __getattr__ = lambda self, name: _swig_getattr(self, constellation_db, name)
     __repr__ = _swig_repr
-    __swig_setmethods__["results"] = _beast.constellation_db_results_set
-    __swig_getmethods__["results"] = _beast.constellation_db_results_get
-    if _newclass:
-        results = _swig_property(_beast.constellation_db_results_get, _beast.constellation_db_results_set)
     __swig_setmethods__["stars"] = _beast.constellation_db_stars_set
     __swig_getmethods__["stars"] = _beast.constellation_db_stars_get
     if _newclass:
         stars = _swig_property(_beast.constellation_db_stars_get, _beast.constellation_db_stars_set)
+    __swig_setmethods__["results"] = _beast.constellation_db_results_set
+    __swig_getmethods__["results"] = _beast.constellation_db_results_get
+    if _newclass:
+        results = _swig_property(_beast.constellation_db_results_get, _beast.constellation_db_results_set)
     __swig_setmethods__["map_size"] = _beast.constellation_db_map_size_set
     __swig_getmethods__["map_size"] = _beast.constellation_db_map_size_get
     if _newclass:
@@ -503,18 +503,6 @@ class constellation_db(_object):
     __swig_getmethods__["map"] = _beast.constellation_db_map_get
     if _newclass:
         map = _swig_property(_beast.constellation_db_map_get, _beast.constellation_db_map_set)
-
-    def kdsearch(self, x, y, z, r, min_flux):
-        return _beast.constellation_db_kdsearch(self, x, y, z, r, min_flux)
-
-    def clear_kdresults(self):
-        return _beast.constellation_db_clear_kdresults(self)
-
-    def r_size(self):
-        return _beast.constellation_db_r_size(self)
-
-    def from_kdresults(self):
-        return _beast.constellation_db_from_kdresults(self)
 
     def __init__(self, s, stars_per_fov, from_image):
         this = _beast.new_constellation_db(s, stars_per_fov, from_image)
@@ -598,11 +586,14 @@ class match_result(_object):
     def related(self, m):
         return _beast.match_result_related(self, m)
 
-    def search(self, star_hash_set):
-        return _beast.match_result_search(self, star_hash_set)
+    def search(self):
+        return _beast.match_result_search(self)
 
-    def compute_score(self, star_hash_set):
-        return _beast.match_result_compute_score(self, star_hash_set)
+    def clear_search(self):
+        return _beast.match_result_clear_search(self)
+
+    def compute_score(self):
+        return _beast.match_result_compute_score(self)
 
     def from_match(self):
         return _beast.match_result_from_match(self)

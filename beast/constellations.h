@@ -57,19 +57,12 @@ bool constellation_lt_s2(const constellation &c1, const constellation &c2) {retu
 bool constellation_lt_p(const constellation &c1, const constellation &c2) {return c1.p < c2.p;}
 
 struct constellation_db {
-private:
-public:
-	star_query* results;
-
+//TODO: private:
 	star_db* stars;
+	star_query* results;
 	size_t map_size;
 	constellation* map;
-	//Aliases for star_query functions
-	//TODO: remove
-	void kdsearch(float x, float y, float z, float r, float min_flux) {if (results->is_kdsorted()) results->kdsearch(x,y,z,r,min_flux);}
-	void clear_kdresults() {if (results->is_kdsorted()) results->clear_kdresults();}
-	size_t r_size() {return results->r_size();}
-	star_db* from_kdresults() {return results->from_kdresults();}
+public:
 	/**
 	* @brief TODO
 	*
@@ -80,7 +73,6 @@ public:
 	constellation_db(star_db *s,const int stars_per_fov, const int from_image) {
 		DBG_CONSTELLATION_DB_COUNT++;
 		DBG_PRINT("DBG_CONSTELLATION_DB_COUNT++ %d\n",DBG_CONSTELLATION_DB_COUNT);
-
 
 		if (from_image) {
 			stars=s->copy();
@@ -95,7 +87,7 @@ public:
 			
 			int idx=0;
 			for (int j=1;j<ns;j++) for (int i=0;i<j;i++,idx++) {
-				map[idx].p=results->map[i]*results->map[j];
+				map[idx].p=results->map[i].dist_arcsec(results->map[j]);
 				map[idx].s1=results->map[i].star_idx;
 				map[idx].s2=results->map[j].star_idx;
 			}
@@ -110,7 +102,7 @@ public:
 				results->kdsearch(results->map[i].x,results->map[i].y,results->map[i].z,MAXFOV,THRESH_FACTOR*IMAGE_VARIANCE);
 				constellation c;
 				for (size_t j=0;j<results->r_size();j++) if (i!=results->kdresults[j] && results->map[i].flux>=results->map[results->kdresults[j]].flux){
-					c.p=results->map[i]*results->map[results->kdresults[j]];
+					c.p=results->map[i].dist_arcsec(results->map[results->kdresults[j]]);
 					c.s1=results->map[i].star_idx;
 					c.s2=results->map[results->kdresults[j]].star_idx;
 					c_set.insert(c);

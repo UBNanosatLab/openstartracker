@@ -91,14 +91,12 @@ struct star {
 	* @param s Star
 	* @return Angular seperation in arcsec
 	*/
-	#define OP operator*
-	float OP(const star& s) const {
+	float dist_arcsec(const star& s) const {
 		float a=x*s.y - s.x*y;
 		float b=x*s.z - s.x*z;
 		float c=y*s.z - s.y*z;
 		return (3600*180.0/PI)*asin(sqrt(a*a+b*b+c*c));
 	}
-	#undef OP
 	/**
 	* @brief Print debug info
 	* @param s Label
@@ -179,7 +177,7 @@ public:
 	#undef OP
 	//TODO - faster to use insert?
 	star_db* OP(star_db* s) {
-		for (size_t i=0;i<s->size();i++) (*this)+=s->get_star_by_idx(i);
+		for (size_t i=0;i<s->size();i++) (*this)+=s->get_star(i);
 		return this;
 	}
 	#define OP operator-
@@ -211,7 +209,7 @@ public:
 	 * 
 	 * @param idx the index of the star 
 	 */
-	star* get_star_by_idx(const int idx) {return get_star_by_hash(star_idx_vector[idx]);}
+	star* get_star(const int idx) {return size()>0?get_star_by_hash(star_idx_vector[idx]):NULL;}
 	/**
 	* @brief make a copy of the star db
 	*/
@@ -296,7 +294,7 @@ public:
 	size_t count(const star* s) {return hash_map.count(s->hash_val);}
 	size_t count(star_db* s) {
 		size_t n=0;
-		for (size_t i=0;i<s->size();i++) n+=count(s->get_star_by_idx(i));
+		for (size_t i=0;i<s->size();i++) n+=count(s->get_star(i));
 		return n;
 	}
 	
@@ -307,7 +305,7 @@ public:
 		DBG_PRINT("max_variance=%f\n",max_variance);
 		for (size_t i=0; i<size(); i++) {
 			DBG_PRINT("%lu:\t",i);
-			get_star_by_idx(i)->DBG_("star");
+			get_star(i)->DBG_("star");
 		}
 	}
 };
@@ -420,8 +418,8 @@ public:
 			sigma_sq=stars->max_variance+db_max_variance;
 			maxdist_sq=-sigma_sq*(log(sigma_sq)+MATCH_VALUE);
 			float maxdist=sqrt(maxdist_sq);
-			s_px[id]=stars->get_star_by_idx(id)->px;
-			s_py[id]=stars->get_star_by_idx(id)->py;
+			s_px[id]=stars->get_star(id)->px;
+			s_py[id]=stars->get_star(id)->py;
 			
 			int xmin=s_px[id]-maxdist-1;
 			int xmax=s_px[id]+maxdist+1;
@@ -470,12 +468,12 @@ struct star_query {
 	size_t map_size;
 	size_t *kdresults;
 private:
-	star_db *stars;
 	uint8_t kdsorted;
 	
 	size_t kdresults_size;
 	int8_t *kdmask;
 	size_t kdresults_maxsize;
+	star_db *stars;
 		 
 	 /** You may be looking at the most compact kd-tree in existence
 	 *  It does not use pointers or indexes or leaf nodes or any extra memory
@@ -519,7 +517,7 @@ public:
 		kdresults=(size_t*)malloc((map_size+1)*sizeof(kdresults[0]));
 		map=(star*)malloc(map_size*sizeof(map[0]));
 		for (size_t i=0;i<map_size;i++){
-			map[i]=stars->get_star_by_idx(i)[0];
+			map[i]=stars->get_star(i)[0];
 			kdresults[i]=i;
 		}
 		reset_kdmask();
@@ -578,7 +576,12 @@ public:
 		x-=map[idx].x;
 		y-=map[idx].y;
 		z-=map[idx].z;
-		if (x-r <= 0 && 0 <= x+r && y-r <= 0 && 0 <= y+r &&z-r <= 0 && 0 <= z+r && min_flux <= map[idx].flux && kdmask[idx] == 0 && x*x+y*y+z*z<=r*r) {
+		if (x-r <= 0 && 0 <= x+r &&
+			y-r <= 0 && 0 <= y+r &&
+			z-r <= 0 && 0 <= z+r &&
+			min_flux <= map[idx].flux &&
+			kdmask[idx] == 0 &&
+			x*x+y*y+z*z<=r*r) {
 			kdmask[idx]=1;
 			/* Insertion sort into list from brightest to dimmest.
 			 * 
