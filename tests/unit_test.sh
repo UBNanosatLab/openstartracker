@@ -5,6 +5,8 @@ REGENERATE=0
 ESA_TEST=0
 IMG_TEST=0
 
+PYTHON="/usr/bin/python2.7"
+
 while getopts ":crei" opt; do
   case $opt in
     c)
@@ -58,11 +60,11 @@ if [[ $IMG_TEST == 1 ]]; then
 fi
 if [[ $CALIBRATE == 1 ]]; then
 	echo "Calibrating..."
-	time python2.7 calibrate.py $TESTDIR || exit
+	time $PYTHON calibrate.py $TESTDIR || exit
 fi
 if [[ $REGENERATE == 1 ]]; then
 	echo "Regenerating..."
-	time python2.7 simulator.py $TESTDIR/calibration.txt $TESTDIR/input.csv $TESTDIR/result.csv || exit
+	time $PYTHON simulator.py $TESTDIR/calibration.txt $TESTDIR/input.csv $TESTDIR/result.csv || exit
 fi
 
 if [[ $ESA_TEST == 1 ]]; then
@@ -72,11 +74,11 @@ if [[ $ESA_TEST == 1 ]]; then
 	gprof test | gprof2dot -s | dot -Tpdf -o test.pdf &&
 	echo "camera coverage simulation percent:" &&
 	echo "100-`diff --suppress-common-lines --speed-large-files -y $TESTDIR/result.csv $TESTDIR/result_real.csv | wc -l`/1" | bc -l &&
-	python2.7 score.py $TESTDIR/result.csv $TESTDIR/result_real.csv 
+	$PYTHON score.py $TESTDIR/result.csv $TESTDIR/result_real.csv 
 fi
 
 if [[ $IMG_TEST == 1 ]]; then
-	$@ python2.7 startracker.py $TESTDIR/calibration.txt 1991.25 $TESTDIR/median_image.png &
+	$@ $PYTHON startracker.py $TESTDIR/calibration.txt 1991.25 $TESTDIR/median_image.png &
 	KILLPID="$!"
 	sleep 10
 	#make sure we dont crash when given an image w/ no stars
