@@ -2,58 +2,19 @@
 #define STARS_H
 
 #include "config.h"
+#include "kdhash.h"
 
 #include <assert.h> //assert()
 #include <limits.h> //INT_MAX
+//stl for days
+#include <array> //sort, nth_element
 #include <algorithm> //sort, nth_element
 #include <set>
 #include <unordered_set>
 #include <map>
+#include <vector>
 #include <unordered_map>
 #include <iterator>     // std::next
-
-
-//Sadness inducing bit twiddling stuff
-
-/**
-* @brief hash function which interleaves values so that nearby stars will have nearby hashes
-* this approach also  also allows you to truncate the hash when less precision is needed
-* 
-* for the magic numbers used for interleaving, see:
-* https://stackoverflow.com/questions/1024754/how-to-compute-a-3d-morton-number-interleave-the-bits-of-3-ints
-*/
-size_t xyz_hash(float x, float y,float z){
-	#define INTERLEAVE_THREE(X)\
-		if (X > 0x1fffff) X=0x1fffff;\
-		if (X < 0) X=0;\
-		X = (X | X <<32) & 0x001f00000000ffff;\
-		X = (X | X <<16) & 0x001f0000ff0000ff;\
-		X = (X | X << 8) & 0x100f00f00f00f00f;\
-		X = (X | X << 4) & 0x10c30c30c30c30c3;\
-		X = (X | X << 2) & 0x1249249249249249;
-	
-	long h0=0x100000*(x+1.0);
-	long h1=0x100000*(y+1.0);
-	long h2=0x100000*(z+1.0);
-	INTERLEAVE_THREE(h0)
-	INTERLEAVE_THREE(h1)
-	INTERLEAVE_THREE(h2)
-	return h0<<2|h1<<1|h2;
-	
-	#undef INTERLEAVE_THREE
-}
-/**
-* @brief returns a mask which can be used to clamp the hash to a specified precision
-* @param radians mask a range of this size, rounded up to the nearest power of two
-*/
-size_t xyz_hash_mask(float radians) {
-	long h0 = 0x100000*radians;
-	if (h0 > 0xfffff) h0=0xfffff;
-	if (h0 < 0) h0=0;
-	size_t mask=-1;
-	for (;h0;h0>>=1) mask<<=3;
-	return mask;
-}
 
 struct star {
 	float x;
@@ -79,7 +40,7 @@ struct star {
 	* @param id User defined id
 	*/
 	star(){};
-	star(float x_, float y_, float z_, float flux_, int id_) {
+	star(const float x_, const float y_, const float z_, const float flux_, const int id_) {
 		x=x_;
 		y=y_;
 		z=z_;
@@ -92,7 +53,7 @@ struct star {
 		unreliable=0;
 		star_idx=-1;
 		sigma_sq=POS_VARIANCE;
-		hash_val=xyz_hash(x,y,z);
+		hash_val=kdhash_3f::hash(x,y,z);
 	}
 	
 	/**
@@ -103,7 +64,7 @@ struct star {
 	* @param flux Pixel brightness
 	* @param id  User defined id
 	*/
-	star(float px_, float py_, float flux_, int id_) {
+	star(const float px_, const float py_, const float flux_, const int id_) {
 		px=px_;
 		py=py_;
 		flux=flux_;
@@ -118,7 +79,7 @@ struct star {
 		unreliable=0;
 		star_idx=-1;
 		sigma_sq=IMAGE_VARIANCE/flux;
-		hash_val=xyz_hash(x,y,z);
+		hash_val=kdhash_3f::hash(x,y,z);
 	}
 
 	#define OP operator==
@@ -130,17 +91,12 @@ struct star {
 	* @param s Star
 	* @return Angular seperation in arcsec
 	*/
-	#define OP operator*
-	float OP(const star& s) const {
+	float dist_arcsec(const star& s) const {
 		float a=x*s.y - s.x*y;
 		float b=x*s.z - s.x*z;
 		float c=y*s.z - s.y*z;
 		return (3600*180.0/PI)*asin(sqrt(a*a+b*b+c*c));
 	}
-	#undef OP
-	#define OP operator size_t
-	OP() const {return hash_val;}
-	#undef OP
 	/**
 	* @brief Print debug info
 	* @param s Label
@@ -171,10 +127,10 @@ bool star_lt_flux(const star &s1, const star &s2) {return s1.flux < s2.flux;}
 
 struct star_db {
 private:
-	std::unordered_map<size_t,star> hash_map;
-	std::set<size_t> hash_set;
-	std::map<int,size_t> star_idx_map;
-	std::multimap<float,size_t> flux_map;
+	std::unordered_map<uint64_t,star> hash_map;
+	std::set<uint64_t> hash_set;
+	std::vector<uint64_t> star_idx_vector;
+	std::multimap<float,uint64_t> flux_map;
 	size_t sz;
 
 	/**
@@ -185,7 +141,7 @@ private:
 	 */
 	template<class T> star_db* copy(T first,T last) {
 		star_db* s = new star_db;
-		for (;first!=last;first++) (*s)+=hash_map[first->second];
+		for (;first!=last;first++) (*s)+=hash_map[*first];
 		return s;
 	}
 public:
@@ -204,40 +160,40 @@ public:
 	size_t size() {return sz;}
 	///Philosophically inspired by python sets
 	#define OP operator+=
+	star_db* OP(const star& s) { return *this+=&s;}
 	star_db* OP(const star* s) {
 		if (count(s)==0) {
 			if (max_variance<s->sigma_sq) max_variance=s->sigma_sq;
 			star temp=s[0];
 			temp.star_idx=size();
-			hash_map[temp]=temp;
-			hash_set.emplace(temp);
-			flux_map.emplace(temp.flux,temp);
-			star_idx_map.emplace(temp.star_idx,temp);
+			hash_map.emplace(temp.hash_val,temp);
+			hash_set.insert(temp.hash_val);
+			flux_map.emplace(temp.flux,temp.hash_val);
+			star_idx_vector.push_back(temp.hash_val);
 			sz++;
 		}
 		return this;
 	}
+	#undef OP
 	//TODO - faster to use insert?
 	star_db* OP(star_db* s) {
 		for (size_t i=0;i<s->size();i++) (*this)+=s->get_star(i);
 		return this;
 	}
-	star_db* OP(const star& s) { return *this+=&s;}
-	#undef OP
 	#define OP operator-
-	star_db* OP(star_db* s) {
+	star_db* OP(const star_db* s) {
 		star_db* r = new star_db;
-		for (auto it = star_idx_map.cbegin(); it != star_idx_map.cend(); ++it) {
-			if (s->hash_map.count(it->second)==0) *r+=hash_map[it->second];
+		for (auto it = star_idx_vector.cbegin(); it != star_idx_vector.cend(); ++it) {
+			if (s->hash_map.count(*it)==0) *r+=hash_map.at(*it);
 		}
 		return r;
 	}
 	#undef OP
 	#define OP operator&
-	star_db* OP(star_db* s) {
+	star_db* OP(const star_db* s) {
 		star_db* r = new star_db;
-		for (auto it = star_idx_map.cbegin(); it != star_idx_map.cend(); ++it) {
-			if (s->hash_map.count(it->second)>0) *r+=hash_map[it->second];
+		for (auto it = star_idx_vector.cbegin(); it != star_idx_vector.cend(); ++it) {
+			if (s->hash_map.count(*it)>0) *r+=hash_map.at(*it);
 		}
 		return r;
 	}
@@ -247,29 +203,55 @@ public:
 	 * 
 	 * @param idx the index of the star 
 	 */
-	star* get_star(int idx) {return size()>0?&(hash_map[star_idx_map[idx]]):NULL;}
+	star* get_star_by_hash(const size_t hash) {return &(hash_map.at(hash));}
+	/**
+	 * @brief returns stars in the order they were added
+	 * 
+	 * @param idx the index of the star 
+	 */
+	star* get_star(const int idx) {return size()>0?get_star_by_hash(star_idx_vector[idx]):NULL;}
 	/**
 	* @brief make a copy of the star db
 	*/
-	star_db* copy() {return copy(star_idx_map.cbegin(),star_idx_map.cend());}
+	star_db* copy() {return copy(star_idx_vector.cbegin(),star_idx_vector.cend());}
 	/**
 	* @brief make a copy of the n brightest elements in the star db
 	*/
-	star_db* copy_n_brightest(size_t n) {return copy(flux_map.crbegin(),std::next(flux_map.crbegin(),std::min(n,size())));}
+	star_db* copy_n_brightest(const size_t n) {
+		//return copy(flux_map.crbegin(),std::next(flux_map.crbegin(),std::min(n,size())));
+		star_db* s = new star_db;
+		auto first=flux_map.crbegin();
+		auto last=std::next(flux_map.crbegin(),std::min(n,size()));
+		for (;first!=last;first++) (*s)+=get_star_by_hash(first->second);
+		return s;
+	}
+	//std::array* n_brightest(T &hs,n) {
+	//	
+	//}
 	/**
 	* @brief return stars in the bounding volume around the specified star
-	* @param r minimum radius of the bounding volume (radians).
+	* @param r minimum radius of the bounding volume (arcseconds).
 	* 
 	*/
 	//TODO: group together by hash_lb,ub, n_brightest_search (maybe return a list?) 
-	template<class T> void search(T &hs, float x,float y,float z, float r, float min_flux) {
-		size_t mask=xyz_hash_mask(r);
+	template<class T> void search(T &hs, const float x,const float y,const float z, float r, const float min_flux) {
+		r=r/3600.0;
+		r=r*PI/180.0;
+		r=2*fabs(sin(r/2.0));
+		size_t mask=kdhash_3f::mask(r);
 		for (int8_t dx=-1;dx<=1;dx++) for (int8_t dy=-1;dy<=1;dy++) for (int8_t dz=-1;dz<=1;dz++) {
-			size_t h=xyz_hash(x+dx*r,y+dy*r,z+dz*r);
+			size_t h=kdhash_3f::hash(x+dx*r,y+dy*r,z+dz*r);
 			auto first = hash_set.lower_bound(h&mask);
 			auto last = hash_set.upper_bound(h|(~mask));
-			star *s=&hash_map[*first];
-			for (;first!=last;first++) if (min_flux <= s->flux && s->x*s->x+s->y*s->y+s->z*s->z<=r*r) hs.insert(*first);
+			for (;first!=last;first++) {
+				star *s=get_star_by_hash(*first);
+				float dist_x=s->x-x;
+				float dist_y=s->y-y;
+				float dist_z=s->z-z;
+				if (dist_x*dist_x+dist_y*dist_y+dist_z*dist_z<=r*r) {
+					if (min_flux <= s->flux) hs.insert(*first);
+				}
+			}
 		}
 	}
 
@@ -280,7 +262,7 @@ public:
 	* @param catalog path to hip_main.dat
 	* @param year Update star positions to the specified year
 	*/
-	void load_catalog(const char* catalog, float year) {
+	void load_catalog(const char* catalog, const float year) {
 		FILE *stream = fopen(catalog, "r");
 		if (stream == NULL) exit(EXIT_FAILURE);
 		max_variance=POS_VARIANCE;
@@ -309,7 +291,7 @@ public:
 		
 	}
 
-	size_t count(const star* s) {return hash_map.count(*s);}
+	size_t count(const star* s) {return hash_map.count(s->hash_val);}
 	size_t count(star_db* s) {
 		size_t n=0;
 		for (size_t i=0;i<s->size();i++) n+=count(s->get_star(i));
@@ -351,7 +333,7 @@ private:
 	*
 	* @return The id of whichever star is the best match to the coordinates in question 
 	*/
-	int resolve_id(int id,float px,float py) {
+	int resolve_id(int id,const float px,const float py) {
 		if (id>=-1) return id;
 		//Any id <-1 is interpreted as an index in the collision buffer (starts at -2)
 		id=-id;
@@ -370,7 +352,7 @@ public:
 	*
 	* @return 
 	*/
-	float get_score(int id,float px,float py) {
+	float get_score(const int id,const float px,const float py) {
 		float sigma_sq,maxdist_sq;
 		sigma_sq=stars->max_variance+db_max_variance;
 		maxdist_sq=-sigma_sq*(log(sigma_sq)+MATCH_VALUE);
@@ -393,7 +375,7 @@ public:
 	*
 	* @return 
 	*/
-	float get_score(int id,float px,float py,float sigma_sq,float maxdist_sq) {
+	float get_score(const int id,const float px,const float py,const float sigma_sq,const float maxdist_sq) {
 		float dx=px-s_px[id];
 		float dy=py-s_py[id];
 		if (dx<-0.5) dx+=1.0;/* use whichever corner of the pixel gives the best score */
@@ -418,7 +400,7 @@ public:
 	* @param s
 	* @param db_max_variance_
 	*/
-	star_fov(star_db* s, float db_max_variance_) {
+	star_fov(star_db* s, const float db_max_variance_) {
 		DBG_STAR_FOV_COUNT++;
 		DBG_PRINT("DBG_STAR_FOV_COUNT++ %d\n",DBG_STAR_FOV_COUNT);
 		db_max_variance=db_max_variance_;
@@ -513,9 +495,9 @@ private:
 			if (max-(mid+1)>KDBUCKET_SIZE) B(mid+1,max);\
 			else std::sort(map+(mid+1), map+max,star_gt_flux);\
 		}
-	void kdsort_x(int min, int max) {KDSORT_NEXT(star_lt_x,kdsort_y)}
-	void kdsort_y(int min, int max) {KDSORT_NEXT(star_lt_y,kdsort_z)}
-	void kdsort_z(int min, int max) {KDSORT_NEXT(star_lt_z,kdsort_x)}
+	void kdsort_x(const int min, const int max) {KDSORT_NEXT(star_lt_x,kdsort_y)}
+	void kdsort_y(const int min, const int max) {KDSORT_NEXT(star_lt_y,kdsort_z)}
+	void kdsort_z(const int min, const int max) {KDSORT_NEXT(star_lt_z,kdsort_x)}
 	#undef KDSORT_NEXT
 public:
 	/**
@@ -590,11 +572,16 @@ public:
 	* @param r
 	* @param min_flux
 	*/
-	void kdcheck(int idx, float x, float y, float z, float r, float min_flux){
+	void kdcheck(const int idx, float x, float y, float z, const float r, const float min_flux){
 		x-=map[idx].x;
 		y-=map[idx].y;
 		z-=map[idx].z;
-		if (x-r <= 0 && 0 <= x+r && y-r <= 0 && 0 <= y+r &&z-r <= 0 && 0 <= z+r && min_flux <= map[idx].flux && kdmask[idx] == 0 && x*x+y*y+z*z<=r*r) {
+		if (x-r <= 0 && 0 <= x+r &&
+			y-r <= 0 && 0 <= y+r &&
+			z-r <= 0 && 0 <= z+r &&
+			min_flux <= map[idx].flux &&
+			kdmask[idx] == 0 &&
+			x*x+y*y+z*z<=r*r) {
 			kdmask[idx]=1;
 			/* Insertion sort into list from brightest to dimmest.
 			 * 
@@ -628,15 +615,13 @@ public:
 	* @param max		end of bounding box
 	* @param dim		start dimension
 	*/
-	void kdsearch(float x, float y, float z, float r, float min_flux, int min, int max, int dim) {
+	void kdsearch(const float x, const float y, const float z, const float r, const float min_flux, const int min, const int max, const int dim) {
 		kdsort();
 		float r_deg=r/3600.0;
 		float r_rad=r_deg*PI/180.0;
 		if (dim==0) kdsearch_x(x, y, z, 2*fabs(sin(r_rad/2.0)), min_flux,min,max);
 		else if (dim==1) kdsearch_y(x, y, z, 2*fabs(sin(r_rad/2.0)), min_flux,min,max);
 		else if (dim==2) kdsearch_z(x, y, z, 2*fabs(sin(r_rad/2.0)), min_flux,min,max);
-		//std::unordered_set<size_t> s;
-		//stars->search(s,x,y,z,r_rad,min_flux);
 	}
 	void kdsearch(float x, float y, float z, float r, float min_flux) {
 		kdsearch(x, y, z, r, min_flux,0,stars->size(),0);
@@ -654,9 +639,9 @@ public:
 			if (max-(mid+1)>KDBUCKET_SIZE) D(x,y,z,r,min_flux,mid+1,max);\
 			else for (int i=mid+1;i<max&&min_flux<=map[i].flux;i++)kdcheck(i,x,y,z,r,min_flux);\
 		}
-	void kdsearch_x(const float x, const float y, const float z, const float r, float min_flux, int min, int max) {KDSEARCH_NEXT(x-r,x,x+r,kdsearch_y)}
-	void kdsearch_y(const float x, const float y, const float z, const float r, float min_flux, int min, int max) {KDSEARCH_NEXT(y-r,y,y+r,kdsearch_z)}
-	void kdsearch_z(const float x, const float y, const float z, const float r, float min_flux, int min, int max) {KDSEARCH_NEXT(z-r,z,z+r,kdsearch_x)}
+	void kdsearch_x(const float x, const float y, const float z, const float r, float min_flux, const int min, const int max) {KDSEARCH_NEXT(x-r,x,x+r,kdsearch_y)}
+	void kdsearch_y(const float x, const float y, const float z, const float r, float min_flux, const int min, const int max) {KDSEARCH_NEXT(y-r,y,y+r,kdsearch_z)}
+	void kdsearch_z(const float x, const float y, const float z, const float r, float min_flux, const int min, const int max) {KDSEARCH_NEXT(z-r,z,z+r,kdsearch_x)}
 	#undef KDSEARCH_NEXT
 
 	/**
@@ -666,7 +651,7 @@ public:
 		for (size_t i=0;i<stars->size();i++) {
 			int8_t lastmask=kdmask[i];
 			kdsearch(map[i].x,map[i].y,map[i].z,DOUBLE_STAR_PX*PIXSCALE,THRESH_FACTOR*IMAGE_VARIANCE);
-			//TODO uncomment for real stars
+			//TODO: this seems to remove more stars than it should
 			//if (kdresults_size>1||lastmask || map[i].flux<THRESH_FACTOR*IMAGE_VARIANCE||map[i].unreliable>0) {
 			if (kdresults_size>1||lastmask || map[i].flux<THRESH_FACTOR*IMAGE_VARIANCE) {
 				kdmask[i]=1;
@@ -680,7 +665,7 @@ public:
 	* @brief Masks the dimmest stars in each area to produce a map with uniform density 
 	* @param min_stars_per_fov Don't mask anything which could result in less than this many stars per field of view
 	*/
-	void kdmask_uniform_density(int min_stars_per_fov) {
+	void kdmask_uniform_density(const int min_stars_per_fov) {
 		std::unordered_set<int> uniform_set;
 		int kdresults_maxsize_old=kdresults_maxsize;
 		kdresults_maxsize=min_stars_per_fov;

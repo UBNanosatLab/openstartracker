@@ -70,10 +70,9 @@ public:
 	* @param stars_per_fov
 	* @param from_image
 	*/
-	constellation_db(star_db *s,int stars_per_fov, int from_image) {
+	constellation_db(star_db *s,const int stars_per_fov, const int from_image) {
 		DBG_CONSTELLATION_DB_COUNT++;
 		DBG_PRINT("DBG_CONSTELLATION_DB_COUNT++ %d\n",DBG_CONSTELLATION_DB_COUNT);
-
 
 		if (from_image) {
 			stars=s->copy();
@@ -88,7 +87,7 @@ public:
 			
 			int idx=0;
 			for (int j=1;j<ns;j++) for (int i=0;i<j;i++,idx++) {
-				map[idx].p=results->map[i]*results->map[j];
+				map[idx].p=results->map[i].dist_arcsec(results->map[j]);
 				map[idx].s1=results->map[i].star_idx;
 				map[idx].s2=results->map[j].star_idx;
 			}
@@ -103,7 +102,7 @@ public:
 				results->kdsearch(results->map[i].x,results->map[i].y,results->map[i].z,MAXFOV,THRESH_FACTOR*IMAGE_VARIANCE);
 				constellation c;
 				for (size_t j=0;j<results->r_size();j++) if (i!=results->kdresults[j] && results->map[i].flux>=results->map[results->kdresults[j]].flux){
-					c.p=results->map[i]*results->map[results->kdresults[j]];
+					c.p=results->map[i].dist_arcsec(results->map[results->kdresults[j]]);
 					c.s1=results->map[i].star_idx;
 					c.s2=results->map[results->kdresults[j]].star_idx;
 					c_set.insert(c);

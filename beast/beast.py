@@ -100,14 +100,6 @@ TWOPI = _beast.TWOPI
 def load_config(filename):
     return _beast.load_config(filename)
 load_config = _beast.load_config
-
-def xyz_hash(x, y, z):
-    return _beast.xyz_hash(x, y, z)
-xyz_hash = _beast.xyz_hash
-
-def xyz_hash_mask(radians):
-    return _beast.xyz_hash_mask(radians)
-xyz_hash_mask = _beast.xyz_hash_mask
 class star(_object):
     __swig_setmethods__ = {}
     __setattr__ = lambda self, name, value: _swig_setattr(self, star, name, value)
@@ -169,8 +161,8 @@ class star(_object):
     def __eq__(self, s):
         return _beast.star___eq__(self, s)
 
-    def __mul__(self, s):
-        return _beast.star___mul__(self, s)
+    def dist_arcsec(self, s):
+        return _beast.star_dist_arcsec(self, s)
 
     def DBG_(self, s):
         return _beast.star_DBG_(self, s)
@@ -238,11 +230,17 @@ class star_db(_object):
     def __iadd__(self, *args):
         return _beast.star_db___iadd__(self, *args)
 
+    def OP(self, s):
+        return _beast.star_db_OP(self, s)
+
     def __sub__(self, s):
         return _beast.star_db___sub__(self, s)
 
     def __and__(self, s):
         return _beast.star_db___and__(self, s)
+
+    def get_star_by_hash(self, hash):
+        return _beast.star_db_get_star_by_hash(self, hash)
 
     def get_star(self, idx):
         return _beast.star_db_get_star(self, idx)

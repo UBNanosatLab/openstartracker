@@ -121,7 +121,7 @@ public:
 					scores[n]=score;
 				}
 			}
-		}
+		}		
 		for(size_t n=0;n<map_size;n++) {
 			match.totalscore+=scores[n];
 		}
@@ -191,6 +191,7 @@ public:
 		float waXwc3=wa1*wc2 - wa2*wc1;
 		
 		/* some of these are unused */
+		
 		float A11=va1*wa1 + vaXvc1*waXwc1 + vc1*wc1;
 		/* float A12=va1*wa2 + vaXvc1*waXwc2 + vc1*wc2; */
 		/* float A13=va1*wa3 + vaXvc1*waXwc3 + vc1*wc3; */
@@ -215,7 +216,7 @@ public:
 		float wbXwc1=wb2*wc3 - wb3*wc2;
 		float wbXwc2=wb3*wc1 - wb1*wc3;
 		float wbXwc3=wb1*wc2 - wb2*wc1;
-
+		
 		/* some of these are unused */
 		float B11=vb1*wb1 + vbXvc1*wbXwc1 + vc1*wc1;
 		/* float B12=vb1*wb2 + vbXvc1*wbXwc2 + vc1*wc2; */
@@ -231,7 +232,7 @@ public:
 		/* weighted triad */
 		float weightA=1.0/(db_s1->sigma_sq+img_s1->sigma_sq);
 		float weightB=1.0/(db_s2->sigma_sq+img_s2->sigma_sq);
-
+		
 		float sumAB=weightA+weightB;
 		weightA/=sumAB;
 		weightB/=sumAB;
@@ -316,7 +317,6 @@ public:
 		c_pairs=NULL;
 		c_pairs_size=0;
 		p_match=0.0;
-//TODO - set size to 4 in python
 		if (db->stars->size()<3||img->stars->size()<3) return;
 		img_mask = new star_fov(img->stars,db->stars->max_variance);
 		
@@ -360,6 +360,13 @@ public:
 		
 		//calculate map
 		if (winner->match.totalscore!=-FLT_MAX) { //Did we even match?
+			/**
+			 * normalize the posterior to find the probability that the best match is the correct one
+			 * this relies on three assumptions:
+			 * 1. The sample point is approximately the maximum likelihood
+			 * 2. The probability distribution around the sample points are all the same
+			 * 3. the probability outside of the range od sampled points is approximately zero
+			 */
 			//calculate p_match
 			p_match=1.0;
 			for (size_t idx=0; idx<c_pairs_size;idx++) {

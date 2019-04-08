@@ -30,6 +30,7 @@
 # Imports
 # -------
 
+from __future__ import print_function
 import pandas as pd
 import numpy as np
 import math
@@ -406,17 +407,16 @@ class StarDetector:
     @staticmethod
     def norm_gaussian(sigma):
         return math.erf((2*sigma)**-0.5)**2/4.
-        
-    def compute_flux(self, magnitude, add_noise=True):
+    #photon_floor is the cutoff at which we can round the number of photons from a star down to zero
+    def compute_flux(self, magnitude, add_noise=True,photon_floor=0.001):
         flux = self.base_flux * (10 ** (-magnitude / 2.5))
 
         if add_noise:
             flux = flux + np.random.normal(0, IMAGE_VARIANCE, len(flux))
             
             flux_per_photon = self.base_flux* self.t_exp * self.aperture ** 2 * np.pi/BASE_PHOTONS
-            flux += flux_per_photon*np.random.normal(0, self.norm_gaussian(self.sigma_psf)*np.sqrt(flux/flux_per_photon), len(flux))
-
-        return flux
+            flux += flux_per_photon*np.random.normal(0, self.norm_gaussian(self.sigma_psf)*np.sqrt(np.clip(flux/flux_per_photon,photon_floor,None)), len(flux))
+        return np.clip(flux,photon_floor*flux_per_photon,None)
 
     def compute_magnitude(self, flux):
         return -2.5 * np.log10(flux / self.base_flux)
@@ -525,7 +525,10 @@ class Scene:
     def scramble(self):
         """Scrambles the order of stars in a scene."""
 
-        scramble_index = np.random.permutation(range(len(self.ids)))
+        scramble_index = np.random.permutation(range(len(self.ids)))    #permutation returns ndarray
+        
+        if len(scramble_index) == 0:
+            return None
 
         self.pos = self.pos[scramble_index, ...]
         self.magnitudes = self.magnitudes[scramble_index]
@@ -618,8 +621,8 @@ if __name__ == '__main__':
 
 	catalog = StarCatalog()
 	cameras = [
-		RectilinearCamera,
-		EquidistantCamera,
+		RectilinearCamera,  #no distortion
+		EquidistantCamera,  # the rest model barrel and pin-cushion distortion
 		EquisolidAngleCamera,
 		StereographicCamera,
 		OrthographicCamera,

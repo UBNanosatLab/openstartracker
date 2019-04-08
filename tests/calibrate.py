@@ -1,3 +1,4 @@
+from __future__ import print_function
 from os import listdir,system,environ
 from os.path import isfile, join
 import cv2
@@ -11,7 +12,7 @@ from scipy import spatial
 
 ## Environment variables:
 try: EXPOSURE_TIME = float(environ['EXPOSURE_TIME'])
-except KeyError: EXPOSURE_TIME = 0.03 # s
+except KeyError: EXPOSURE_TIME = 0.05 # s
 try: APERTURE = float(environ['APERTURE'])
 except KeyError: APERTURE = 60.7 # mm
 try: DOUBLE_STAR_PX = float(environ['DOUBLE_STAR_PX'])
@@ -79,12 +80,13 @@ if __name__ == '__main__':
 	samplepath=sys.argv[1]+"/samples"
 	image_names = [ f for f in listdir(samplepath) if isfile(join(samplepath,f)) ]
 	num_images=len(image_names)
+	#NOTE: if you get NoneType error, delete non-png files
 	images = np.asarray([cv2.imread( join(samplepath,image_names[n]) ).astype(float) for n in range(0, num_images)])
 	median_image=np.median(images,axis=0)
 	cv2.imwrite(sys.argv[1]+"/median_image.png",median_image)
 	system("md5sum "+samplepath+"/* >"+sys.argv[1]+"/checksum.txt")
 	if system("diff -q "+sys.argv[1]+"/checksum.txt "+sys.argv[1]+"/calibration_data/checksum.txt")!=0:
-		print "Clearing old calibration data:"
+		print ("Clearing old calibration data:")
 		system("rm -rfv "+sys.argv[1]+"/calibration_data/* ")
 	
 	system("mv "+sys.argv[1]+"/checksum.txt "+sys.argv[1]+"/calibration_data/checksum.txt")
@@ -99,10 +101,11 @@ if __name__ == '__main__':
 		img=np.clip(images[n],a_min=0,a_max=255).astype(np.uint8)
 		cv2.imwrite(image_name,img)
 		solve_cmd="solve-field --skip-solved --cpulimit 60 "+image_name
-		print solve_cmd
+		#solve_cmd="solve-field --skip-solved --cpulimit 60 -v "+image_name #verbose
+		print (solve_cmd)
 		system(solve_cmd)
 		if isfile(basename(image_name)+'.wcs'):
-			print 'wcsinfo '+basename(image_name)+'.wcs  | tr [:lower:] [:upper:] | tr " " "=" | grep "=[0-9.-]*$" > '+basename(image_name)+'.solved'
+			print ('wcsinfo '+basename(image_name)+'.wcs  | tr [:lower:] [:upper:] | tr " " "=" | grep "=[0-9.-]*$" > '+basename(image_name)+'.solved')
 			system('wcsinfo '+basename(image_name)+'.wcs  | tr [:lower:] [:upper:] | tr " " "=" | grep "=[0-9.-]*$" > '+basename(image_name)+'.solved')
 			hdulist=fits.open(basename(image_name)+".corr")
 			astrometry_results[image_names[n]]=np.array([[i['flux'],i['field_x'],i['field_y'],i['index_x'],i['index_y']]+angles2xyz(i['index_ra'],i['index_dec']) for i in hdulist[1].data])
@@ -117,7 +120,8 @@ if __name__ == '__main__':
 	bestimage=""
 	maxstars=0
 	#for stars over 5*IMAGE_VARIANCE, find the corresponding star in the db
-	sd=np.array(stardb.values(),dtype = object)
+	sd = np.array(list(stardb.values()), dtype = object)	#<SB> had to explicitly convert to list for python3
+	
 	star_kd = spatial.cKDTree(sd[:,4:7])
 	for i in astrometry_results:
 		astrometry_results[i]=astrometry_results[i][astrometry_results[i][:,0]>IMAGE_VARIANCE*THRESH_FACTOR]
@@ -125,20 +129,26 @@ if __name__ == '__main__':
 		if len(astrometry_results[i])>maxstars:
 			bestimage=i
 			maxstars=len(astrometry_results[i])
-	astrometry_results_all=np.vstack(astrometry_results.values())
+	astrometry_results_all=np.vstack(np.array(astrometry_results.values()))
+
+	# Expicitly convert to a float array to prevent numpy error
+	astrometry_results_all = astrometry_results_all.astype('float')
 	
 	#find the dimmest star
 	dimmest_match = astrometry_results_all[np.argmax(astrometry_results_all[:,1]),:]
 
 	BASE_FLUX=dimmest_match[8]/pow(10.0,-dimmest_match[1]/2.5)
+	print ("BASE_FLUX: ",BASE_FLUX) 
 	
 	db_img_dist=np.linalg.norm(astrometry_results_all[:,9:11]-astrometry_results_all[:,11:13],axis=1)
 	db_img_dist=db_img_dist-IMAGE_VARIANCE/(astrometry_results_all[:,8])
 	
 	POS_VARIANCE=np.mean(db_img_dist)
 	
-	execfile(sys.argv[1]+"/calibration_data/"+basename(bestimage)+".solved")
-	
+	#<SB> execfile went away in python3
+	#https://stackoverflow.com/questions/6357361/alternative-to-execfile-in-python-3
+	filename = sys.argv[1]+"/calibration_data/"+basename(bestimage)+".solved"
+	exec(compile(open(filename, "rb").read(), filename, 'exec'))
 	
 	f_calib=open(sys.argv[1]+"/calibration.txt", 'w')
 	f_calib.write("IMG_X="+str(IMAGEW)+"\n")
@@ -157,6 +167,6 @@ if __name__ == '__main__':
 	f_calib.write("EXPOSURE_TIME="+str(EXPOSURE_TIME)+"\n")
 	f_calib.close()
 	
-	print "Calibration finished"
-	print "calibration.txt and median_image.png are in "+sys.argv[1]+"\n"
+	print ("Calibration finished")
+	print ("calibration.txt and median_image.png are in "+sys.argv[1]+"\n")
 	system("cat "+sys.argv[1]+"/calibration.txt")

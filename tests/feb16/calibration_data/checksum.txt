@@ -1,6 +1,0 @@
-325842a10eb92b49ac0991606772c715  feb16/samples/2.bmp
-433e780fcfd8cb31e21d061aaf09f2b0  feb16/samples/3.bmp
-bf94adf21cace05c6ce1abe395d73721  feb16/samples/5.bmp
-7ab34aa5e8196d689cbe28525b724107  feb16/samples/6.bmp
-1dad7d37ba315b13b3bceff52d905ce7  feb16/samples/8.bmp
-aff4cd2ff422186fffb5a5d66725d1d3  feb16/samples/9.bmp
