@@ -1,3 +1,4 @@
+from __future__ import print_function
 import sys
 stars=open("hip_main.dat","r").readlines()
 result=open(sys.argv[1],"r").readlines()
@@ -36,8 +37,8 @@ a=0
 b=0		
 for i in range(0,len(scores)):
 	if scores[i][1]<scores[i][0]:
-		print i," ".join([str(j) for j in scores[i]])
+		print (i," ".join([str(j) for j in scores[i]]))
 	a+=scores[i][0]
 	b+=scores[i][1]
 	
-print a,b
+print (a,b)	#print 

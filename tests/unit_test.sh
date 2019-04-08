@@ -57,13 +57,16 @@ if [[ $IMG_TEST == 1 ]]; then
 	popd>/dev/null
 fi
 if [[ $CALIBRATE == 1 ]]; then
+	echo "Calibrating..."
 	time python2.7 calibrate.py $TESTDIR || exit
 fi
 if [[ $REGENERATE == 1 ]]; then
+	echo "Regenerating..."
 	time python2.7 simulator.py $TESTDIR/calibration.txt $TESTDIR/input.csv $TESTDIR/result.csv || exit
 fi
 
 if [[ $ESA_TEST == 1 ]]; then
+	echo "ESA test..."
 	make &&
 	time $@ ./test $TESTDIR/input.csv $TESTDIR/calibration.txt 1991.25 | tee $TESTDIR/result_real.csv &&
 	gprof test | gprof2dot -s | dot -Tpdf -o test.pdf &&

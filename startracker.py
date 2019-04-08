@@ -1,10 +1,11 @@
+from __future__ import print_function
 from time import time
 import sys, traceback
 import socket,select, os, gc
 import cv2
 import numpy as np
 import numpy.linalg as LA
-import cStringIO
+from io  import BytesIO
 import fcntl
 import beast
 from systemd import daemon
@@ -15,7 +16,7 @@ if 'WATCHDOG_USEC' not in os.environ:
 	os.environ['WATCHDOG_USEC']="30000000"
 
 def trace(frame, event, arg):
-	print>>sys.stderr,"%s, %s:%d" % (event, frame.f_code.co_filename, frame.f_lineno)
+	print("%s, %s:%d" % (event, frame.f_code.co_filename, frame.f_lineno), file=sys.stderr)
 	return trace
 
 #sys.settrace(trace)
@@ -26,24 +27,29 @@ YEAR=float(sys.argv[2])
 #set up server before we do anything else
 server=socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-server.bind(('127.0.0.1', 8010))
+try: 
+	server.bind(('127.0.0.1', 8010))
+except:
+	print("server socket already open: try terminal command: sudo kill $(sudo lsof -t -i:8010)")
+	exit()
+
 server.listen(5)
 server.setblocking(0)
 
-print "Loading config" 
+print ("Loading config" )
+print (CONFIGFILE)
 beast.load_config(CONFIGFILE)
-print "Loading hip_main.dat" 
+print ("Loading hip_main.dat" )
 S_DB=beast.star_db()
 S_DB.load_catalog("hip_main.dat",YEAR)
-print "Filtering stars" 
+print ("Filtering stars" )
 SQ_RESULTS=beast.star_query(S_DB)
 SQ_RESULTS.kdmask_filter_catalog()
 SQ_RESULTS.kdmask_uniform_density(beast.cvar.REQUIRED_STARS)
 S_FILTERED=SQ_RESULTS.from_kdmask()
-print "Generating DB" 
-#Two because we are looking at pairs of stars, plus however many extra we want
+print ("Generating DB" )
 C_DB=beast.constellation_db(S_FILTERED,2+beast.cvar.DB_REDUNDANCY,0)
-print "Ready"
+print ("Ready")
 def a2q(A):
 	q4=0.5*np.sqrt(1+np.trace(A));
 	
@@ -124,11 +130,11 @@ def print_ori(body2ECI):
 		ORIENTATION=ORIENTATION-360
 
 	#rotation about the y axis (-90 to +90)
-	print >>sys.stderr, "DEC="+str(DEC)
+	print ("DEC="+str(DEC), file=sys.stderr)
 	#rotation about the z axis (-180 to +180)
-	print >>sys.stderr, "RA="+str(RA)
+	print ("RA="+str(RA), file=sys.stderr)
 	#rotation about the camera axis (-180 to +180)
-	print >>sys.stderr, "ORIENTATION="+str(ORIENTATION)
+	print ("ORIENTATION="+str(ORIENTATION), file=sys.stderr)
 
 class star_image:
 	def __init__(self, imagefile,median_image):
@@ -151,7 +157,7 @@ class star_image:
 		else:
 			img=cv2.imread(imagefile)
 		if img is None:
-			print >>sys.stderr, "Invalid image, using blank dummy image"
+			print ("Invalid image, using blank dummy image", file=sys.stderr)
 			img=median_image
 			
 		img=np.clip(img.astype(np.int16)-median_image,a_min=0,a_max=255).astype(np.uint8)
@@ -239,7 +245,7 @@ class star_image:
 		if db is None:
 			if self.db_stars_from_lm is None:
 				#neither relative nor absolute matching could be used
-				print ""
+				print ("")
 				return
 			else:
 				db=self.db_stars_from_lm
@@ -252,9 +258,9 @@ class star_image:
 				weight=1.0/(s_db.sigma_sq+s_im.sigma_sq)
 				temp=np.dot(bodyCorrection, np.array([[s_im.x],[s_im.y],[s_im.z]]))
 				star_out.append(str(temp[0,0])+','+str(temp[1,0])+','+str(temp[2,0])+','+str(s_db.x)+','+str(s_db.y)+','+str(s_db.z)+','+str(weight))
-		print >>sys.stderr,"stars",len(star_out)
-		print >>sys.stderr,"ang_rate: "+angrate_string
-		print " ".join(star_out)+" "+angrate_string
+		print ("stars",len(star_out), file=sys.stderr)
+		print ("ang_rate: "+angrate_string, file=sys.stderr)
+		print (" ".join(star_out)+" "+angrate_string)
 
 NONSTARS={}
 NONSTAR_NEXT_ID=0
@@ -365,48 +371,48 @@ class star_camera:
 			s.connect(("jeb",7011))
 			data = s.recv(2048)
 			s.close()
-		print>>sys.stderr,"Time1: "+str(time() - starttime)
+		print("Time1: "+str(time() - starttime), file=sys.stderr)
 		self.current_image=star_image(imagefile,self.median_image)
-		print>>sys.stderr,"Time2: "+str(time() - starttime)
+		print("Time2: "+str(time() - starttime), file=sys.stderr)
 		if (lis==1):
 			self.current_image.match_lis()
-		print>>sys.stderr,"Time3: "+str(time() - starttime)
+		print("Time3: "+str(time() - starttime), file=sys.stderr)
 		if self.last_match is not None:
 			self.current_image.match_rel(self.last_match)
 		if (quiet==0):
 			if (SIMULATE==1): 
-				print data.rstrip("\n").rstrip("\r")
+				print (data.rstrip("\n").rstrip("\r"))
 			else:
 				self.current_image.print_match()
-			print>>sys.stderr,"Time4: "+str(time() - starttime)
+			print("Time4: "+str(time() - starttime), file=sys.stderr)
 			
 		update_nonstars(self.current_image,self.source)
-		print>>sys.stderr,"Time5: "+str(time() - starttime)
+		print("Time5: "+str(time() - starttime), file=sys.stderr)
 		if self.current_image.match is not None:
 			self.last_match=self.current_image
 		else:
 			self.last_match=None
-		print>>sys.stderr,"Time6: "+str(time() - starttime)
+		print("Time6: "+str(time() - starttime), file=sys.stderr)
 		
 	def extrapolate_image(self,imagefile1,imagefile2,time1,time2):
 		#self.solve_image(imagefile2,lis=1,quiet=0)
 		self.solve_image(imagefile1,lis=1,quiet=1)
-		print>>sys.stderr,1
+		print(1, file=sys.stderr)
 		if (self.last_match is None):
-			print>>sys.stderr,2
-			print ""
+			print(2, file=sys.stderr)
+			print ("")
 			return
 		a1=winner_attitude(self.last_match.match.winner)
 		self.solve_image(imagefile2,lis=1,quiet=1)
-		print>>sys.stderr,3
+		print(3, file=sys.stderr)
 		if (self.last_match is None):
-			print>>sys.stderr,4
-			print ""
+			print(4, file=sys.stderr)
+			print ("")
 			return
 		a2=winner_attitude(self.last_match.match.winner)
-		print>>sys.stderr,a1,a2,LA.svd(a1)[1],LA.svd(a1)[1]
+		print(a1,a2,LA.svd(a1)[1],LA.svd(a1)[1], file=sys.stderr)
 		a,angrate=extrapolate_matrix(a1,a2,time1,time2,time()*1e6)
-		print>>sys.stderr,a,LA.svd(a)[1]
+		print(a,LA.svd(a)[1], file=sys.stderr)
 		
 		self.last_match.print_match(a,",".join([str(i) for i in angrate.tolist()]))
 		
@@ -457,12 +463,12 @@ class connection:
 				data += os.read(self.fd, 1024)
 				if len(data)==lastlen:
 					break
-		except OSError, e:
+		except OSError as e:
 			# error 11 means we have no more data to read
 			if e.errno == 11:
 				pass
 			elif e.errno == 104:
-				print >>sys.stderr, "WARNING: ABNORMAL DISCONNECT"
+				print("WARNING: ABNORMAL DISCONNECT", file=sys.stderr)
 			else:
 				raise
 		return data
@@ -502,7 +508,7 @@ lastPing = time()
 while True:
 	#systemd watchdog
 	events = epoll.poll(float(os.environ['WATCHDOG_USEC'])/2.0e6 - (time() - lastPing))
-	if len(events) == 0 or time() >= lastPing + float(os.environ['WATCHDOG_USEC'])/2.0e6:
+	if len(events) == 0 or time() >= (lastPing + float(os.environ['WATCHDOG_USEC'])/2.0e6):
 		daemon.notify("WATCHDOG=1")
 		lastPing = time()
 	#events = epoll.poll()
@@ -514,18 +520,21 @@ while True:
 		elif fd in CONNECTIONS:
 			w = CONNECTIONS[fd]
 			data = w.read()
-			print>>sys.stderr, data
+			print(data, file=sys.stderr)
 			if len(data) > 0:
-				stdout_redir = cStringIO.StringIO()
+				stdout_redir = BytesIO()
 				stdout_old = sys.stdout
 				sys.stdout = stdout_redir
 				try:
 					exec(data)
+				except SystemExit:
+					w.close()
+					raise
 				except:
 					traceback.print_exc(file=sys.stdout)
 				sys.stdout = stdout_old
 				data_out = stdout_redir.getvalue()
-				print>>sys.stderr, data_out
+				print(data_out, file=sys.stderr)
 				w.write(data_out)
 			else:
 				w.close()
