@@ -5,7 +5,7 @@ import socket,select, os, gc
 import cv2
 import numpy as np
 import numpy.linalg as LA
-from io  import BytesIO
+from io	import StringIO,BytesIO
 import fcntl
 import beast
 from systemd import daemon
@@ -104,7 +104,7 @@ def wahba(A, B, weight=[]):
 	if (len(weight) == 0):
 		weight=np.array([1]*len(A))
 	# dot is matrix multiplication for array
-	H =  np.dot(np.transpose(A)*weight,B)
+	H =	np.dot(np.transpose(A)*weight,B)
 
 	#calculate attitude matrix
 	#from http://malcolmdshuster.com/FC_MarkleyMortari_Girdwood_1999_AAS.pdf
@@ -245,7 +245,7 @@ class star_image:
 		if db is None:
 			if self.db_stars_from_lm is None:
 				#neither relative nor absolute matching could be used
-				print ("")
+				print("")
 				return
 			else:
 				db=self.db_stars_from_lm
@@ -294,9 +294,15 @@ class nonstar:
 			s_db_z=s_im.x*w.R31+s_im.y*w.R32+s_im.z*w.R33
 		self.data.append([source,s_im.x,s_im.y,s_im.z,s_db_x,s_db_y,s_db_z]+current_image.img_data[i])
 	def write_data(self,fd):
-		os.write(fd,str(self.id)+" " +str(len(self.data))+"\n")
+		if sys.version_info[0]>2:
+			os.write(fd,bytes(str(self.id)+" " +str(len(self.data))+"\n",encoding='UTF-8'))
+		else:
+			os.write(fd,str(self.id)+" " +str(len(self.data))+"\n")
 		for i in self.data:
 			s=[str(j) for j in i]
+		if sys.version_info[0]>2:
+			os.write(fd,bytes(" ".join(s)+"\n",encoding='UTF-8'))
+		else:
 			os.write(fd," ".join(s)+"\n")
 	def __del__(self):
 		self.write_data(NONSTAR_DATAFILE.fileno())
@@ -425,7 +431,10 @@ class science_camera:
 		self.last_match=None
 		self.median_image=cv2.imread(median_file)
 	def solve_image(self,imagefile):
-		os.write(1,os.path.abspath(NONSTAR_DATAFILENAME))
+		if sys.version_info[0]>2:
+			os.write(1,bytes(os.path.abspath(NONSTAR_DATAFILENAME),encoding='UTF-8'))
+		else:
+			os.write(1,os.path.abspath(NONSTAR_DATAFILENAME))
 
 rgb=star_camera(sys.argv[3])
 ir=science_camera(sys.argv[3])
@@ -456,7 +465,7 @@ class connection:
 		# need nonblocking for read
 		fl = fcntl.fcntl(self.fd, fcntl.F_GETFL)
 		fcntl.fcntl(self.fd, fcntl.F_SETFL, fl | os.O_NONBLOCK)
-		data = ''
+		data = b''
 		try:
 			while True:
 				lastlen=len(data)
@@ -481,12 +490,18 @@ class connection:
 		"""
 		if len(data) == 0: return
 		if self.fd==0: #stdin
-			os.write(1, data)
+			if sys.version_info[0]>2:
+				os.write(1, bytes(data,encoding='UTF-8'))
+			else:
+				os.write(1, data)
 			return
 		# need blocking IO for writing
 		fl = fcntl.fcntl(self.fd, fcntl.F_GETFL)
 		fcntl.fcntl(self.fd, fcntl.F_SETFL, fl & ~os.O_NONBLOCK)
-		os.write(self.fd, data)
+		if sys.version_info[0]>2:
+			os.write(self.fd, bytes(data,encoding='UTF-8'))
+		else:
+			os.write(self.fd, data)
 
 	def close(self):
 		"""Close connection with file descriptor"""
@@ -520,9 +535,12 @@ while True:
 		elif fd in CONNECTIONS:
 			w = CONNECTIONS[fd]
 			data = w.read()
-			print(data, file=sys.stderr)
+			print(data.decode(encoding='UTF-8'), file=sys.stderr)
 			if len(data) > 0:
-				stdout_redir = BytesIO()
+				if sys.version_info[0]>2:
+					stdout_redir = StringIO()
+				else:
+					stdout_redir = BytesIO()
 				stdout_old = sys.stdout
 				sys.stdout = stdout_redir
 				try:

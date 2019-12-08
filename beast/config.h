@@ -42,7 +42,7 @@ void load_config(const char *filename) {
 	
 	FILE *stream = fopen(filename, "r");
 	if (stream == NULL) exit(EXIT_FAILURE);
-
+	//FILE *stream = fopen(filename, "r");
 	ssize_t read;
 	char *line = NULL;
 	size_t len = 0;

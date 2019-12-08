@@ -129,8 +129,7 @@ if __name__ == '__main__':
 		if len(astrometry_results[i])>maxstars:
 			bestimage=i
 			maxstars=len(astrometry_results[i])
-	astrometry_results_all=np.vstack(np.array(astrometry_results.values()))
-
+	astrometry_results_all=np.vstack(list(astrometry_results.values()))
 	# Expicitly convert to a float array to prevent numpy error
 	astrometry_results_all = astrometry_results_all.astype('float')
 	

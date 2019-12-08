@@ -6,6 +6,7 @@ ESA_TEST=0
 IMG_TEST=0
 
 PYTHON="/usr/bin/python2.7"
+#PYTHON="/usr/bin/python3.5"
 
 while getopts ":crei" opt; do
   case $opt in
@@ -90,6 +91,9 @@ if [[ $IMG_TEST == 1 ]]; then
 		echo "rgb.solve_image('$i')" | nc 127.0.0.1 8010
 		sleep 0.5
 	done
+  #sleep 0.5
+  #echo 'exception test' | nc 127.0.0.1 8010
+  sleep 0.5
 	echo 'quit()' | nc 127.0.0.1 8010
 fi
 if [ "$KILLPID" != "" ] ; then 
