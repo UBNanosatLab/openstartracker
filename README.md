@@ -57,19 +57,18 @@ run ./unit_test.sh -crei yourcamera to recalibrate and test
 
 The ESA test should have a score of >70. If its worse than this, play around with exposure time (50ms is a good starting point)
 
-~~~~
 ##### Python 3 support:
-~~~~
 
 To enable python 3, you will need to edit 2 lines in two files:
 
 beast/Makefile: PYTHONHEADERS=... 
+
 tests/unit_test.sh: PYTHON=...
 
 for python 3 you may need to install the python 3 versions of the dependencies - ie
 
-```
+~~~~
 sudo apt-get python3-scipy python3-systemd python3-pip
 sudo -H pip3 install opencv-python
 sudo -H pip3 install astropy
-```
+~~~~
