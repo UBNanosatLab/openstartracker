@@ -14,10 +14,17 @@ Features:
 ### Basic setup:
 
 
-##### From a fresh xubuntu 16.04 linux install
+##### From a fresh ubuntu 18.04 linux install
 ```
-sudo apt-get install python-scipy libopencv-dev python-opencv swig python-systemd
+sudo apt-get install python-scipy libopencv-dev python-opencv swig python-systemd libfitsio
 ```
+Requires some pip packages globally installed, including an older version of numpy for testing compatibilty
+~~~~
+sudo apt-get python3-scipy python3-systemd python3-pip
+sudo -H pip3 install opencv-python
+sudo -H pip3 install astropy pandas
+sudo pip3 install numpy==1.16.0 
+~~~~
 
 Additional packages needed for calibration and unit testing:
 ~~~~
@@ -57,9 +64,9 @@ run ./unit_test.sh -crei yourcamera to recalibrate and test
 
 The ESA test should have a score of >70. If its worse than this, play around with exposure time (50ms is a good starting point)
 
-##### Python 3 support:
+##### Alternate Python Support:
 
-To enable python 3, you will need to edit 2 lines in two files:
+Python versioning is hard-coded in two places in the repo, modify accordingly:
 
 beast/Makefile: PYTHONHEADERS=... 
 
@@ -67,8 +74,4 @@ tests/unit_test.sh: PYTHON=...
 
 for python 3 you may need to install the python 3 versions of the dependencies - ie
 
-~~~~
-sudo apt-get python3-scipy python3-systemd python3-pip
-sudo -H pip3 install opencv-python
-sudo -H pip3 install astropy
-~~~~
+

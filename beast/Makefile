@@ -1,5 +1,5 @@
 CC = g++
-PYTHONHEADERS=/usr/include/python3.5
+PYTHONHEADERS=/usr/include/python3.6m 
 #PYTHONHEADERS=/usr/include/python2.7
 
 all: $(OBJ)
