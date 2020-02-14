@@ -72,3 +72,8 @@ sudo apt-get python3-scipy python3-systemd python3-pip
 sudo -H pip3 install opencv-python
 sudo -H pip3 install astropy
 ~~~~
+
+##### Reference frames used:
+
+For RA,DEC,Ori, openstartracker uses the same convention as astrometry.net, where RA and DEC are in the same frame as the star positions specified in the hipparcos catalogue (updated to the current year). Orientation is degrees east of north (ie orientation 0 means that up and down aligns with north-south)
+
