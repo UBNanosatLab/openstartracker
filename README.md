@@ -14,7 +14,7 @@ Features:
 ### Basic setup:
 
 
-##### From a fresh xubuntu 16.04 linux install
+##### From a fresh ubuntu linux install
 ```
 sudo apt-get install python-scipy libopencv-dev python-opencv swig python-systemd
 ```
