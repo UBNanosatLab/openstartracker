@@ -49,6 +49,9 @@ According to their website,
 
 In practice, it's a nice way to ensure you always have the same dependencies installed, independent of the rest of your system.
 
+**Note:** the Docker environment here is best used for development purposed. When running openstartracker on a flight computer, it is most
+likely better to run the program directly, without the Docker container. Docker is used here just to create a standard, reproducible dev and testing environment.
+
 To use the Docker environment to run openstartracker,
 
 0. Install [Docker](https://docs.docker.com/get-docker/).
