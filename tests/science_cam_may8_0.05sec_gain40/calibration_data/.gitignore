@@ -1,0 +1,3 @@
+# ignore all the calibration outputs in this directory, but don't ignore this .gitignore file
+*
+!.gitignore
