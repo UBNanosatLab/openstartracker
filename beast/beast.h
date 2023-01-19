@@ -287,10 +287,19 @@ public:
 	/**
 	* @brief TODO
 	*/
-	void print_ori() {
-		fprintf(stderr,"DEC=%f\n",fmod(360+asin(R31)* 180 / PI,360));
-		fprintf(stderr,"RA=%f\n",fmod(360+atan2(R21,R11)* 180 / PI,360));
-		fprintf(stderr,"ORIENTATION=%f\n",-atan2(R32,R33)* 180 / PI);
+	char *print_ori() {
+	  static char s[256];
+
+	  snprintf (s, sizeof(s), "DEC=%f\nRA=%f\nORIENTATION=%f\n",
+		    fmod(360+asin(R31)* 180 / PI,360),
+		    fmod(360+atan2(R21,R11)* 180 / PI,360)
+		    -atan2(R32,R33)* 180 / PI);
+	  
+	  /* fprintf(stderr,"DEC=%f\n",fmod(360+asin(R31)* 180 / PI,360)); */
+	  /* fprintf(stderr,"RA=%f\n",fmod(360+atan2(R21,R11)* 180 / PI,360)); */
+	  /* fprintf(stderr,"ORIENTATION=%f\n",-atan2(R32,R33)* 180 / PI); */
+
+	  return &s[0];
 	}
 };
 

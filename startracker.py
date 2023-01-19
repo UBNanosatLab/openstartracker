@@ -239,7 +239,8 @@ class star_image:
 		if bodyCorrection is None:
 			bodyCorrection=np.eye(3)
 		if self.match is not None:
-			self.match.winner.print_ori()
+			s = self.match.winner.print_ori()
+			print(s)
 		db=self.db_stars
 		im=self.img_stars
 		if db is None:
@@ -257,10 +258,10 @@ class star_image:
 			if (s_db.id>=0):
 				weight=1.0/(s_db.sigma_sq+s_im.sigma_sq)
 				temp=np.dot(bodyCorrection, np.array([[s_im.x],[s_im.y],[s_im.z]]))
-				star_out.append(str(temp[0,0])+','+str(temp[1,0])+','+str(temp[2,0])+','+str(s_db.x)+','+str(s_db.y)+','+str(s_db.z)+','+str(weight))
-		print ("stars",len(star_out), file=sys.stderr)
-		print ("ang_rate: "+angrate_string, file=sys.stderr)
-		print (" ".join(star_out)+" "+angrate_string)
+				star_out.append(str(temp[0,0])+','+str(temp[1,0])+','+str(temp[2,0])+','+str(s_db.x)+','+str(s_db.y)+','+str(s_db.z)+','+str(weight)+'\n')
+		print ("stars",len(star_out))
+		print ("ang_rate: "+angrate_string)
+		print ("".join(star_out)+" "+angrate_string)
 
 NONSTARS={}
 NONSTAR_NEXT_ID=0
@@ -377,28 +378,28 @@ class star_camera:
 			s.connect(("jeb",7011))
 			data = s.recv(2048)
 			s.close()
-		print("Time1: "+str(time() - starttime), file=sys.stderr)
+		# print("Time1: "+str(time() - starttime))
 		self.current_image=star_image(imagefile,self.median_image)
-		print("Time2: "+str(time() - starttime), file=sys.stderr)
+		# print("Time2: "+str(time() - starttime))
 		if (lis==1):
 			self.current_image.match_lis()
-		print("Time3: "+str(time() - starttime), file=sys.stderr)
+		# print("Time3: "+str(time() - starttime))
 		if self.last_match is not None:
 			self.current_image.match_rel(self.last_match)
 		if (quiet==0):
 			if (SIMULATE==1): 
 				print (data.rstrip("\n").rstrip("\r"))
 			else:
-				self.current_image.print_match()
-			print("Time4: "+str(time() - starttime), file=sys.stderr)
+                                self.current_image.print_match()
+			# print("Time4: "+str(time() - starttime))
 			
 		update_nonstars(self.current_image,self.source)
-		print("Time5: "+str(time() - starttime), file=sys.stderr)
+		# print("Time5: "+str(time() - starttime))
 		if self.current_image.match is not None:
 			self.last_match=self.current_image
 		else:
 			self.last_match=None
-		print("Time6: "+str(time() - starttime), file=sys.stderr)
+		# print("Time6: "+str(time() - starttime))
 		
 	def extrapolate_image(self,imagefile1,imagefile2,time1,time2):
 		#self.solve_image(imagefile2,lis=1,quiet=0)
