@@ -112,3 +112,4 @@ The ESA test should have a score of >70. If its worse than this, play around wit
 
 For RA,DEC,Ori, openstartracker uses the same convention as astrometry.net, where RA and DEC are in the same frame as the star positions specified in the hipparcos catalogue (updated to the current year). Orientation is degrees east of north (ie orientation 0 means that up and down aligns with north-south)
 
+NOTE: RA, DEC & Ori are provided for debugging purposes only. For spacecraft attitude determination, the star reference vectors should be used, either directly, or converted to a quaternion via one of the many algorithms that have been developed for this purpose (see: https://en.wikipedia.org/wiki/Wahba%27s_problem)
