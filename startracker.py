@@ -1,7 +1,7 @@
 from __future__ import print_function
 from time import time
 import sys, traceback
-import socket,select, os, gc
+import socket,select, os, gc, atexit
 import cv2
 import numpy as np
 import numpy.linalg as LA
@@ -275,6 +275,7 @@ class nonstar:
 		current_image.img_stars.get_star(i).id=self.id
 		NONSTAR_NEXT_ID+=1
 		self.data=[]
+		self.closed=False
 		self.add_data(current_image,i,source)
 		
 	def add_data(self,current_image,i,source):
@@ -300,15 +301,29 @@ class nonstar:
 			os.write(fd,str(self.id)+" " +str(len(self.data))+"\n")
 		for i in self.data:
 			s=[str(j) for j in i]
-		if sys.version_info[0]>2:
-			os.write(fd,bytes(" ".join(s)+"\n",encoding='UTF-8'))
-		else:
-			os.write(fd," ".join(s)+"\n")
-	def __del__(self):
-		self.write_data(NONSTAR_DATAFILE.fileno())
+			if sys.version_info[0]>2:
+				os.write(fd,bytes(" ".join(s)+"\n",encoding='UTF-8'))
+			else:
+				os.write(fd," ".join(s)+"\n")
+	def close(self):
+		if not self.closed:
+			self.write_data(NONSTAR_DATAFILE.fileno())
+			self.closed=True
+
+def close_nonstars():
+	global NONSTARS,NONSTAR_DATAFILE
+	for ns in list(NONSTARS.values()):
+		ns.close()
+	NONSTARS={}
+	if not NONSTAR_DATAFILE.closed:
+		NONSTAR_DATAFILE.close()
+
+atexit.register(close_nonstars)
 
 def flush_nonstars():
 	global NONSTARS,NONSTAR_NEXT_ID,NONSTAR_DATAFILENAME,NONSTAR_DATAFILE
+	for ns in list(NONSTARS.values()):
+		ns.close()
 	NONSTARS={}
 	NONSTAR_NEXT_ID=0
 	gc.collect()
@@ -333,6 +348,7 @@ def update_nonstars(current_image,source):
 		#is this a star? if so remove from nonstars
 		if (db != None and db.get_star(i).id>=0):
 			if (s_im.id in NONSTARS):
+				NONSTARS[s_im.id].close()
 				del NONSTARS[s_im.id]
 			s_im.id=-1
 		#if it's already there, add the latest mesurement
@@ -343,6 +359,9 @@ def update_nonstars(current_image,source):
 		else:
 			ns=nonstar(current_image,i,source)
 			nonstars_next[ns.id]=ns
+	for id, ns in list(NONSTARS.items()):
+		if id not in nonstars_next:
+			ns.close()
 	NONSTARS=nonstars_next
 	
 	#wrap around to prevent integer overflow

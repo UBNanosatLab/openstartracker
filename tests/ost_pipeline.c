@@ -1,5 +1,129 @@
-#define C_BEAST_IMPLEMENTATION
-#include "../c_beast/c_beast.h"
+#define BEAST_IMPLEMENTATION
+#include "../beast/beast.h"
+
+static void work_match_init(Work *w, BeastMatchWork *mw)
+{
+    beast_match_work_init(mw, w->candidates, MAX_CANDIDATES,
+                           w->fov_mask, w->collision, MAX_COLLISION,
+                           w->fov_px, w->fov_py, w->scores,
+                           w->match_map, w->work_map);
+}
+
+static int star_measurements_to_img_db(Work *w, StarDB *db, Star *storage,
+                                       const double *stars, int len,
+                                       int ids_from_index);
+
+static int match_catalog_stars(Work *w, Query *full_q, CDB *global,
+                               const double *stars, int *result, int len)
+{
+    StarDB img, bright, near;
+    CDB img_cdb, fov_cdb, img_full_cdb;
+    Query q_img = {0}, q_near = {0}, q_img2 = {0};
+    MatchResult winner, fov_winner;
+    BeastMatchWork mw;
+    float p_match;
+
+    work_match_init(w, &mw);
+    if (star_measurements_to_img_db(w, &img, w->img_stars, stars, len, 0) < 0)
+        return -1;
+    beast_star_db_init(&bright, w->img_bright, MAX_STARS);
+    beast_star_db_init(&near, w->near_stars, MAX_NEAR);
+    for (int i = 0; i < len; i++)
+        result[i] = -1;
+    if (beast_copy_n_brightest(&bright, &img, w->tmp_stars,
+                         w->cfg.MAX_FALSE_STARS + w->cfg.REQUIRED_STARS) < 0)
+        return -1;
+    if (beast_db_from_image(&img_cdb, &bright, w->tmp_stars, MAX_STARS,
+                               &q_img, w->q_img_map, w->q_img_results,
+                               w->q_img_mask, w->img_cmap, 16,
+                               w->cfg.MAX_FALSE_STARS + 2) < 0)
+        return -1;
+    if (beast_db_match(global, &img_cdb, &winner, &w->cfg, &mw, &p_match) < 0)
+        return -1;
+    if (p_match > 0.9f) {
+        beast_query_search(full_q, &w->cfg, winner.R[0],
+                     w->cfg.MAXFOV / 2, w->cfg.THRESH_FACTOR * w->cfg.IMAGE_VARIANCE);
+        beast_query_search(&global->results, &w->cfg, winner.R[0],
+                     w->cfg.MAXFOV / 2, w->cfg.THRESH_FACTOR * w->cfg.IMAGE_VARIANCE);
+        if (beast_db_from_results(&near, full_q) < 0)
+            return -1;
+        if (beast_db_from_image(&fov_cdb, &near, w->near_stars, MAX_NEAR,
+                                   &q_near, w->q_near_map, w->q_near_results,
+                                   w->q_near_mask, w->local_cdb_map,
+                                   MAX_LOCAL_CDB,
+                                   global->results.kdresults_size) < 0)
+            return -1;
+        beast_query_clear_results(&global->results);
+        beast_query_clear_results(full_q);
+
+        if (beast_db_from_image(&img_full_cdb, &img, w->img_bright,
+                                   MAX_STARS, &q_img2, w->q_img2_map,
+                                   w->q_img2_results, w->q_img2_mask,
+                                   w->img2_cmap,
+                                   MAX_STARS * (MAX_STARS - 1) / 2,
+                                   w->cfg.MAX_FALSE_STARS + 2) < 0)
+            return -1;
+        if (beast_db_match(&fov_cdb, &img_full_cdb, &fov_winner,
+                     &w->cfg, &mw, &p_match) < 0)
+            return -1;
+        for (int i = 0; i < len; i++) {
+            int dbi = fov_winner.map[i];
+            result[i] = (dbi >= 0) ? fov_cdb.stars.v[dbi].id : -1;
+        }
+    }
+    return 0;
+}
+
+static int star_measurements_to_img_db(Work *w, StarDB *db, Star *storage,
+                                       const double *stars, int len,
+                                       int ids_from_index)
+{
+    beast_star_db_init(db, storage, MAX_STARS);
+    for (int i = 0; i < len; i++) {
+        Star s = beast_make_img_star(&w->cfg,
+                               (float)(stars[3 * i] - w->cfg.IMG_X / 2.0),
+                               (float)(-(stars[3 * i + 1] - w->cfg.IMG_Y / 2.0)),
+                               w->cfg.BASE_FLUX * powf(10.0f, (float)(-stars[3 * i + 2] / 2.5)),
+                               ids_from_index ? i : -1);
+        if (beast_db_add(db, s) < 0)
+            return -1;
+    }
+    return 0;
+}
+
+static int prepare_catalog(Work *tw, int *fov_mask,
+                           const char *catalog_path, float year)
+{
+    Work *w = (Work *)tw;
+    const char *path = catalog_path ? catalog_path : "hip_main.dat";
+
+    if (!w || !fov_mask || w->cfg.IMG_X <= 0 || w->cfg.IMG_Y <= 0)
+        return -1;
+    w->fov_mask = fov_mask;
+    beast_star_db_init(&w->catalog_db, w->cat, MAX_CAT);
+    beast_star_db_init(&w->filtered_db, w->filtered, MAX_FILTERED);
+    if (beast_load_catalog(&w->cfg, &w->catalog_db, path, year,
+                             w->cat_keys) < 0)
+        return -1;
+    beast_query_init(&w->full_q, &w->catalog_db,
+               w->q_full_map, w->q_full_results, w->q_full_mask);
+    beast_query_mask_filter(&w->full_q, &w->cfg);
+    beast_query_mask_uniform(&w->full_q, &w->cfg, w->cfg.REQUIRED_STARS,
+                       w->keep_full);
+    if (beast_db_from_mask(&w->filtered_db, &w->full_q) < 0)
+        return -1;
+    beast_query_reset_mask(&w->full_q);
+    if (beast_db_from_catalog(&w->global, &w->filtered_db, w->filtered,
+                           MAX_FILTERED, &w->filtered_q,
+                           w->q_filtered_map, w->q_filtered_results,
+                           w->q_filtered_mask, w->cdb_map, MAX_CDB,
+                           2 + w->cfg.DB_REDUNDANCY, &w->cfg,
+                           w->keep_filtered) < 0)
+        return -1;
+    w->prepared = 1;
+    return 0;
+}
+
 
 #include <errno.h>
 #include <math.h>
@@ -166,7 +290,7 @@ int main(int argc, char **argv)
         goto done;
     }
     memset(p.tracker, 0, sizeof(*p.tracker));
-    if (load_config(&p.tracker->cfg, argv[arg]) < 0)
+    if (beast_load_config(&p.tracker->cfg, argv[arg]) < 0)
         goto done;
     width = p.tracker->cfg.IMG_X;
     height = p.tracker->cfg.IMG_Y;

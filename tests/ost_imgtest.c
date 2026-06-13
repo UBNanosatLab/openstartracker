@@ -1,5 +1,5 @@
-#define C_BEAST_IMPLEMENTATION
-#include "../c_beast/c_beast.h"
+#define BEAST_IMPLEMENTATION
+#include "../beast/beast.h"
 
 #include <errno.h>
 #include <math.h>

@@ -7,7 +7,7 @@ Features:
 * Image to image matching
 * Collect and store size, shape and color information of unknown objects
 * Tracks unknown objects between images
-* Programable python frontend / reusable C++ backend (BEAST-2) with no external dependencies 
+* Programmable Python frontend with a reusable C BEAST backend
 * Uses astrometry.net for calibration (check if your camera is good enough by uploading your star images to nova.astrometry.net)
 * Supports python 2 and 3 (see bottom)
 
@@ -16,7 +16,7 @@ Features:
 
 ##### From a fresh ubuntu linux install
 ```
-sudo apt-get install python3-scipy libopencv-dev python3-opencv swig python3-systemd
+sudo apt-get install python3-scipy libopencv-dev python3-opencv python3-systemd
 ```
 
 Additional packages needed for calibration and unit testing:
@@ -76,6 +76,8 @@ cd tests/
 ```
 
 This command will **c**alibrate your image sensor, **r** regenerate the test data, run an **E**SA test, and finally run the **i**mage test where images are fed to the calibrated star tracker program to produce an attitude fix.
+
+The BEAST backend is implemented in C in `beast/beast.h`. The Python package builds a small `_beast_py.so` module from `beast/beast_py.c`; no C++ or SWIG build step is required.
 
 The usage message for `unit_test.py` is here:
 ```
