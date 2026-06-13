@@ -140,18 +140,6 @@ int ost_bg_fit_stars(const OSTBGConfig *cfg, const uint16_t *image, int stride,
                      double *params_out, double *cov_xy_out,
                      int *dropped_count_out);
 
-typedef struct Work OSTTracker;
-
-size_t ost_tracker_work_size(void);
-int ost_tracker_configure(OSTTracker *w, const char *calibration);
-int ost_tracker_width(const OSTTracker *w);
-int ost_tracker_height(const OSTTracker *w);
-float ost_tracker_base_flux(const OSTTracker *w);
-int ost_tracker_prepare(OSTTracker *w, int *fov_mask,
-                        const char *catalog_path, float year);
-int ost_tracker_solve_spikes(OSTTracker *w, const double *spikes,
-                             int *result, int len);
-
 #ifdef __cplusplus
 }
 #endif
@@ -1705,6 +1693,7 @@ typedef struct Work {
     signed char keep_full[MAX_CAT], keep_filtered[MAX_FILTERED];
     Constellation cdb_map[MAX_CDB], local_cdb_map[MAX_LOCAL_CDB];
     Constellation img_cmap[16], img2_cmap[MAX_STARS * (MAX_STARS - 1) / 2];
+    Constellation rel_cmap[MAX_STARS * (MAX_STARS - 1) / 2];
     CPair candidates[MAX_CANDIDATES];
     int *fov_mask;
     int collision[MAX_COLLISION];
@@ -2526,8 +2515,12 @@ static int copy_n_brightest(StarDB *dst, StarDB *src, Star *tmp, int n)
     return 0;
 }
 
-static int star_id(Work *w, Query *full_q, CDB *global,
-                   const double *spikes, int *result, int len)
+static int star_measurements_to_img_db(Work *w, StarDB *db, Star *storage,
+                                       const double *stars, int len,
+                                       int ids_from_index);
+
+static int match_catalog_stars(Work *w, Query *full_q, CDB *global,
+                               const double *stars, int *result, int len)
 {
     StarDB img, bright, near;
     CDB img_cdb, fov_cdb, img_full_cdb;
@@ -2535,19 +2528,12 @@ static int star_id(Work *w, Query *full_q, CDB *global,
     MatchResult winner, fov_winner;
     float p_match;
 
-    img.v = w->img_stars; img.n = 0; img.cap = MAX_STARS; img.max_variance = 0;
+    if (star_measurements_to_img_db(w, &img, w->img_stars, stars, len, 0) < 0)
+        return -1;
     bright.v = w->img_bright; bright.n = 0; bright.cap = MAX_STARS; bright.max_variance = 0;
     near.v = w->near_stars; near.n = 0; near.cap = MAX_NEAR; near.max_variance = 0;
-    for (int i = 0; i < len; i++) {
-        Star s = make_img_star(&w->cfg,
-                               (float)(spikes[3 * i] - w->cfg.IMG_X / 2.0),
-                               (float)(-(spikes[3 * i + 1] - w->cfg.IMG_Y / 2.0)),
-                               w->cfg.BASE_FLUX * powf(10.0f, (float)(-spikes[3 * i + 2] / 2.5)),
-                               -1);
-        if (db_add(&img, s) < 0)
-            return -1;
+    for (int i = 0; i < len; i++)
         result[i] = -1;
-    }
     if (copy_n_brightest(&bright, &img, w->tmp_stars,
                          w->cfg.MAX_FALSE_STARS + w->cfg.REQUIRED_STARS) < 0)
         return -1;
@@ -2589,41 +2575,81 @@ static int star_id(Work *w, Query *full_q, CDB *global,
     return 0;
 }
 
-size_t ost_tracker_work_size(void)
+static int star_measurements_to_img_db(Work *w, StarDB *db, Star *storage,
+                                       const double *stars, int len,
+                                       int ids_from_index)
 {
-    return sizeof(Work);
+    db->v = storage;
+    db->n = 0;
+    db->cap = MAX_STARS;
+    db->max_variance = 0;
+    for (int i = 0; i < len; i++) {
+        Star s = make_img_star(&w->cfg,
+                               (float)(stars[3 * i] - w->cfg.IMG_X / 2.0),
+                               (float)(-(stars[3 * i + 1] - w->cfg.IMG_Y / 2.0)),
+                               w->cfg.BASE_FLUX * powf(10.0f, (float)(-stars[3 * i + 2] / 2.5)),
+                               ids_from_index ? i : -1);
+        if (db_add(db, s) < 0)
+            return -1;
+    }
+    return 0;
 }
 
-int ost_tracker_configure(OSTTracker *tw, const char *calibration)
+static int match_relative_stars(Work *w,
+                                const double *reference_stars,
+                                int reference_len,
+                                const double *current_stars,
+                                int *reference_index_result,
+                                int current_len,
+                                float *p_match)
 {
-    Work *w = (Work *)tw;
+    StarDB reference, current;
+    CDB reference_cdb, current_cdb;
+    Query q_reference = {0}, q_current = {0};
+    MatchResult winner;
 
-    if (!w || !calibration)
+    *p_match = 0.0f;
+    for (int i = 0; i < current_len; i++)
+        reference_index_result[i] = -1;
+    if (star_measurements_to_img_db(w, &reference, w->near_stars,
+                                    reference_stars, reference_len, 1) < 0 ||
+        star_measurements_to_img_db(w, &current, w->img_stars,
+                                    current_stars, current_len, 0) < 0)
         return -1;
-    memset(w, 0, sizeof(*w));
-    return load_config(&w->cfg, calibration);
+
+    reference_cdb.stars.v = w->near_stars;
+    reference_cdb.stars.cap = MAX_STARS;
+    q_reference.map = w->q_near_map;
+    q_reference.kdresults = w->q_near_results;
+    q_reference.kdmask = w->q_near_mask;
+    if (cdb_from_image(&reference_cdb, &reference, &q_reference, w->rel_cmap,
+                       MAX_STARS * (MAX_STARS - 1) / 2,
+                       w->cfg.MAX_FALSE_STARS + 2) < 0)
+        return -1;
+
+    current_cdb.stars.v = w->img_bright;
+    current_cdb.stars.cap = MAX_STARS;
+    q_current.map = w->q_img2_map;
+    q_current.kdresults = w->q_img2_results;
+    q_current.kdmask = w->q_img2_mask;
+    if (cdb_from_image(&current_cdb, &current, &q_current, w->img2_cmap,
+                       MAX_STARS * (MAX_STARS - 1) / 2,
+                       w->cfg.MAX_FALSE_STARS + 2) < 0)
+        return -1;
+
+    if (db_match(&reference_cdb, &current_cdb, &winner, w, p_match) < 0)
+        return -1;
+    if (*p_match > 0.0f) {
+        for (int i = 0; i < current_len; i++) {
+            int dbi = winner.map[i];
+            reference_index_result[i] = (dbi >= 0) ? reference_cdb.stars.v[dbi].id : -1;
+        }
+    }
+    return 0;
 }
 
-int ost_tracker_width(const OSTTracker *tw)
-{
-    const Work *w = (const Work *)tw;
-    return w ? w->cfg.IMG_X : 0;
-}
-
-int ost_tracker_height(const OSTTracker *tw)
-{
-    const Work *w = (const Work *)tw;
-    return w ? w->cfg.IMG_Y : 0;
-}
-
-float ost_tracker_base_flux(const OSTTracker *tw)
-{
-    const Work *w = (const Work *)tw;
-    return w ? w->cfg.BASE_FLUX : 0.0f;
-}
-
-int ost_tracker_prepare(OSTTracker *tw, int *fov_mask,
-                        const char *catalog_path, float year)
+static int prepare_catalog(Work *tw, int *fov_mask,
+                           const char *catalog_path, float year)
 {
     Work *w = (Work *)tw;
     const char *path = catalog_path ? catalog_path : "hip_main.dat";
@@ -2660,17 +2686,6 @@ int ost_tracker_prepare(OSTTracker *tw, int *fov_mask,
         return -1;
     w->prepared = 1;
     return 0;
-}
-
-int ost_tracker_solve_spikes(OSTTracker *tw, const double *spikes,
-                             int *result, int len)
-{
-    Work *w = (Work *)tw;
-
-    if (!w || !spikes || !result || len < 0 || len > MAX_STARS ||
-        !w->prepared)
-        return -1;
-    return star_id(w, &w->full_q, &w->global, spikes, result, len);
 }
 
 

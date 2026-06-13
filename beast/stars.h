@@ -2,19 +2,12 @@
 #define STARS_H
 
 #include "config.h"
-#include "kdhash.h"
 
 #include <assert.h> //assert()
 #include <limits.h> //INT_MAX
-//stl for days
-#include <array> //sort, nth_element
+#include <stdint.h>
 #include <algorithm> //sort, nth_element
-#include <set>
-#include <unordered_set>
-#include <map>
 #include <vector>
-#include <unordered_map>
-#include <iterator>     // std::next
 
 struct star {
 	float x;
@@ -29,7 +22,6 @@ struct star {
 	/** how many stars were inserted before this one? */
 	int star_idx;
 	float sigma_sq;
-	size_t hash_val;
 	/**
 	* @brief add star from catalog 
 	*
@@ -53,7 +45,6 @@ struct star {
 		unreliable=0;
 		star_idx=-1;
 		sigma_sq=POS_VARIANCE;
-		hash_val=kdhash_3f::hash(x,y,z);
 	}
 	
 	/**
@@ -79,11 +70,13 @@ struct star {
 		unreliable=0;
 		star_idx=-1;
 		sigma_sq=IMAGE_VARIANCE/flux;
-		hash_val=kdhash_3f::hash(x,y,z);
 	}
 
 	#define OP operator==
-	bool OP(const star& s) const {return hash_val==s.hash_val;}
+	bool OP(const star& s) const {
+		if (id >= 0 && s.id >= 0) return id == s.id;
+		return x == s.x && y == s.y && z == s.z;
+	}
 	#undef OP
 	
 	/**
@@ -127,21 +120,12 @@ bool star_lt_flux(const star &s1, const star &s2) {return s1.flux < s2.flux;}
 
 struct star_db {
 private:
-	std::unordered_map<uint64_t,star> hash_map;
-	std::set<uint64_t> hash_set;
-	std::vector<uint64_t> star_idx_vector;
-	std::multimap<float,uint64_t> flux_map;
-	size_t sz;
+	std::vector<star> stars;
 
-	/**
-	 * @brief Transcribe a portion of the db between first and last
-	 * 
-	 * @param first an iterator to a map. key can be anything, but value must be a star hash 
-	 * @param last copy up to but not including the element pointed to by this iterator
-	 */
-	template<class T> star_db* copy(T first,T last) {
+	star_db* copy_range(const star *first, const star *last) const {
 		star_db* s = new star_db;
-		for (;first!=last;first++) (*s)+=hash_map[*first];
+		s->stars.reserve((size_t)(last - first));
+		for (;first!=last;first++) (*s)+=*first;
 		return s;
 	}
 public:
@@ -151,27 +135,20 @@ public:
 		DBG_STAR_DB_COUNT++;
 		DBG_PRINT("DBG_STAR_DB_COUNT++ %d\n",DBG_STAR_DB_COUNT);
 		max_variance=0.0;
-		sz=0;
 	}
 	~star_db() {
 		DBG_STAR_DB_COUNT--;
 		DBG_PRINT("DBG_STAR_DB_COUNT-- %d\n",DBG_STAR_DB_COUNT);
 	}
-	size_t size() {return sz;}
+	size_t size() const {return stars.size();}
 	///Philosophically inspired by python sets
 	#define OP operator+=
 	star_db* OP(const star& s) { return *this+=&s;}
 	star_db* OP(const star* s) {
-		if (count(s)==0) {
-			if (max_variance<s->sigma_sq) max_variance=s->sigma_sq;
-			star temp=s[0];
-			temp.star_idx=size();
-			hash_map.emplace(temp.hash_val,temp);
-			hash_set.insert(temp.hash_val);
-			flux_map.emplace(temp.flux,temp.hash_val);
-			star_idx_vector.push_back(temp.hash_val);
-			sz++;
-		}
+		if (max_variance<s->sigma_sq) max_variance=s->sigma_sq;
+		star temp=s[0];
+		temp.star_idx=size();
+		stars.push_back(temp);
 		return this;
 	}
 	#undef OP
@@ -183,18 +160,16 @@ public:
 	#define OP operator-
 	star_db* OP(const star_db* s) {
 		star_db* r = new star_db;
-		for (auto it = star_idx_vector.cbegin(); it != star_idx_vector.cend(); ++it) {
-			if (s->hash_map.count(*it)==0) *r+=hash_map.at(*it);
-		}
+		r->stars.reserve(stars.size());
+		for (size_t i=0;i<stars.size();i++) if (s->count(&stars[i])==0) *r+=stars[i];
 		return r;
 	}
 	#undef OP
 	#define OP operator&
 	star_db* OP(const star_db* s) {
 		star_db* r = new star_db;
-		for (auto it = star_idx_vector.cbegin(); it != star_idx_vector.cend(); ++it) {
-			if (s->hash_map.count(*it)>0) *r+=hash_map.at(*it);
-		}
+		r->stars.reserve(stars.size());
+		for (size_t i=0;i<stars.size();i++) if (s->count(&stars[i])>0) *r+=stars[i];
 		return r;
 	}
 	#undef OP
@@ -203,58 +178,23 @@ public:
 	 * 
 	 * @param idx the index of the star 
 	 */
-	star* get_star_by_hash(const size_t hash) {return &(hash_map.at(hash));}
-	/**
-	 * @brief returns stars in the order they were added
-	 * 
-	 * @param idx the index of the star 
-	 */
-	star* get_star(const int idx) {return size()>0?get_star_by_hash(star_idx_vector[idx]):NULL;}
+	star* get_star(const int idx) {return size()>0?&stars[idx]:NULL;}
 	/**
 	* @brief make a copy of the star db
 	*/
-	star_db* copy() {return copy(star_idx_vector.cbegin(),star_idx_vector.cend());}
+	star_db* copy() {return copy_range(stars.data(),stars.data()+stars.size());}
 	/**
 	* @brief make a copy of the n brightest elements in the star db
 	*/
 	star_db* copy_n_brightest(const size_t n) {
-		//return copy(flux_map.crbegin(),std::next(flux_map.crbegin(),std::min(n,size())));
 		star_db* s = new star_db;
-		auto first=flux_map.crbegin();
-		auto last=std::next(flux_map.crbegin(),std::min(n,size()));
-		for (;first!=last;first++) (*s)+=get_star_by_hash(first->second);
+		std::vector<star> by_flux=stars;
+		std::sort(by_flux.begin(), by_flux.end(), star_gt_flux);
+		size_t last=std::min(n, by_flux.size());
+		s->stars.reserve(last);
+		for (size_t i=0;i<last;i++) (*s)+=by_flux[i];
 		return s;
 	}
-	//std::array* n_brightest(T &hs,n) {
-	//	
-	//}
-	/**
-	* @brief return stars in the bounding volume around the specified star
-	* @param r minimum radius of the bounding volume (arcseconds).
-	* 
-	*/
-	//TODO: group together by hash_lb,ub, n_brightest_search (maybe return a list?) 
-	template<class T> void search(T &hs, const float x,const float y,const float z, float r, const float min_flux) {
-		r=r/3600.0;
-		r=r*PI/180.0;
-		r=2*fabs(sin(r/2.0));
-		size_t mask=kdhash_3f::mask(r);
-		for (int8_t dx=-1;dx<=1;dx++) for (int8_t dy=-1;dy<=1;dy++) for (int8_t dz=-1;dz<=1;dz++) {
-			size_t h=kdhash_3f::hash(x+dx*r,y+dy*r,z+dz*r);
-			auto first = hash_set.lower_bound(h&mask);
-			auto last = hash_set.upper_bound(h|(~mask));
-			for (;first!=last;first++) {
-				star *s=get_star_by_hash(*first);
-				float dist_x=s->x-x;
-				float dist_y=s->y-y;
-				float dist_z=s->z-z;
-				if (dist_x*dist_x+dist_y*dist_y+dist_z*dist_z<=r*r) {
-					if (min_flux <= s->flux) hs.insert(*first);
-				}
-			}
-		}
-	}
-
 
 	/**
 	* @brief Load stars from hip_main.dat
@@ -291,7 +231,10 @@ public:
 		
 	}
 
-	size_t count(const star* s) {return hash_map.count(s->hash_val);}
+	size_t count(const star* s) const {
+		for (size_t i=0;i<stars.size();i++) if (stars[i]==*s) return 1;
+		return 0;
+	}
 	size_t count(star_db* s) {
 		size_t n=0;
 		for (size_t i=0;i<s->size();i++) n+=count(s->get_star(i));
@@ -314,8 +257,7 @@ struct star_fov {
 private:
 	int *mask;
 	star_db *stars;
-	int *collision;
-	int collision_size;
+	std::vector<int> collision;
 	float db_max_variance;
 	float *s_px;
 	float *s_py;
@@ -405,8 +347,7 @@ public:
 		DBG_PRINT("DBG_STAR_FOV_COUNT++ %d\n",DBG_STAR_FOV_COUNT);
 		db_max_variance=db_max_variance_;
 		stars=s;
-		collision=NULL;
-		collision_size=0;
+		collision.clear();
 		s_px=(float*)malloc(stars->size()*sizeof(s_px[0]));
 		s_py=(float*)malloc(stars->size()*sizeof(s_py[0]));
 		mask=(int*)malloc(IMG_X*IMG_Y*sizeof(mask[0]));
@@ -441,11 +382,9 @@ public:
 					/* has this pixel already been assigned to a different star? */
 					int id2=mask[x+y*IMG_X];
 					if (id2!=-1){
-						collision_size+=2;
-						mask[x+y*IMG_X]=-collision_size;
-						collision=(int*)realloc(collision,collision_size*sizeof(collision[0]));
-						collision[collision_size-2]=id;
-						collision[collision_size-1]=id2;
+						collision.push_back(id);
+						collision.push_back(id2);
+						mask[x+y*IMG_X]=-(int)collision.size();
 					} else {
 						mask[x+y*IMG_X]=id;
 					}
@@ -459,7 +398,6 @@ public:
 		free(s_px);
 		free(s_py);
 		free(mask);
-		free(collision);
 	}
 };
 
@@ -666,17 +604,15 @@ public:
 	* @param min_stars_per_fov Don't mask anything which could result in less than this many stars per field of view
 	*/
 	void kdmask_uniform_density(const int min_stars_per_fov) {
-		std::unordered_set<int> uniform_set;
+		std::vector<char> keep(stars->size(),0);
 		int kdresults_maxsize_old=kdresults_maxsize;
 		kdresults_maxsize=min_stars_per_fov;
 		for (size_t i=0;i<stars->size();i++) if (kdmask[i]==0) {
 			kdsearch(map[i].x,map[i].y,map[i].z,MINFOV/2,THRESH_FACTOR*IMAGE_VARIANCE);
-			for (size_t j=0;j<kdresults_size;j++) uniform_set.insert(kdresults[j]);
+			for (size_t j=0;j<kdresults_size;j++) keep[kdresults[j]]=1;
 			clear_kdresults();
 		}
-		for (size_t i=0;i<stars->size();i++) kdmask[i]=1;
-		std::unordered_set<int>::iterator it = uniform_set.begin();
-		for (size_t i=0; i<uniform_set.size();i++,it++) kdmask[*it]=0;
+		for (size_t i=0;i<stars->size();i++) kdmask[i]=keep[i]?0:1;
 		kdresults_maxsize=kdresults_maxsize_old;
 	}
 	/**

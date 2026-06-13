@@ -10,7 +10,7 @@
 #include <string.h>
 
 typedef struct Pipeline {
-    OSTTracker *tracker;
+    Work *tracker;
     OSTBGConfig bg_cfg;
     OSTBGStats bg_stats;
     OSTCCContext cc;
@@ -22,7 +22,7 @@ typedef struct Pipeline {
     int *parent, *label_live, *free_after_row, *touched_stamp, *seen_stamp;
     OSTCCRun *prev_runs, *curr_runs;
     OSTBGFitWorkspace fit_work;
-    double *fit_params, *fit_cov, *spikes;
+    double *fit_params, *fit_cov, *stars;
     int *result;
 } Pipeline;
 
@@ -53,10 +53,10 @@ static int read_png_rgba(const char *filename, int w, int h,
     return 0;
 }
 
-static void write_spikes(FILE *f, const double *spikes, int n)
+static void write_stars(FILE *f, const double *stars, int n)
 {
     for (int i = 0; i < 3 * n; i++)
-        fprintf(f, "%.17g%c", spikes[i], i == 3 * n - 1 ? '\n' : ',');
+        fprintf(f, "%.17g%c", stars[i], i == 3 * n - 1 ? '\n' : ',');
     if (n == 0)
         fputc('\n', f);
 }
@@ -69,7 +69,7 @@ static void write_ids(const int *ids, int n)
         putchar('\n');
 }
 
-static int process_image(Pipeline *p, const char *filename, FILE *spikes_file)
+static int process_image(Pipeline *p, const char *filename, FILE *stars_file)
 {
     int n, fit_n, dropped, out_n = 0;
     float base_flux;
@@ -95,7 +95,7 @@ static int process_image(Pipeline *p, const char *filename, FILE *spikes_file)
     if (fit_n < 0)
         return -1;
 
-    base_flux = ost_tracker_base_flux(p->tracker);
+    base_flux = p->tracker->cfg.BASE_FLUX;
     if (base_flux <= 0.0f)
         return -1;
     for (int i = 0; i < fit_n; i++) {
@@ -105,14 +105,16 @@ static int process_image(Pipeline *p, const char *filename, FILE *spikes_file)
 
         if (!isfinite(x) || !isfinite(y) || !isfinite(flux) || flux <= 0.0)
             continue;
-        p->spikes[3 * out_n + 0] = x;
-        p->spikes[3 * out_n + 1] = y;
-        p->spikes[3 * out_n + 2] = -2.5 * log10(flux / base_flux);
+        p->stars[3 * out_n + 0] = x;
+        p->stars[3 * out_n + 1] = y;
+        p->stars[3 * out_n + 2] = -2.5 * log10(flux / base_flux);
         out_n++;
     }
-    if (spikes_file)
-        write_spikes(spikes_file, p->spikes, out_n);
-    if (ost_tracker_solve_spikes(p->tracker, p->spikes, p->result, out_n) < 0)
+    if (stars_file)
+        write_stars(stars_file, p->stars, out_n);
+    if (match_catalog_stars(p->tracker, &p->tracker->full_q,
+                            &p->tracker->global, p->stars,
+                            p->result, out_n) < 0)
         return -1;
     write_ids(p->result, out_n);
     fprintf(stderr, "%s: components=%d fitted=%d used=%d dropped=%d sigma=%.9g\n",
@@ -124,7 +126,7 @@ static int process_image(Pipeline *p, const char *filename, FILE *spikes_file)
 static void usage(const char *prog)
 {
     fprintf(stderr,
-            "usage: %s [--catalog hip_main.dat] [--spikes-out csv] "
+            "usage: %s [--catalog hip_main.dat] [--stars-out csv] "
             "calibration.txt year image.png [...]\n", prog);
 }
 
@@ -133,8 +135,8 @@ int main(int argc, char **argv)
     Pipeline p;
     OSTCCBufferSizes cc_sizes;
     const char *catalog_path = "hip_main.dat";
-    const char *spikes_path = NULL;
-    FILE *spikes_file = NULL;
+    const char *stars_path = NULL;
+    FILE *stars_file = NULL;
     int arg = 1, width, height, max_stars;
     int *fov_mask = NULL;
     size_t pixels, map_pixels;
@@ -145,8 +147,8 @@ int main(int argc, char **argv)
         if (!strcmp(argv[arg], "--catalog") && arg + 1 < argc) {
             catalog_path = argv[arg + 1];
             arg += 2;
-        } else if (!strcmp(argv[arg], "--spikes-out") && arg + 1 < argc) {
-            spikes_path = argv[arg + 1];
+        } else if (!strcmp(argv[arg], "--stars-out") && arg + 1 < argc) {
+            stars_path = argv[arg + 1];
             arg += 2;
         } else {
             usage(argv[0]);
@@ -158,15 +160,16 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    p.tracker = (OSTTracker *)malloc(ost_tracker_work_size());
+    p.tracker = (Work *)malloc(sizeof(*p.tracker));
     if (!p.tracker) {
         fprintf(stderr, "out of memory\n");
         goto done;
     }
-    if (ost_tracker_configure(p.tracker, argv[arg]) < 0)
+    memset(p.tracker, 0, sizeof(*p.tracker));
+    if (load_config(&p.tracker->cfg, argv[arg]) < 0)
         goto done;
-    width = ost_tracker_width(p.tracker);
-    height = ost_tracker_height(p.tracker);
+    width = p.tracker->cfg.IMG_X;
+    height = p.tracker->cfg.IMG_Y;
     if (ost_bg_config_init(&p.bg_cfg, width, height) < 0 ||
         ost_cc_buffer_sizes(width, &cc_sizes) < 0)
         goto done;
@@ -226,8 +229,8 @@ int main(int argc, char **argv)
                                     sizeof(*p.fit_params));
     p.fit_cov = (double *)malloc((size_t)(2 * max_stars) *
                                  sizeof(*p.fit_cov));
-    p.spikes = (double *)malloc((size_t)(3 * max_stars) *
-                                sizeof(*p.spikes));
+    p.stars = (double *)malloc((size_t)(3 * max_stars) *
+                               sizeof(*p.stars));
     p.result = (int *)malloc((size_t)max_stars * sizeof(*p.result));
 
     if (!fov_mask || !p.rgba || !p.gray || !p.bg_mean ||
@@ -239,7 +242,7 @@ int main(int argc, char **argv)
         !p.fit_work.sigma_col || !p.fit_work.rhs ||
         !p.fit_work.sigma_solve || !p.fit_work.rhs_solve ||
         !p.fit_work.cov_xy || !p.fit_work.dropped || !p.fit_params ||
-        !p.fit_cov || !p.spikes || !p.result) {
+        !p.fit_cov || !p.stars || !p.result) {
         fprintf(stderr, "out of memory\n");
         goto done;
     }
@@ -253,26 +256,26 @@ int main(int argc, char **argv)
                     p.free_after_row, p.touched_stamp, p.seen_stamp,
                     p.prev_runs, p.curr_runs) < 0)
         goto done;
-    if (ost_tracker_prepare(p.tracker, fov_mask, catalog_path,
-                            (float)atof(argv[arg + 1])) < 0)
+    if (prepare_catalog(p.tracker, fov_mask, catalog_path,
+                        (float)atof(argv[arg + 1])) < 0)
         goto done;
-    if (spikes_path) {
-        spikes_file = fopen(spikes_path, "w");
-        if (!spikes_file) {
-            fprintf(stderr, "%s: %s\n", spikes_path, strerror(errno));
+    if (stars_path) {
+        stars_file = fopen(stars_path, "w");
+        if (!stars_file) {
+            fprintf(stderr, "%s: %s\n", stars_path, strerror(errno));
             goto done;
         }
     }
     for (int i = arg + 2; i < argc; i++)
-        if (process_image(&p, argv[i], spikes_file) < 0)
+        if (process_image(&p, argv[i], stars_file) < 0)
             goto done;
     rc = 0;
 
 done:
-    if (spikes_file)
-        fclose(spikes_file);
+    if (stars_file)
+        fclose(stars_file);
     free(p.result);
-    free(p.spikes);
+    free(p.stars);
     free(p.fit_cov);
     free(p.fit_params);
     free(p.fit_work.dropped);

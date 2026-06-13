@@ -130,6 +130,10 @@ if c_score + 1e-12 < cpp_score:
 PY
 		fi
 	fi
+	./test --relative-self $TESTDIR/input.csv $TESTDIR/calibration.txt 1991.25 >/dev/null || {
+		echo "C BEAST relative star self-test failed"
+		exit 1
+	}
 	if command -v gprof2dot >/dev/null && command -v dot >/dev/null; then
 		gprof test | gprof2dot -s | dot -Tpdf -o test.pdf
 	fi
@@ -141,7 +145,7 @@ fi
 if [[ $IMG_TEST == 1 ]]; then
 	if [ -x ./ost_imgtest ]; then
 		PIPE_OUT=""
-		PIPE_SPIKES=""
+		PIPE_STARS=""
 		PIPE_UNIT=""
 		# Make sure we do not crash when given an image with no stars,
 		# then run each sample twice like the original socket test.
@@ -151,25 +155,25 @@ if [[ $IMG_TEST == 1 ]]; then
 		done
 		if [ -x ./ost_pipeline ] && [ -x ./test ]; then
 			PIPE_OUT="$(mktemp)"
-			PIPE_SPIKES="$(mktemp)"
+			PIPE_STARS="$(mktemp)"
 			PIPE_UNIT="$(mktemp)"
-			$@ ./ost_pipeline --spikes-out "$PIPE_SPIKES" \
+			$@ ./ost_pipeline --stars-out "$PIPE_STARS" \
 				$TESTDIR/calibration.txt 1991.25 $TESTDIR/samples/* \
 				> "$PIPE_OUT" || {
-				rm -f "$PIPE_OUT" "$PIPE_SPIKES" "$PIPE_UNIT"
+				rm -f "$PIPE_OUT" "$PIPE_STARS" "$PIPE_UNIT"
 				exit 1
 			}
-			$@ ./test "$PIPE_SPIKES" $TESTDIR/calibration.txt 1991.25 \
+			$@ ./test "$PIPE_STARS" $TESTDIR/calibration.txt 1991.25 \
 				> "$PIPE_UNIT" 2>/dev/null || {
-				rm -f "$PIPE_OUT" "$PIPE_SPIKES" "$PIPE_UNIT"
+				rm -f "$PIPE_OUT" "$PIPE_STARS" "$PIPE_UNIT"
 				exit 1
 			}
 			diff -q "$PIPE_OUT" "$PIPE_UNIT" >/dev/null || {
 				echo "C image pipeline regression: tracker API output differs from unit-test executable"
-				rm -f "$PIPE_OUT" "$PIPE_SPIKES" "$PIPE_UNIT"
+				rm -f "$PIPE_OUT" "$PIPE_STARS" "$PIPE_UNIT"
 				exit 1
 			}
-			rm -f "$PIPE_OUT" "$PIPE_SPIKES" "$PIPE_UNIT"
+			rm -f "$PIPE_OUT" "$PIPE_STARS" "$PIPE_UNIT"
 		fi
 	else
 		$@ $PYTHON startracker.py $TESTDIR/calibration.txt 1991.25 $TESTDIR/median_image.png &

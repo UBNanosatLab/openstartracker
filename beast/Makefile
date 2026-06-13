@@ -1,6 +1,6 @@
 CC = g++
-PYTHONHEADERS=/usr/include/python3.10
-#PYTHONHEADERS=/usr/include/python2.7
+PYTHON ?= python3
+PYTHONHEADERS ?= $(shell $(PYTHON) -c 'import sysconfig; print(sysconfig.get_paths()["include"])')
 
 all: $(OBJ)
 	swig -python -c++ beast.i
@@ -8,4 +8,4 @@ all: $(OBJ)
 	$(CC) -g -shared -fPIC beast_wrap.o -o _beast.so
 	
 clean:
-	rm beast.so beast.o	beast.py beast.pyc beast_wrap.cxx beast_wrap.o
+	rm -f _beast.so beast.so beast.o beast.py beast.pyc beast_wrap.cxx beast_wrap.o

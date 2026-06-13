@@ -3,7 +3,7 @@
 
 int main(int argc, char **argv)
 {
-    OSTTracker *tracker;
+    Work *tracker;
     FILE *file;
     char line[131072];
     double data[3 * OST_TRACKER_MAX_STARS];
@@ -12,35 +12,81 @@ int main(int argc, char **argv)
     clock_t time_sum = 0;
     int run_times = 0;
     int rc = 1;
+    int relative_self = 0;
+    float p_match;
+    int arg = 1;
 
-    if (argc < 4) {
-        printf("./test_beast_c input.csv calibration.txt year\n");
+    if (argc > 1 && !strcmp(argv[1], "--relative-self")) {
+        relative_self = 1;
+        arg = 2;
+    }
+    if (argc - arg < 3) {
+        printf("./test_beast_c [--relative-self] input.csv calibration.txt year\n");
         return 0;
     }
 
-    tracker = (OSTTracker *)calloc(1, ost_tracker_work_size());
+    tracker = (Work *)calloc(1, sizeof(*tracker));
     if (!tracker) {
         fprintf(stderr, "out of memory\n");
         return 1;
     }
-    if (ost_tracker_configure(tracker, argv[2]) < 0)
+    if (load_config(&tracker->cfg, argv[arg + 1]) < 0)
         goto done_tracker;
-    fov_mask = (int *)malloc((size_t)ost_tracker_width(tracker) *
-                             (size_t)ost_tracker_height(tracker) *
+    fov_mask = (int *)malloc((size_t)tracker->cfg.IMG_X *
+                             (size_t)tracker->cfg.IMG_Y *
                              sizeof(*fov_mask));
     if (!fov_mask) {
         fprintf(stderr, "out of memory\n");
         goto done_tracker;
     }
-    if (ost_tracker_prepare(tracker, fov_mask, "hip_main.dat",
-                            (float)atof(argv[3])) < 0)
+    if (prepare_catalog(tracker, fov_mask, "hip_main.dat",
+                        (float)atof(argv[arg + 2])) < 0)
         goto done_fov;
 
-    file = fopen(argv[1], "r");
+    file = fopen(argv[arg], "r");
     if (!file) {
-        fprintf(stderr, "%s: %s\n", argv[1], strerror(errno));
+        fprintf(stderr, "%s: %s\n", argv[arg], strerror(errno));
         goto done_fov;
     }
+    if (relative_self) {
+        int i = 0, len;
+        char *tok;
+
+        if (!fgets(line, sizeof(line), file)) {
+            fprintf(stderr, "empty input\n");
+            fclose(file);
+            goto done_fov;
+        }
+        tok = strtok(line, ",");
+        while (tok && i < 3 * OST_TRACKER_MAX_STARS) {
+            data[i++] = atof(tok);
+            tok = strtok(NULL, ",");
+        }
+        len = i / 3;
+        if (match_relative_stars(tracker, data, len, data, result, len,
+                                 &p_match) < 0) {
+            fprintf(stderr, "relative star match failed\n");
+            fclose(file);
+            goto done_fov;
+        }
+        if (p_match <= 0.99f) {
+            fprintf(stderr, "relative star self-test confidence too low: %g\n", p_match);
+            fclose(file);
+            goto done_fov;
+        }
+        for (i = 0; i < len; i++) {
+            if (result[i] != i) {
+                fprintf(stderr, "relative star self-test failed at %d: got %d\n",
+                        i, result[i]);
+                fclose(file);
+                goto done_fov;
+            }
+        }
+        fclose(file);
+        rc = 0;
+        goto done_fov;
+    }
+
     while (fgets(line, sizeof(line), file)) {
         int i = 0;
         int len;
@@ -54,8 +100,9 @@ int main(int argc, char **argv)
         }
         len = i / 3;
         start = clock();
-        if (ost_tracker_solve_spikes(tracker, data, result, len) < 0) {
-            fprintf(stderr, "star_id failed\n");
+        if (match_catalog_stars(tracker, &tracker->full_q, &tracker->global,
+                                data, result, len) < 0) {
+            fprintf(stderr, "star match failed\n");
             fclose(file);
             goto done_fov;
         }

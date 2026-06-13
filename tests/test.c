@@ -45,17 +45,17 @@ constellation_db *C_DB;
 
 /***
  * Determines the HIP numbers of stars in a scene.
- * 
- * @param spikes The data of the spikes in the scene. x, y, and magnitude interleaved.
+ *
+ * @param stars The image stars. x, y, and magnitude interleaved.
  * @param result The output array that should be filled with the HIP numbers.
- * @param length The number of spikes in the scene.
+ * @param length The number of stars in the scene.
  */
 int IDNUM;
-void star_id(double spikes[], int result[], size_t length)
-{	
+void star_id(double stars[], int result[], size_t length)
+{ 	
 	star_db* img_stars=new star_db;
 	for(size_t i = 0; i < length; i++) {
-		*img_stars+=star(spikes[3*i]-IMG_X/2.0,-(spikes[3*i+1]-IMG_Y/2.0),BASE_FLUX*powf(10.0,-spikes[3*i+2]/2.5),-1);
+		*img_stars+=star(stars[3*i]-IMG_X/2.0,-(stars[3*i+1]-IMG_Y/2.0),BASE_FLUX*powf(10.0,-stars[3*i+2]/2.5),-1);
 		result[i] = -1;
 	}
 	star_db* img_stars_n_brightest=img_stars->copy_n_brightest(MAX_FALSE_STARS+REQUIRED_STARS);
@@ -65,7 +65,7 @@ void star_id(double spikes[], int result[], size_t length)
 		float x=lis->winner->R11;
 		float y=lis->winner->R21;
 		float z=lis->winner->R31;
-		
+
 		//Tests relative matching, and fills in missing stars
 		//and fill in missing stars
 		SQ_RESULTS->kdsearch(x,y,z,MAXFOV/2,THRESH_FACTOR*IMAGE_VARIANCE);
@@ -75,7 +75,7 @@ void star_id(double spikes[], int result[], size_t length)
 		delete near_stars;
 		C_DB->results->clear_kdresults();
 		SQ_RESULTS->clear_kdresults();
-		
+
 		constellation_db * img=new constellation_db(img_stars,MAX_FALSE_STARS+2,1);
 		db_match* fov_match = new db_match(fov_db,img);
 		star_db* db_stars=fov_match->winner->from_match();
@@ -99,11 +99,11 @@ int main(int argc, char* argv[])
 		printf("year >= 1991.25");
 		return 0;
 	}
-	
+
 	load_config(argv[2]);
 	S_DB=new star_db;
 	S_DB->load_catalog("hip_main.dat",atof(argv[3]));
-	
+
 	SQ_RESULTS=new star_query(S_DB);
 	SQ_RESULTS->kdmask_filter_catalog();
 	SQ_RESULTS->kdmask_uniform_density(REQUIRED_STARS);

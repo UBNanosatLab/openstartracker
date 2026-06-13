@@ -16,6 +16,7 @@ private:
 	star_fov *img_mask;
 	int *map; /* Usage: map[imgstar]=dbstar */
 	size_t map_size;
+	std::vector<float> scores;
 	constellation* db_const;
 	constellation_db *db,*img;
 public:
@@ -34,6 +35,7 @@ public:
 		img_mask=img_mask_;
 		map_size=img->stars->size();
 		map=(int *)malloc(sizeof(map[0])*map_size);
+		scores.resize(map_size);
 		match.totalscore=-FLT_MAX;
 		
 	}
@@ -99,7 +101,6 @@ public:
 	void compute_score() {
 		//TODO: figure out where 2*map_size came from
 		match.totalscore=log(1.0/(IMG_X*IMG_Y))*(2*map_size);
-		float* scores=(float *)malloc(sizeof(float)*map_size);
 		for (size_t i=0;i<map_size;i++) {
 			map[i]=-1;
 			scores[i]=0.0;
@@ -125,7 +126,6 @@ public:
 		for(size_t n=0;n<map_size;n++) {
 			match.totalscore+=scores[n];
 		}
-		free(scores);
 	}
 	/**
 	* @return matching stars from db, in order of star_idx
@@ -296,8 +296,7 @@ public:
 
 struct db_match {
 private:
-	constellation_pair *c_pairs;
-	size_t c_pairs_size;
+	std::vector<constellation_pair> c_pairs;
 	star_fov *img_mask;
 public:
 	float p_match;
@@ -314,10 +313,10 @@ public:
 		DBG_PRINT("DBG_DB_MATCH_COUNT++ %d\n",DBG_DB_MATCH_COUNT);
 		winner=NULL;
 		img_mask=NULL;
-		c_pairs=NULL;
-		c_pairs_size=0;
+		c_pairs.clear();
 		p_match=0.0;
 		if (db->stars->size()<3||img->stars->size()<3) return;
+		c_pairs.reserve(img->map_size * 32);
 		img_mask = new star_fov(img->stars,db->stars->max_variance);
 		
 		//find stars
@@ -333,9 +332,6 @@ public:
 			//rewind upper & do sanity checks
 			if (db->map>=upper--) continue;
 			if (db->map+db->map_size<=lower) continue;
-			if (lower->idx<=upper->idx) {
-				c_pairs=(struct constellation_pair*)realloc(c_pairs,sizeof(struct constellation_pair)*(c_pairs_size+(upper->idx-lower->idx+1)*2));
-			}
 			for (int o=lower->idx;o<=upper->idx;o++) {
 				m->init(db->map[o],img->map[n]);
 				m->weighted_triad();
@@ -344,9 +340,9 @@ public:
 				#define ADD_SCORE\
 					m->compute_score();\
 					if (m->match.totalscore>winner->match.totalscore) {\
-						if (winner->match.totalscore!=-FLT_MAX) c_pairs[c_pairs_size++]=winner->match;\
+						if (winner->match.totalscore!=-FLT_MAX) c_pairs.push_back(winner->match);\
 						m->copy_over(winner);\
-					} else c_pairs[c_pairs_size++]=m->match;
+					} else c_pairs.push_back(m->match);
 
 				ADD_SCORE
 				/* try both orderings of stars */
@@ -369,7 +365,7 @@ public:
 			 */
 			//calculate p_match
 			p_match=1.0;
-			for (size_t idx=0; idx<c_pairs_size;idx++) {
+			for (size_t idx=0; idx<c_pairs.size();idx++) {
 				if (!winner->related(c_pairs[idx])){
 					p_match+=exp(c_pairs[idx].totalscore-winner->match.totalscore);
 				}
@@ -383,7 +379,6 @@ public:
 		DBG_PRINT("DBG_DB_MATCH_COUNT-- %d\n",DBG_DB_MATCH_COUNT);
 		delete winner;
 		delete img_mask;
-		free(c_pairs);
 	}
 };
 #endif
