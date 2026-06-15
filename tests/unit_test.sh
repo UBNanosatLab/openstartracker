@@ -54,18 +54,11 @@ fi
 
 shift
 
-KILLPID=""
 if [[ $ESA_TEST == 1 ]]; then
 	make || exit
 fi
 if [[ $IMG_TEST == 1 ]]; then
-	if [ -f ost_imgtest.c ]; then
-		make imgtest pipeline test || exit
-	else
-		pushd ../beast >/dev/null
-		./go || exit
-		popd>/dev/null
-	fi
+	make imgtest pipeline test || exit
 fi
 if [[ $CALIBRATE == 1 ]]; then
 	echo "Calibrating..."
@@ -95,7 +88,7 @@ if [[ $ESA_TEST == 1 ]]; then
 		$@ ./test_cpp $TESTDIR/input.csv $TESTDIR/calibration.txt 1991.25 > $TESTDIR/result_cpp.csv 2>/dev/null || exit
 		if [ "${OST_STRICT_CPP:-0}" = "1" ]; then
 			diff -q $TESTDIR/result_cpp.csv $TESTDIR/result_real.csv >/dev/null || {
-				echo "C BEAST regression: output differs from C++ test_cpp"
+				echo "C OST regression: output differs from C++ test_cpp"
 				exit 1
 			}
 		elif [ -f "$TESTDIR/result.csv" ]; then
@@ -125,13 +118,13 @@ expected, cpp, c = sys.argv[1:]
 cpp_score = score(expected, cpp)
 c_score = score(expected, c)
 if c_score + 1e-12 < cpp_score:
-    print("C BEAST regression: C score %.12g < C++ score %.12g" % (c_score, cpp_score))
+    print("C OST regression: C score %.12g < C++ score %.12g" % (c_score, cpp_score))
     sys.exit(1)
 PY
 		fi
 	fi
 	./test --relative-self $TESTDIR/input.csv $TESTDIR/calibration.txt 1991.25 >/dev/null || {
-		echo "C BEAST relative star self-test failed"
+		echo "C OST relative star self-test failed"
 		exit 1
 	}
 	if command -v gprof2dot >/dev/null && command -v dot >/dev/null; then
@@ -143,58 +136,34 @@ PY
 fi
 
 if [[ $IMG_TEST == 1 ]]; then
-	if [ -x ./ost_imgtest ]; then
-		PIPE_OUT=""
-		PIPE_STARS=""
-		PIPE_UNIT=""
-		# Make sure we do not crash when given an image with no stars,
-		# then run each sample twice like the original socket test.
-		$@ ./ost_imgtest $TESTDIR/calibration.txt $TESTDIR/median_image.png $TESTDIR/median_image.png >/dev/null || exit
-		for i in $TESTDIR/samples/*; do
-			$@ ./ost_imgtest $TESTDIR/calibration.txt $TESTDIR/median_image.png "$i" "$i" >/dev/null || exit
-		done
-		if [ -x ./ost_pipeline ] && [ -x ./test ]; then
-			PIPE_OUT="$(mktemp)"
-			PIPE_STARS="$(mktemp)"
-			PIPE_UNIT="$(mktemp)"
-			$@ ./ost_pipeline --stars-out "$PIPE_STARS" \
-				$TESTDIR/calibration.txt 1991.25 $TESTDIR/samples/* \
-				> "$PIPE_OUT" || {
-				rm -f "$PIPE_OUT" "$PIPE_STARS" "$PIPE_UNIT"
-				exit 1
-			}
-			$@ ./test "$PIPE_STARS" $TESTDIR/calibration.txt 1991.25 \
-				> "$PIPE_UNIT" 2>/dev/null || {
-				rm -f "$PIPE_OUT" "$PIPE_STARS" "$PIPE_UNIT"
-				exit 1
-			}
-			diff -q "$PIPE_OUT" "$PIPE_UNIT" >/dev/null || {
-				echo "C image pipeline regression: tracker API output differs from unit-test executable"
-				rm -f "$PIPE_OUT" "$PIPE_STARS" "$PIPE_UNIT"
-				exit 1
-			}
-			rm -f "$PIPE_OUT" "$PIPE_STARS" "$PIPE_UNIT"
-		fi
-	else
-		$@ $PYTHON startracker.py $TESTDIR/calibration.txt 1991.25 $TESTDIR/median_image.png &
-		KILLPID="$!"
-		sleep 10
-		#make sure we dont crash when given an image w/ no stars
-		echo "rgb.solve_image('$TESTDIR/median_image.png')" | nc -w1 127.0.0.1 8010
-		sleep 0.5
-		for i in $TESTDIR/samples/*; do
-			echo "rgb.solve_image('$i')" | nc -w1 127.0.0.1 8010
-			sleep 0.5
-			echo "rgb.solve_image('$i')" | nc -w1 127.0.0.1 8010
-			sleep 0.5
-		done
-	  #sleep 0.5
-	  #echo 'exception test' | nc 127.0.0.1 8010
-	  sleep 0.5
-		echo 'quit()' | nc -w1 127.0.0.1 8010
-	fi
-fi
-if [ "$KILLPID" != "" ] ; then 
-	kill $KILLPID
+	PIPE_OUT=""
+	PIPE_STARS=""
+	PIPE_UNIT=""
+	# Make sure we do not crash when given an image with no stars,
+	# then run each sample twice like the original socket test.
+	$@ ./ost_imgtest $TESTDIR/calibration.txt $TESTDIR/median_image.png $TESTDIR/median_image.png >/dev/null || exit
+	for i in $TESTDIR/samples/*; do
+		$@ ./ost_imgtest $TESTDIR/calibration.txt $TESTDIR/median_image.png "$i" "$i" >/dev/null || exit
+	done
+	PIPE_OUT="$(mktemp)"
+	PIPE_STARS="$(mktemp)"
+	PIPE_UNIT="$(mktemp)"
+	$@ ./ost_pipeline --stars-out "$PIPE_STARS" \
+		$TESTDIR/calibration.txt 1991.25 $TESTDIR/samples/* \
+		> "$PIPE_OUT" || {
+		rm -f "$PIPE_OUT" "$PIPE_STARS" "$PIPE_UNIT"
+		exit 1
+	}
+	$@ ./test "$PIPE_STARS" $TESTDIR/calibration.txt 1991.25 \
+		> "$PIPE_UNIT" 2>/dev/null || {
+		rm -f "$PIPE_OUT" "$PIPE_STARS" "$PIPE_UNIT"
+		exit 1
+	}
+	diff -q "$PIPE_OUT" "$PIPE_UNIT" >/dev/null || {
+		echo "C image pipeline regression: tracker API output differs from unit-test executable"
+		rm -f "$PIPE_OUT" "$PIPE_STARS" "$PIPE_UNIT"
+		exit 1
+	}
+	rm -f "$PIPE_OUT" "$PIPE_STARS" "$PIPE_UNIT"
 fi
 popd>/dev/null

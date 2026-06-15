@@ -1,12 +1,14 @@
 # Python cache files
 __pycache__/
 *.pyc
+*.swp
 
 # Generated shared libraries
 beast/_beast.so
 beast/_beast_py.so
 ost/_ost.so
 ost/_ost_core.so
+ost/*.o
 
 # Legacy SWIG/backend artifacts
 beast/beast_wrap.cxx
@@ -19,4 +21,5 @@ tests/test_cpp
 tests/test-beast
 tests/ost_imgtest
 tests/ost_pipeline
-tests/science_cam_may8_0.05sec_gain40/result_cpp.csv
+tests/test.pdf
+tests/*/result_cpp.csv

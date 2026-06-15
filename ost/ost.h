@@ -35,7 +35,7 @@
 #define OST_DEF __attribute__((visibility("default")))
 #endif
 #else
-#define OST_DEF static OST_UNUSED
+#define OST_DEF
 #endif
 #endif
 
@@ -45,11 +45,12 @@ extern "C" {
 
 /* Single-header C core; all algorithm work buffers are caller-owned. */
 
-#define OST_SWAP(type, a, b) do { \
-    type ost_swap_tmp = (a); \
-    (a) = (b); \
-    (b) = ost_swap_tmp; \
-} while (0)
+#define OST_SWAP(type, a, b)              \
+    do {                                  \
+        type ost_swap_tmp = (a);          \
+        (a)               = (b);          \
+        (b)               = ost_swap_tmp; \
+    } while (0)
 
 /* Binary fields are area/sums; weighted fields are flux moments. */
 typedef struct OSTCCComponent {
@@ -177,6 +178,126 @@ int ost_bg_fit_stars(const OSTBGConfig *cfg, const uint16_t *image, int stride,
                      double *params_out, double *cov_xy_out,
                      int *dropped_count_out);
 
+static const double PI = 3.14159265358979323846;
+
+typedef float Vec3[3];
+typedef Vec3 Mat3[3];
+
+/* Star identification and attitude primitives. */
+
+/* File config plus derived field-of-view and tangent-plane calibration. */
+typedef struct Config {
+    int IMG_X, IMG_Y, MAX_FALSE_STARS, DB_REDUNDANCY, REQUIRED_STARS;
+    int KDBUCKET_SIZE;
+    float PIXSCALE, DOUBLE_STAR_PX, BASE_FLUX, IMAGE_VARIANCE;
+    float THRESH_FACTOR, POS_VARIANCE, POS_ERR_SIGMA;
+    float MAXFOV, MINFOV, MATCH_VALUE, PIXX_TANGENT, PIXY_TANGENT;
+} Config;
+
+/* Catalog and image stars share unit-vector storage; image stars also keep px/py. */
+typedef struct Star {
+    union {
+        Vec3 v;
+        struct { float x, y, z; };
+    };
+    float flux;
+    float px, py, sigma_sq;
+    int id, star_idx, unreliable;
+} Star;
+
+typedef struct StarDB {
+    Star *v;
+    int n, cap;
+    float max_variance;
+} StarDB;
+
+/* KD-search map plus caller-owned result and mask arrays. */
+typedef struct Query {
+    Star *map;
+    int n, kdsorted;
+    int *kdresults;
+    int kdresults_size, kdresults_maxsize;
+    signed char *kdmask;
+} Query;
+
+/* Pairwise angular separation; sorted arrays enable candidate range lookup. */
+typedef struct Constellation {
+    float p;
+    int s1, s2, idx;
+} Constellation;
+
+typedef struct CPair {
+    float totalscore;
+    int db_s1, db_s2, img_s1, img_s2;
+} CPair;
+
+typedef struct CDB {
+    StarDB stars;
+    Query results;
+    Constellation *map;
+    int map_size;
+} CDB;
+
+typedef struct StarFov {
+    int *mask, *collision;
+    int collision_size, collision_cap;
+    float *s_px, *s_py, maxdist_sq, sigma_sq;
+} StarFov;
+
+typedef struct MatchResult {
+    CPair match;
+    Mat3 R;
+    int *map;
+    int map_size;
+    CDB *db, *img;
+    StarFov *img_mask;
+} MatchResult;
+
+typedef struct MatchWork {
+    CPair *candidates;
+    int candidate_cap;
+    int *fov_mask, *collision;
+    int collision_cap;
+    float *fov_px, *fov_py, *scores;
+    int *match_map, *work_map;
+} MatchWork;
+
+int ost_load_config(Config *c, const char *filename);
+Star ost_make_db_star(const Config *c, float x, float y, float z, float flux, int id);
+Star ost_make_img_star(const Config *c, float px, float py, float flux, int id);
+void ost_star_db_init(StarDB *db, Star *storage, int cap);
+int ost_db_add(StarDB *db, Star s);
+int ost_load_catalog(const Config *cfg, StarDB *db, const char *filename,
+                     float year, uint64_t *cat_keys, size_t cat_key_cap);
+void ost_query_init(Query *q, StarDB *db, Star *map, int *res, signed char *mask);
+void ost_query_reset_mask(Query *q);
+void ost_query_clear_results(Query *q);
+void ost_query_sort_flux(Query *q);
+void ost_query_kdsort(Query *q, const Config *c);
+void ost_query_search(Query *q, const Config *c, const float p[3],
+                      float radius, float min_flux);
+void ost_query_search_range(Query *q, const Config *c, const float p[3],
+                            float r, float min_flux, int start, int end, int dim);
+void ost_query_mask_filter(Query *q, const Config *c);
+void ost_query_mask_uniform(Query *q, const Config *c, int min_stars, signed char *keep);
+int ost_db_from_mask(StarDB *out, Query *q);
+int ost_db_from_results(StarDB *out, Query *q);
+int ost_db_from_image(CDB *cdb, StarDB *src, Star *star_storage, int star_cap,
+                      Query *q, Star *query_map, int *query_results,
+                      signed char *query_mask, Constellation *map, int map_cap,
+                      int stars_per_fov);
+int ost_db_from_catalog(CDB *cdb, StarDB *src, Star *star_storage, int star_cap,
+                        Query *q, Star *query_map, int *query_results,
+                        signed char *query_mask, Constellation *map, int map_cap,
+                        int stars_per_fov, const Config *cfg, signed char *keep);
+int ost_db_match(CDB *db, CDB *img, MatchResult *winner,
+                 const Config *cfg, MatchWork *mw, float *p_match);
+void ost_match_work_init(MatchWork *mw, CPair *candidates, int candidate_cap,
+                         int *fov_mask, int *collision, int collision_cap,
+                         float *fov_px, float *fov_py, float *scores,
+                         int *match_map, int *work_map);
+int ost_copy_n_brightest(StarDB *dst, StarDB *src, Star *tmp, int n);
+
 #ifdef __cplusplus
 }
 #endif
@@ -184,10 +305,6 @@ int ost_bg_fit_stars(const OSTBGConfig *cfg, const uint16_t *image, int stride,
 #ifdef OST_IMPLEMENTATION
 
 /* utilities */
-static const double PI = 3.14159265358979323846;
-
-typedef float Vec3[3];
-typedef Vec3 Mat3[3];
 typedef const float *OST_RESTRICT Vec3In;
 typedef float *OST_RESTRICT Vec3Out;
 typedef const Vec3 *OST_RESTRICT Mat3In;
@@ -1676,85 +1793,6 @@ int ost_bg_fit_stars(const OSTBGConfig *cfg, const uint16_t *image, int stride,
     return n;
 }
 
-/* Star identification and attitude primitives. */
-
-/* File config plus derived field-of-view and tangent-plane calibration. */
-typedef struct Config {
-    int IMG_X, IMG_Y, MAX_FALSE_STARS, DB_REDUNDANCY, REQUIRED_STARS;
-    int KDBUCKET_SIZE;
-    float PIXSCALE, DOUBLE_STAR_PX, BASE_FLUX, IMAGE_VARIANCE;
-    float THRESH_FACTOR, POS_VARIANCE, POS_ERR_SIGMA;
-    float MAXFOV, MINFOV, MATCH_VALUE, PIXX_TANGENT, PIXY_TANGENT;
-} Config;
-
-/* Catalog and image stars share unit-vector storage; image stars also keep px/py. */
-typedef struct Star {
-    union {
-        Vec3 v;
-        struct { float x, y, z; };
-    };
-    float flux;
-    float px, py, sigma_sq;
-    int id, star_idx, unreliable;
-} Star;
-
-typedef struct StarDB {
-    Star *v;
-    int n, cap;
-    float max_variance;
-} StarDB;
-
-/* KD-search map plus caller-owned result and mask arrays. */
-typedef struct Query {
-    Star *map;
-    int n, kdsorted;
-    int *kdresults;
-    int kdresults_size, kdresults_maxsize;
-    signed char *kdmask;
-} Query;
-
-/* Pairwise angular separation; sorted arrays enable candidate range lookup. */
-typedef struct Constellation {
-    float p;
-    int s1, s2, idx;
-} Constellation;
-
-typedef struct CPair {
-    float totalscore;
-    int db_s1, db_s2, img_s1, img_s2;
-} CPair;
-
-typedef struct CDB {
-    StarDB stars;
-    Query results;
-    Constellation *map;
-    int map_size;
-} CDB;
-
-typedef struct StarFov {
-    int *mask, *collision;
-    int collision_size, collision_cap;
-    float *s_px, *s_py, maxdist_sq, sigma_sq;
-} StarFov;
-
-typedef struct MatchResult {
-    CPair match;
-    Mat3 R;
-    int *map;
-    int map_size;
-    CDB *db, *img;
-    StarFov *img_mask;
-} MatchResult;
-
-typedef struct MatchWork {
-    CPair *candidates;
-    int candidate_cap;
-    int *fov_mask, *collision;
-    int collision_cap;
-    float *fov_px, *fov_py, *scores;
-    int *match_map, *work_map;
-} MatchWork;
-
 OST_DEF int ost_load_config(Config *c, const char *filename)
 {
     FILE *f;
@@ -2088,7 +2126,7 @@ OST_DEF void ost_query_search(Query *q, const Config *c, const float p[3],
 {
     float r = arcsec / 3600.0f * (float)PI / 180.0f;
     ost_query_kdsort(q, c);
-    kdsearch(q, p, 2 * fabsf(sin(r / 2.0f)), min_flux, 0, q->n,
+    kdsearch(q, p, 2.0f * fabsf(sinf(r / 2.0f)), min_flux, 0, q->n,
              c->KDBUCKET_SIZE, 0);
 }
 

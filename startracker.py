@@ -85,8 +85,7 @@ def extrapolate_matrix(A,B,t1,t2,t3):
 
 	return (C,(1000000.0)*anglesAB/(t2-t1))
 
-#Note: SWIG's policy is to garbage collect objects created with
-#constructors, but not objects created by returning from a function
+# Keep references to wrapper-owned objects that back C-side pointers.
 
 def wahba(A, B, weight=[]):
 	"""
@@ -146,7 +145,7 @@ class star_image:
 		self.match_from_lm=None
 		self.db_stars_from_lm=None
 		
-		#Placeholders so that these don't get garbage collected by SWIG
+		# Placeholders so C-side pointers keep valid Python-owned storage.
 		self.fov_db=None
 		self.const_from_lm=None
 		

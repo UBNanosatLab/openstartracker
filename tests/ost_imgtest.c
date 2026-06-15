@@ -1,4 +1,3 @@
-#define OST_IMPLEMENTATION
 #include "../ost/ost.h"
 
 #include <errno.h>

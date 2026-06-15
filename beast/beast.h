@@ -1,9 +1,6 @@
 #ifndef OST_COMPAT_BEAST_H
 #define OST_COMPAT_BEAST_H
 
-#ifndef OST_IMPLEMENTATION
-#define OST_IMPLEMENTATION
-#endif
 #include "../ost/ost.h"
 
 #if defined(__GNUC__) || defined(__clang__)

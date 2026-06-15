@@ -7,9 +7,9 @@ Features:
 * Image to image matching
 * Collect and store size, shape and color information of unknown objects
 * Tracks unknown objects between images
-* Programmable Python frontend with a reusable C BEAST backend
+* Programmable Python frontend with a reusable C OST backend
 * Uses astrometry.net for calibration (check if your camera is good enough by uploading your star images to nova.astrometry.net)
-* Supports python 2 and 3 (see bottom)
+* Supports Python 3
 
 ### Basic setup:
 
@@ -77,7 +77,7 @@ cd tests/
 
 This command will **c**alibrate your image sensor, **r** regenerate the test data, run an **E**SA test, and finally run the **i**mage test where images are fed to the calibrated star tracker program to produce an attitude fix.
 
-The BEAST backend is implemented in C in `beast/beast.h`. The Python package builds a small `_beast_py.so` module from `beast/beast_py.c`; no C++ or SWIG build step is required.
+The native backend is implemented in `ost/ost.h` with `ost/ost.c` building the Python shared library `ost/_ost.so`. Legacy `beast` Python/C++ entry points remain as compatibility shims.
 
 The usage message for `unit_test.py` is here:
 ```
