@@ -1,5 +1,5 @@
-#define BEAST_IMPLEMENTATION
-#include "../beast/beast.h"
+#define OST_IMPLEMENTATION
+#include "../ost/ost.h"
 
 #include <errno.h>
 #include <math.h>

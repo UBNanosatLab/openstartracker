@@ -3,7 +3,17 @@ import math as _math
 import os as _os
 
 _here = _os.path.dirname(__file__)
-_lib = _ct.CDLL(_os.path.join(_here, "_beast_py.so"))
+
+class _CompatCDLL:
+    def __init__(self, path):
+        self._dll = _ct.CDLL(path)
+
+    def __getattr__(self, name):
+        if name.startswith("beast_"):
+            name = "ost_" + name[6:]
+        return getattr(self._dll, name)
+
+_lib = _CompatCDLL(_os.path.join(_here, "..", "ost", "_ost.so"))
 
 class Config(_ct.Structure):
     _fields_ = [
@@ -77,9 +87,9 @@ PCDB = _ct.POINTER(CDB)
 
 MAX_STARS = 1000
 MAX_CAT = 120000
-MAX_CDB = 600000
-MAX_CANDIDATES = 65536
-MAX_COLLISION = 16384
+INITIAL_CDB = 600000
+INITIAL_CANDIDATES = 65536
+INITIAL_COLLISION = 16384
 KEY_CAP = 262144
 
 _lib.beast_load_config.argtypes = [PConfig, _ct.c_char_p]
@@ -93,7 +103,7 @@ _lib.beast_db_add.argtypes = [PStarDB, BeastStar]
 _lib.beast_db_add.restype = _ct.c_int
 _lib.beast_copy_n_brightest.argtypes = [PStarDB, PStarDB, PStar, _ct.c_int]
 _lib.beast_copy_n_brightest.restype = _ct.c_int
-_lib.beast_load_catalog.argtypes = [PConfig, PStarDB, _ct.c_char_p, _ct.c_float, _ct.POINTER(_ct.c_uint64)]
+_lib.beast_load_catalog.argtypes = [PConfig, PStarDB, _ct.c_char_p, _ct.c_float, _ct.POINTER(_ct.c_uint64), _ct.c_size_t]
 _lib.beast_load_catalog.restype = _ct.c_int
 _lib.beast_query_init.argtypes = [PQuery, PStarDB, PStar, _ct.POINTER(_ct.c_int), _ct.POINTER(_ct.c_byte)]
 _lib.beast_query_sort_flux.argtypes = [PQuery]
@@ -244,18 +254,26 @@ class star_db:
             raise MemoryError("copy_n_brightest")
         return out
     def load_catalog(self, catalog, year):
-        self._ensure(MAX_CAT)
-        self._db.n = 0
-        keys = (_ct.c_uint64 * KEY_CAP)()
-        rc = _lib.beast_load_catalog(
-            _ct.byref(_cfg),
-            _ct.byref(self._db),
-            _b(catalog),
-            float(year),
-            keys,
-        )
-        if rc < 0:
-            raise OSError(catalog)
+        with open(catalog, 'rb'):
+            pass
+        star_cap = max(self._cap, MAX_CAT)
+        key_cap = KEY_CAP
+        while True:
+            self._ensure(star_cap)
+            self._db.n = 0
+            keys = (_ct.c_uint64 * key_cap)()
+            rc = _lib.beast_load_catalog(
+                _ct.byref(_cfg),
+                _ct.byref(self._db),
+                _b(catalog),
+                float(year),
+                keys,
+                key_cap,
+            )
+            if rc == 0:
+                break
+            star_cap *= 2
+            key_cap *= 2
     def count(self, s):
         sid = s.id
         return sum(1 for i in range(self._db.n) if self._stars[i].id == sid) if sid >= 0 else 0
@@ -338,18 +356,22 @@ class constellation_db:
         self._cdb = CDB()
         if from_image:
             ns = min(self.stars.size(), int(stars_per_fov))
-            cap = ns * (ns - 1) // 2
+            cap = max(1, ns * (ns - 1) // 2)
         else:
-            cap = MAX_CDB
-        self._map_cap = max(1, cap)
-        self._map = (Constellation * self._map_cap)()
-        if from_image:
-            rc = _lib.beast_db_from_image(_ct.byref(self._cdb), _ct.byref(s._db), self.stars._stars, self.stars._cap, _ct.byref(self.results._q), self.results.map, self.results.kdresults, self.results._kdmask, self._map, self._map_cap, int(stars_per_fov))
-        else:
-            keep = (_ct.c_byte * max(1, self.stars.size()))()
-            rc = _lib.beast_db_from_catalog(_ct.byref(self._cdb), _ct.byref(s._db), self.stars._stars, self.stars._cap, _ct.byref(self.results._q), self.results.map, self.results.kdresults, self.results._kdmask, self._map, self._map_cap, int(stars_per_fov), _ct.byref(_cfg), keep)
-        if rc < 0:
-            raise MemoryError("constellation_db")
+            cap = max(INITIAL_CDB, self.stars.size() * int(stars_per_fov), 1)
+        while True:
+            self._map_cap = cap
+            self._map = (Constellation * self._map_cap)()
+            if from_image:
+                rc = _lib.beast_db_from_image(_ct.byref(self._cdb), _ct.byref(s._db), self.stars._stars, self.stars._cap, _ct.byref(self.results._q), self.results.map, self.results.kdresults, self.results._kdmask, self._map, self._map_cap, int(stars_per_fov))
+            else:
+                keep = (_ct.c_byte * max(1, self.stars.size()))()
+                rc = _lib.beast_db_from_catalog(_ct.byref(self._cdb), _ct.byref(s._db), self.stars._stars, self.stars._cap, _ct.byref(self.results._q), self.results.map, self.results.kdresults, self.results._kdmask, self._map, self._map_cap, int(stars_per_fov), _ct.byref(_cfg), keep)
+            if rc == 0:
+                break
+            if from_image:
+                raise MemoryError("constellation_db")
+            cap *= 2
         self.stars._db = self._cdb.stars
         self.results._q = self._cdb.results
         self.map_size = self._cdb.map_size
@@ -402,27 +424,34 @@ class db_match:
         db._sync_results()
         img._sync_results()
         n = img.stars.size()
-        candidates = _arr('candidates', CPair, MAX_CANDIDATES)
-        fov_mask = _arr('fov_mask', _ct.c_int, cvar.IMG_X * cvar.IMG_Y)
-        collision = _arr('collision', _ct.c_int, MAX_COLLISION)
-        fov_px = _arr('fov_px', _ct.c_float, n)
-        fov_py = _arr('fov_py', _ct.c_float, n)
-        scores = _arr('scores', _ct.c_float, n)
-        match_map = _arr('match_map', _ct.c_int, n)
-        work_map = _arr('work_map', _ct.c_int, n)
-        work = MatchWork()
-        _lib.beast_match_work_init(_ct.byref(work), candidates, len(candidates), fov_mask, collision, len(collision), fov_px, fov_py, scores, match_map, work_map)
-        cwin = MatchResultC()
-        p = _ct.c_float(0)
-        rc = _lib.beast_db_match(
-            _ct.byref(db._cdb),
-            _ct.byref(img._cdb),
-            _ct.byref(cwin),
-            _ct.byref(_cfg),
-            _ct.byref(work),
-            _ct.byref(p),
-        )
-        if rc < 0:
-            raise RuntimeError("db_match")
+        candidate_cap = max(INITIAL_CANDIDATES, img._cdb.map_size * 16, 1)
+        collision_cap = max(INITIAL_COLLISION, n * 8, 1)
+        while True:
+            candidates = _arr('candidates', CPair, candidate_cap)
+            fov_mask = _arr('fov_mask', _ct.c_int, cvar.IMG_X * cvar.IMG_Y)
+            collision = _arr('collision', _ct.c_int, collision_cap)
+            fov_px = _arr('fov_px', _ct.c_float, n)
+            fov_py = _arr('fov_py', _ct.c_float, n)
+            scores = _arr('scores', _ct.c_float, n)
+            match_map = _arr('match_map', _ct.c_int, n)
+            work_map = _arr('work_map', _ct.c_int, n)
+            work = MatchWork()
+            _lib.beast_match_work_init(_ct.byref(work), candidates, len(candidates), fov_mask, collision, len(collision), fov_px, fov_py, scores, match_map, work_map)
+            cwin = MatchResultC()
+            p = _ct.c_float(0)
+            rc = _lib.beast_db_match(
+                _ct.byref(db._cdb),
+                _ct.byref(img._cdb),
+                _ct.byref(cwin),
+                _ct.byref(_cfg),
+                _ct.byref(work),
+                _ct.byref(p),
+            )
+            if rc == 0:
+                break
+            if db._cdb.results.kdsorted:
+                _lib.beast_query_clear_results(_ct.byref(db._cdb.results))
+            candidate_cap *= 2
+            collision_cap *= 2
         self.p_match = p.value
         self.winner = match_result(cwin, db, img)
