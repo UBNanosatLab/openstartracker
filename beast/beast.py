@@ -1,19 +1,32 @@
+"""Python bindings for OpenStartracker's legacy beast API.
+
+New code should use the native ``ost`` Python module.  This module keeps the
+older lower-case beast classes used by ``startracker.py``.
+
+Typical legacy use::
+
+    import beast
+
+    beast.load_config("calibration.txt")
+    catalog = beast.star_db()
+    catalog.load_catalog("hip_main.dat", 1991.25)
+    query = beast.star_query(catalog)
+    query.kdmask_filter_catalog()
+    query.kdmask_uniform_density(beast.cvar.REQUIRED_STARS)
+    filtered = query.from_kdmask()
+    catalog_constellations = beast.constellation_db(
+        filtered, 2 + beast.cvar.DB_REDUNDANCY, 0)
+
+Image stars are collected in another :class:`star_db`, converted to a
+``constellation_db(..., from_image=1)``, and matched with :class:`db_match`.
+"""
+
 import ctypes as _ct
 import math as _math
 import os as _os
 
 _here = _os.path.dirname(__file__)
-
-class _CompatCDLL:
-    def __init__(self, path):
-        self._dll = _ct.CDLL(path)
-
-    def __getattr__(self, name):
-        if name.startswith("beast_"):
-            name = "ost_" + name[6:]
-        return getattr(self._dll, name)
-
-_lib = _CompatCDLL(_os.path.join(_here, "..", "ost", "_ost.so"))
+_lib = _ct.CDLL(_os.path.join(_here, "..", "ost", "_ost.so"))
 
 class Config(_ct.Structure):
     _fields_ = [
@@ -28,7 +41,7 @@ class Config(_ct.Structure):
         ("PIXX_TANGENT", _ct.c_float), ("PIXY_TANGENT", _ct.c_float),
     ]
 
-class BeastStar(_ct.Structure):
+class Star(_ct.Structure):
     _fields_ = [
         ("x", _ct.c_float), ("y", _ct.c_float), ("z", _ct.c_float),
         ("flux", _ct.c_float), ("px", _ct.c_float), ("py", _ct.c_float),
@@ -37,11 +50,11 @@ class BeastStar(_ct.Structure):
     ]
 
 class StarDB(_ct.Structure):
-    _fields_ = [("v", _ct.POINTER(BeastStar)), ("n", _ct.c_int),
+    _fields_ = [("v", _ct.POINTER(Star)), ("n", _ct.c_int),
                 ("cap", _ct.c_int), ("max_variance", _ct.c_float)]
 
 class Query(_ct.Structure):
-    _fields_ = [("map", _ct.POINTER(BeastStar)), ("n", _ct.c_int),
+    _fields_ = [("map", _ct.POINTER(Star)), ("n", _ct.c_int),
                 ("kdsorted", _ct.c_int), ("kdresults", _ct.POINTER(_ct.c_int)),
                 ("kdresults_size", _ct.c_int), ("kdresults_maxsize", _ct.c_int),
                 ("kdmask", _ct.POINTER(_ct.c_byte))]
@@ -80,7 +93,7 @@ class MatchWork(_ct.Structure):
                 ("work_map", _ct.POINTER(_ct.c_int))]
 
 PConfig = _ct.POINTER(Config)
-PStar = _ct.POINTER(BeastStar)
+PStar = _ct.POINTER(Star)
 PStarDB = _ct.POINTER(StarDB)
 PQuery = _ct.POINTER(Query)
 PCDB = _ct.POINTER(CDB)
@@ -92,43 +105,63 @@ INITIAL_CANDIDATES = 65536
 INITIAL_COLLISION = 16384
 KEY_CAP = 262144
 
-_lib.beast_load_config.argtypes = [PConfig, _ct.c_char_p]
-_lib.beast_load_config.restype = _ct.c_int
-_lib.beast_make_db_star.argtypes = [PConfig, _ct.c_float, _ct.c_float, _ct.c_float, _ct.c_float, _ct.c_int]
-_lib.beast_make_db_star.restype = BeastStar
-_lib.beast_make_img_star.argtypes = [PConfig, _ct.c_float, _ct.c_float, _ct.c_float, _ct.c_int]
-_lib.beast_make_img_star.restype = BeastStar
-_lib.beast_star_db_init.argtypes = [PStarDB, PStar, _ct.c_int]
-_lib.beast_db_add.argtypes = [PStarDB, BeastStar]
-_lib.beast_db_add.restype = _ct.c_int
-_lib.beast_copy_n_brightest.argtypes = [PStarDB, PStarDB, PStar, _ct.c_int]
-_lib.beast_copy_n_brightest.restype = _ct.c_int
-_lib.beast_load_catalog.argtypes = [PConfig, PStarDB, _ct.c_char_p, _ct.c_float, _ct.POINTER(_ct.c_uint64), _ct.c_size_t]
-_lib.beast_load_catalog.restype = _ct.c_int
-_lib.beast_query_init.argtypes = [PQuery, PStarDB, PStar, _ct.POINTER(_ct.c_int), _ct.POINTER(_ct.c_byte)]
-_lib.beast_query_sort_flux.argtypes = [PQuery]
-_lib.beast_query_kdsort.argtypes = [PQuery, PConfig]
-_lib.beast_query_reset_mask.argtypes = [PQuery]
-_lib.beast_query_clear_results.argtypes = [PQuery]
-_lib.beast_query_search.argtypes = [PQuery, PConfig, _ct.POINTER(_ct.c_float), _ct.c_float, _ct.c_float]
-_lib.beast_query_search_range.argtypes = [PQuery, PConfig, _ct.POINTER(_ct.c_float), _ct.c_float, _ct.c_float, _ct.c_int, _ct.c_int, _ct.c_int]
-_lib.beast_query_mask_filter.argtypes = [PQuery, PConfig]
-_lib.beast_query_mask_uniform.argtypes = [PQuery, PConfig, _ct.c_int, _ct.POINTER(_ct.c_byte)]
-_lib.beast_db_from_mask.argtypes = [PStarDB, PQuery]
-_lib.beast_db_from_mask.restype = _ct.c_int
-_lib.beast_db_from_results.argtypes = [PStarDB, PQuery]
-_lib.beast_db_from_results.restype = _ct.c_int
-_lib.beast_db_from_image.argtypes = [PCDB, PStarDB, PStar, _ct.c_int, PQuery, PStar, _ct.POINTER(_ct.c_int), _ct.POINTER(_ct.c_byte), _ct.POINTER(Constellation), _ct.c_int, _ct.c_int]
-_lib.beast_db_from_image.restype = _ct.c_int
-_lib.beast_db_from_catalog.argtypes = [PCDB, PStarDB, PStar, _ct.c_int, PQuery, PStar, _ct.POINTER(_ct.c_int), _ct.POINTER(_ct.c_byte), _ct.POINTER(Constellation), _ct.c_int, _ct.c_int, PConfig, _ct.POINTER(_ct.c_byte)]
-_lib.beast_db_from_catalog.restype = _ct.c_int
-_lib.beast_match_work_init.argtypes = [_ct.POINTER(MatchWork), _ct.POINTER(CPair), _ct.c_int, _ct.POINTER(_ct.c_int), _ct.POINTER(_ct.c_int), _ct.c_int, _ct.POINTER(_ct.c_float), _ct.POINTER(_ct.c_float), _ct.POINTER(_ct.c_float), _ct.POINTER(_ct.c_int), _ct.POINTER(_ct.c_int)]
-_lib.beast_db_match.argtypes = [PCDB, PCDB, _ct.POINTER(MatchResultC), PConfig, _ct.POINTER(MatchWork), _ct.POINTER(_ct.c_float)]
-_lib.beast_db_match.restype = _ct.c_int
+__all__ = [
+    "cvar",
+    "load_config",
+    "star",
+    "star_db",
+    "star_query",
+    "constellation_db",
+    "db_match",
+    "match_result",
+]
+
+_lib.ost_load_config.argtypes = [PConfig, _ct.c_char_p]
+_lib.ost_load_config.restype = _ct.c_int
+_lib.ost_make_db_star.argtypes = [PConfig, _ct.c_float, _ct.c_float, _ct.c_float, _ct.c_float, _ct.c_int]
+_lib.ost_make_db_star.restype = Star
+_lib.ost_make_img_star.argtypes = [PConfig, _ct.c_float, _ct.c_float, _ct.c_float, _ct.c_int]
+_lib.ost_make_img_star.restype = Star
+_lib.ost_star_db_init.argtypes = [PStarDB, PStar, _ct.c_int]
+_lib.ost_db_add.argtypes = [PStarDB, Star]
+_lib.ost_db_add.restype = _ct.c_int
+_lib.ost_copy_n_brightest.argtypes = [PStarDB, PStarDB, PStar, _ct.c_int]
+_lib.ost_copy_n_brightest.restype = _ct.c_int
+_lib.ost_load_catalog.argtypes = [PConfig, PStarDB, _ct.c_char_p, _ct.c_float, _ct.POINTER(_ct.c_uint64), _ct.c_size_t]
+_lib.ost_load_catalog.restype = _ct.c_int
+_lib.ost_query_init.argtypes = [PQuery, PStarDB, PStar, _ct.POINTER(_ct.c_int), _ct.POINTER(_ct.c_byte)]
+_lib.ost_query_sort_flux.argtypes = [PQuery]
+_lib.ost_query_kdsort.argtypes = [PQuery, PConfig]
+_lib.ost_query_reset_mask.argtypes = [PQuery]
+_lib.ost_query_clear_results.argtypes = [PQuery]
+_lib.ost_query_search.argtypes = [PQuery, PConfig, _ct.POINTER(_ct.c_float), _ct.c_float, _ct.c_float]
+_lib.ost_query_search_range.argtypes = [PQuery, PConfig, _ct.POINTER(_ct.c_float), _ct.c_float, _ct.c_float, _ct.c_int, _ct.c_int, _ct.c_int]
+_lib.ost_query_mask_filter.argtypes = [PQuery, PConfig]
+_lib.ost_query_mask_uniform.argtypes = [PQuery, PConfig, _ct.c_int, _ct.POINTER(_ct.c_byte)]
+_lib.ost_db_from_mask.argtypes = [PStarDB, PQuery]
+_lib.ost_db_from_mask.restype = _ct.c_int
+_lib.ost_db_from_results.argtypes = [PStarDB, PQuery]
+_lib.ost_db_from_results.restype = _ct.c_int
+_lib.ost_db_from_image.argtypes = [PCDB, PStarDB, PStar, _ct.c_int, PQuery, PStar, _ct.POINTER(_ct.c_int), _ct.POINTER(_ct.c_byte), _ct.POINTER(Constellation), _ct.c_int, _ct.c_int]
+_lib.ost_db_from_image.restype = _ct.c_int
+_lib.ost_db_from_catalog.argtypes = [PCDB, PStarDB, PStar, _ct.c_int, PQuery, PStar, _ct.POINTER(_ct.c_int), _ct.POINTER(_ct.c_byte), _ct.POINTER(Constellation), _ct.c_int, _ct.c_int, PConfig, _ct.POINTER(_ct.c_byte)]
+_lib.ost_db_from_catalog.restype = _ct.c_int
+_lib.ost_match_work_init.argtypes = [_ct.POINTER(MatchWork), _ct.POINTER(CPair), _ct.c_int, _ct.POINTER(_ct.c_int), _ct.POINTER(_ct.c_int), _ct.c_int, _ct.POINTER(_ct.c_float), _ct.POINTER(_ct.c_float), _ct.POINTER(_ct.c_float), _ct.POINTER(_ct.c_int), _ct.POINTER(_ct.c_int)]
+_lib.ost_db_match.argtypes = [PCDB, PCDB, _ct.POINTER(MatchResultC), PConfig, _ct.POINTER(MatchWork), _ct.POINTER(_ct.c_float)]
+_lib.ost_db_match.restype = _ct.c_int
 
 _cfg = Config()
 class _CVar:
-    pass
+    """Configuration values loaded by :func:`load_config`.
+
+    Attributes mirror the calibration/configuration fields used by the C core,
+    such as ``IMG_X``, ``IMG_Y``, ``PIXSCALE``, ``REQUIRED_STARS``,
+    ``MAX_FALSE_STARS``, ``DB_REDUNDANCY``, and matching thresholds.
+    """
+    def __dir__(self):
+        """Return the config field names exposed after loading a config."""
+        return [name for name, _ in Config._fields_]
+
 cvar = _CVar()
 
 def _b(path):
@@ -139,21 +172,42 @@ def _publish_config():
         setattr(cvar, name, getattr(_cfg, name))
 
 def load_config(filename):
-    if _lib.beast_load_config(_ct.byref(_cfg), _b(filename)) < 0:
+    """Load a camera calibration/configuration file.
+
+    After this succeeds, the parsed values are available as attributes on
+    :data:`cvar`.  Load a config before constructing image stars, loading a
+    catalog, creating constellation databases, or matching.
+
+    Args:
+        filename: Path to a calibration/configuration text file.
+
+    Raises:
+        OSError: If the file cannot be read or parsed by the OST backend.
+    """
+    if _lib.ost_load_config(_ct.byref(_cfg), _b(filename)) < 0:
         raise OSError(filename)
     _publish_config()
 
 class star:
+    """A single catalog or image star.
+
+    ``star(x, y, z, flux, id)`` creates a catalog star when ``id >= 0``.
+    ``star(px, py, flux, -1)`` creates an image star from pixel offsets relative
+    to the image center; the loaded config supplies the camera model.  Stars
+    returned by :meth:`star_db.get_star` are lightweight views into that
+    database, so assigning properties updates the database entry.
+    """
     __slots__ = ("_db", "_idx", "_own")
     def __init__(self, a=0.0, b=0.0, c=0.0, flux=None, id=-1, _db=None, _idx=None, _own=None):
+        """Create a catalog star, image star, or internal database view."""
         self._db = _db
         self._idx = _idx
         if _own is not None:
             self._own = _own
         elif flux is None:
-            self._own = BeastStar()
+            self._own = Star()
         elif id == -1:
-            self._own = _lib.beast_make_img_star(
+            self._own = _lib.ost_make_img_star(
                 _ct.byref(_cfg),
                 float(a),
                 float(b),
@@ -161,7 +215,7 @@ class star:
                 int(flux),
             )
         else:
-            self._own = _lib.beast_make_db_star(
+            self._own = _lib.ost_make_db_star(
                 _ct.byref(_cfg),
                 float(a),
                 float(b),
@@ -178,35 +232,44 @@ class star:
         else:
             self._own = v
 
-    def _get(name):
+    def _get(name, doc):
         return property(
             lambda self: getattr(self._c, name),
             lambda self, v: setattr(self._c, name, v),
+            doc=doc,
         )
-    x = _get("x")
-    y = _get("y")
-    z = _get("z")
-    flux = _get("flux")
-    px = _get("px")
-    py = _get("py")
-    sigma_sq = _get("sigma_sq")
-    id = _get("id")
-    star_idx = _get("star_idx")
-    unreliable = _get("unreliable")
+    x = _get("x", "Unit-vector x coordinate.")
+    y = _get("y", "Unit-vector y coordinate.")
+    z = _get("z", "Unit-vector z coordinate.")
+    flux = _get("flux", "Star brightness/flux value.")
+    px = _get("px", "Image-space x coordinate in pixels relative to image center.")
+    py = _get("py", "Image-space y coordinate in pixels relative to image center.")
+    sigma_sq = _get("sigma_sq", "Estimated position variance for this star.")
+    id = _get("id", "Catalog identifier, or -1 when unmatched/unknown.")
+    star_idx = _get("star_idx", "Original index of this star in its source database.")
+    unreliable = _get("unreliable", "Nonzero when the backend marked this star unreliable.")
     def dist_arcsec(self, s):
+        """Return angular distance to another star in arcseconds."""
         a = self.x * s.y - s.x * self.y
         b = self.x * s.z - s.x * self.z
         c = self.y * s.z - s.y * self.z
         return (3600 * 180.0 / _math.pi) * _math.asin(_math.sqrt(a*a+b*b+c*c))
 
 class star_db:
+    """Resizable database of :class:`star` entries.
+
+    A ``star_db`` owns the contiguous C array used by the OST backend.  It is
+    used for both catalog stars and image detections.
+    """
     def __init__(self, cap=MAX_STARS):
+        """Create an empty database with at least ``cap`` star slots."""
         self._cap = max(1, int(cap))
-        self._stars = (BeastStar * self._cap)()
+        self._stars = (Star * self._cap)()
         self._db = StarDB()
-        _lib.beast_star_db_init(_ct.byref(self._db), self._stars, self._cap)
+        _lib.ost_star_db_init(_ct.byref(self._db), self._stars, self._cap)
     @property
     def max_variance(self):
+        """Maximum position variance among stars in this database."""
         return self._db.max_variance
 
     @max_variance.setter
@@ -217,34 +280,39 @@ class star_db:
         if n <= self._cap:
             return
         cap = max(n, self._cap * 2)
-        new = (BeastStar * cap)()
-        _ct.memmove(new, self._stars, _ct.sizeof(BeastStar) * self._db.n)
+        new = (Star * cap)()
+        _ct.memmove(new, self._stars, _ct.sizeof(Star) * self._db.n)
         self._stars = new
         self._cap = cap
         self._db.v = self._stars
         self._db.cap = cap
     def size(self):
+        """Return the number of stars currently stored."""
         return self._db.n
     def __iadd__(self, s):
+        """Append a :class:`star` and return this database."""
         self._ensure(self._db.n + 1)
         cs = s._c if isinstance(s, star) else s
-        if _lib.beast_db_add(_ct.byref(self._db), cs) < 0:
+        if _lib.ost_db_add(_ct.byref(self._db), cs) < 0:
             raise MemoryError("star_db full")
         return self
     def get_star(self, idx):
+        """Return a mutable view of the star at ``idx``, or ``None`` if empty."""
         if self._db.n <= 0:
             return None
         return star(_db=self, _idx=int(idx))
     def copy(self):
+        """Return a deep copy of this database."""
         out = star_db(max(self._db.n, 1))
         out._db.n = self._db.n
         out._db.max_variance = self._db.max_variance
-        _ct.memmove(out._stars, self._stars, _ct.sizeof(BeastStar) * self._db.n)
+        _ct.memmove(out._stars, self._stars, _ct.sizeof(Star) * self._db.n)
         return out
     def copy_n_brightest(self, n):
+        """Return a new database containing the ``n`` brightest stars."""
         out = star_db(max(1, min(int(n), self._db.n)))
-        tmp = (BeastStar * max(1, self._db.n))()
-        rc = _lib.beast_copy_n_brightest(
+        tmp = (Star * max(1, self._db.n))()
+        rc = _lib.ost_copy_n_brightest(
             _ct.byref(out._db),
             _ct.byref(self._db),
             tmp,
@@ -254,6 +322,11 @@ class star_db:
             raise MemoryError("copy_n_brightest")
         return out
     def load_catalog(self, catalog, year):
+        """Load Hipparcos catalog stars for ``year`` into this database.
+
+        The database grows as needed.  Existing entries are replaced.
+        ``catalog`` is usually ``"hip_main.dat"``.
+        """
         with open(catalog, 'rb'):
             pass
         star_cap = max(self._cap, MAX_CAT)
@@ -262,7 +335,7 @@ class star_db:
             self._ensure(star_cap)
             self._db.n = 0
             keys = (_ct.c_uint64 * key_cap)()
-            rc = _lib.beast_load_catalog(
+            rc = _lib.ost_load_catalog(
                 _ct.byref(_cfg),
                 _ct.byref(self._db),
                 _b(catalog),
@@ -275,43 +348,64 @@ class star_db:
             star_cap *= 2
             key_cap *= 2
     def count(self, s):
+        """Return how many stars in this database have the same catalog id."""
         sid = s.id
         return sum(1 for i in range(self._db.n) if self._stars[i].id == sid) if sid >= 0 else 0
 
 class star_query:
+    """Search and filtering helper for a :class:`star_db`.
+
+    Queries can sort a database, perform angular kd-tree searches, maintain a
+    mask of selected stars, and create new databases from search results.
+    """
     def __init__(self, db):
+        """Create query workspace for ``db``."""
         self.stars = db
         n = db.size()
-        self.map = (BeastStar * max(1, n))()
+        self.map = (Star * max(1, n))()
         self.kdresults = (_ct.c_int * (n + 1))()
         self._kdmask = (_ct.c_byte * (n + 1))()
         self._q = Query()
-        _lib.beast_query_init(_ct.byref(self._q), _ct.byref(db._db), self.map, self.kdresults, self._kdmask)
+        _lib.ost_query_init(_ct.byref(self._q), _ct.byref(db._db), self.map, self.kdresults, self._kdmask)
         self.map_size = n
     def is_kdsorted(self):
+        """Return whether this query has been kd-tree sorted."""
         return self._q.kdsorted
 
     def sort(self):
-        _lib.beast_query_sort_flux(_ct.byref(self._q))
+        """Sort the query map by decreasing flux."""
+        _lib.ost_query_sort_flux(_ct.byref(self._q))
 
     def kdsort(self):
-        _lib.beast_query_kdsort(_ct.byref(self._q), _ct.byref(_cfg))
+        """Sort the query map for kd-tree angular searches."""
+        _lib.ost_query_kdsort(_ct.byref(self._q), _ct.byref(_cfg))
 
     def r_size(self):
+        """Return the number of stars in the current kd-search result set."""
         return self._q.kdresults_size
 
     def get_kdmask(self, i):
+        """Return the current mask value for query-map entry ``i``."""
         return self._kdmask[i]
 
     def reset_kdmask(self):
-        _lib.beast_query_reset_mask(_ct.byref(self._q))
+        """Mark all query-map entries as available."""
+        _lib.ost_query_reset_mask(_ct.byref(self._q))
 
     def clear_kdresults(self):
-        _lib.beast_query_clear_results(_ct.byref(self._q))
+        """Clear the current kd-search result set."""
+        _lib.ost_query_clear_results(_ct.byref(self._q))
     def kdsearch(self, x, y, z, r, min_flux, min=0, max=None, dim=0):
+        """Search near unit vector ``(x, y, z)`` within ``r`` arcseconds.
+
+        Results are available through :meth:`from_kdresults` and
+        :meth:`r_size`.  ``min_flux`` rejects stars dimmer than the threshold.
+        The optional ``min``, ``max``, and ``dim`` arguments search a kd-tree
+        subrange and are mainly for backend/internal use.
+        """
         if max is None:
             p = (_ct.c_float * 3)(x, y, z)
-            _lib.beast_query_search(
+            _lib.ost_query_search(
                 _ct.byref(self._q),
                 _ct.byref(_cfg),
                 p,
@@ -320,7 +414,7 @@ class star_query:
             )
         else:
             p = (_ct.c_float * 3)(x, y, z)
-            _lib.beast_query_search_range(
+            _lib.ost_query_search_range(
                 _ct.byref(self._q),
                 _ct.byref(_cfg),
                 p,
@@ -332,25 +426,44 @@ class star_query:
             )
 
     def kdmask_filter_catalog(self):
-        _lib.beast_query_mask_filter(_ct.byref(self._q), _ct.byref(_cfg))
+        """Mask catalog stars that are poor candidates for matching."""
+        _lib.ost_query_mask_filter(_ct.byref(self._q), _ct.byref(_cfg))
     def kdmask_uniform_density(self, min_stars_per_fov):
+        """Mask stars to keep roughly uniform sky density."""
         keep = (_ct.c_byte * max(1, self.map_size))()
-        _lib.beast_query_mask_uniform(_ct.byref(self._q), _ct.byref(_cfg), int(min_stars_per_fov), keep)
+        _lib.ost_query_mask_uniform(_ct.byref(self._q), _ct.byref(_cfg), int(min_stars_per_fov), keep)
     def from_kdmask(self):
+        """Return a new database containing entries kept by the current mask."""
         out = star_db(max(1, self.map_size))
         out.max_variance = self.stars.max_variance
-        if _lib.beast_db_from_mask(_ct.byref(out._db), _ct.byref(self._q)) < 0:
+        if _lib.ost_db_from_mask(_ct.byref(out._db), _ct.byref(self._q)) < 0:
             raise MemoryError("from_kdmask")
         return out
     def from_kdresults(self):
+        """Return a new database containing the current kd-search results."""
         out = star_db(max(1, self._q.kdresults_size))
         out.max_variance = self.stars.max_variance
-        if _lib.beast_db_from_results(_ct.byref(out._db), _ct.byref(self._q)) < 0:
+        if _lib.ost_db_from_results(_ct.byref(out._db), _ct.byref(self._q)) < 0:
             raise MemoryError("from_kdresults")
         return out
 
 class constellation_db:
+    """Constellation-pair database used for star matching.
+
+    Catalog databases are normally built with ``from_image=0`` after catalog
+    filtering.  Image/FOV databases are normally built with ``from_image=1``
+    from detected image stars or nearby catalog stars.  This mirrors the flow
+    used by ``startracker.py``: filtered catalog -> catalog constellation DB,
+    image detections -> image constellation DB, then :class:`db_match`.
+    """
     def __init__(self, s, stars_per_fov, from_image):
+        """Build constellation pairs from ``s``.
+
+        Args:
+            s: Source :class:`star_db`.
+            stars_per_fov: Number of neighbors/pairs to keep per field of view.
+            from_image: Nonzero for image/FOV databases, zero for catalogs.
+        """
         self.stars = s.copy()
         self.results = star_query(self.stars)
         self._cdb = CDB()
@@ -363,10 +476,10 @@ class constellation_db:
             self._map_cap = cap
             self._map = (Constellation * self._map_cap)()
             if from_image:
-                rc = _lib.beast_db_from_image(_ct.byref(self._cdb), _ct.byref(s._db), self.stars._stars, self.stars._cap, _ct.byref(self.results._q), self.results.map, self.results.kdresults, self.results._kdmask, self._map, self._map_cap, int(stars_per_fov))
+                rc = _lib.ost_db_from_image(_ct.byref(self._cdb), _ct.byref(s._db), self.stars._stars, self.stars._cap, _ct.byref(self.results._q), self.results.map, self.results.kdresults, self.results._kdmask, self._map, self._map_cap, int(stars_per_fov))
             else:
                 keep = (_ct.c_byte * max(1, self.stars.size()))()
-                rc = _lib.beast_db_from_catalog(_ct.byref(self._cdb), _ct.byref(s._db), self.stars._stars, self.stars._cap, _ct.byref(self.results._q), self.results.map, self.results.kdresults, self.results._kdmask, self._map, self._map_cap, int(stars_per_fov), _ct.byref(_cfg), keep)
+                rc = _lib.ost_db_from_catalog(_ct.byref(self._cdb), _ct.byref(s._db), self.stars._stars, self.stars._cap, _ct.byref(self.results._q), self.results.map, self.results.kdresults, self.results._kdmask, self._map, self._map_cap, int(stars_per_fov), _ct.byref(_cfg), keep)
             if rc == 0:
                 break
             if from_image:
@@ -388,7 +501,14 @@ def _arr(key, typ, n):
     return a
 
 class match_result:
+    """Best match returned by :class:`db_match`.
+
+    Matrix entries ``R11`` .. ``R33`` describe the attitude solution.  The
+    result also stores the mapping from image stars to catalog stars and can
+    convert that mapping back into a :class:`star_db` with :meth:`from_match`.
+    """
     def __init__(self, c, db, img):
+        """Wrap a backend match result."""
         self.match = c.match
         self._db = db
         self._img = img
@@ -398,8 +518,14 @@ class match_result:
         self.R12, self.R22, self.R32 = c.R[1][0], c.R[1][1], c.R[1][2]
         self.R13, self.R23, self.R33 = c.R[2][0], c.R[2][1], c.R[2][2]
     def size(self):
+        """Return the number of image stars considered in this match."""
         return self._size
     def from_match(self):
+        """Return image stars with matched catalog entries filled in.
+
+        Unmatched stars have ``id == -1``.  Returns ``None`` if the backend did
+        not produce a valid winner.
+        """
         if self.match.totalscore < -3e38:
             return None
         out = self._img.stars.copy()
@@ -413,12 +539,20 @@ class match_result:
         return out
 
     def print_ori(self):
+        """Print DEC, RA, and ORIENTATION angles for debugging."""
         print("DEC=%f" % ((360 + _math.asin(self.R31) * 180 / _math.pi) % 360))
         print("RA=%f" % ((360 + _math.atan2(self.R21, self.R11) * 180 / _math.pi) % 360))
         print("ORIENTATION=%f" % (-_math.atan2(self.R32, self.R33) * 180 / _math.pi))
 
 class db_match:
+    """Match an image/FOV constellation database against a catalog database.
+
+    After construction, :attr:`p_match` is the estimated match probability and
+    :attr:`winner` is a :class:`match_result`.  ``startracker.py`` accepts a
+    match when ``p_match`` exceeds its threshold and enough stars were matched.
+    """
     def __init__(self, db, img):
+        """Run the matcher between catalog/FOV ``db`` and image ``img``."""
         self.p_match = 0.0
         self.winner = None
         db._sync_results()
@@ -436,10 +570,10 @@ class db_match:
             match_map = _arr('match_map', _ct.c_int, n)
             work_map = _arr('work_map', _ct.c_int, n)
             work = MatchWork()
-            _lib.beast_match_work_init(_ct.byref(work), candidates, len(candidates), fov_mask, collision, len(collision), fov_px, fov_py, scores, match_map, work_map)
+            _lib.ost_match_work_init(_ct.byref(work), candidates, len(candidates), fov_mask, collision, len(collision), fov_px, fov_py, scores, match_map, work_map)
             cwin = MatchResultC()
             p = _ct.c_float(0)
-            rc = _lib.beast_db_match(
+            rc = _lib.ost_db_match(
                 _ct.byref(db._cdb),
                 _ct.byref(img._cdb),
                 _ct.byref(cwin),
@@ -450,7 +584,7 @@ class db_match:
             if rc == 0:
                 break
             if db._cdb.results.kdsorted:
-                _lib.beast_query_clear_results(_ct.byref(db._cdb.results))
+                _lib.ost_query_clear_results(_ct.byref(db._cdb.results))
             candidate_cap *= 2
             collision_cap *= 2
         self.p_match = p.value

@@ -77,7 +77,7 @@ cd tests/
 
 This command will **c**alibrate your image sensor, **r** regenerate the test data, run an **E**SA test, and finally run the **i**mage test where images are fed to the calibrated star tracker program to produce an attitude fix.
 
-The native backend is implemented in `ost/ost.h` with `ost/ost.c` building the Python shared library `ost/_ost.so`. Legacy `beast` Python/C++ entry points remain as compatibility shims.
+The native backend is implemented in `ost/ost.h` with `ost/ost.c` building the Python shared library `ost/_ost.so`. Python code can use `import ost` from the source tree, and `startracker_ost.py` runs the native image pipeline without OpenCV or a median image; legacy `beast` Python/C++ entry points remain as compatibility shims.
 
 The usage message for `unit_test.py` is here:
 ```
