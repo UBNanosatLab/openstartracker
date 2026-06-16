@@ -290,7 +290,7 @@ int main(int argc, char **argv)
             if (fit_mode) {
                 t0 = now_sec();
                 fit_n = ost_bg_fit_stars(&bg_cfg, gray16, cfg.width, &bg_stats,
-                                         stars, n, 10, &fit_work,
+                                         stars, n, 3, &fit_work,
                                          bg_cfg.max_stars, fit_params,
                                          fit_cov, &dropped_count);
                 t1 = now_sec();

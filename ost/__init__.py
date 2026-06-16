@@ -24,6 +24,7 @@ __all__ = [
     "Tracker",
     "load_config",
     "match",
+    "read_png_rgba",
 ]
 
 MAX_STARS = 1000
@@ -228,6 +229,10 @@ _lib.ost_cc_init.argtypes = [_ct.POINTER(_CCContext), _ct.c_int,
                              _ct.POINTER(_ct.c_int), _ct.POINTER(_ct.c_int),
                              _ct.POINTER(_CCRun), _ct.POINTER(_CCRun)]
 _lib.ost_cc_init.restype = _ct.c_int
+_lib.ost_png_dimensions.argtypes = [_ct.c_char_p, _ct.POINTER(_ct.c_int), _ct.POINTER(_ct.c_int)]
+_lib.ost_png_dimensions.restype = _ct.c_int
+_lib.ost_png_read_rgba.argtypes = [_ct.c_char_p, _ct.POINTER(_ct.c_ubyte), _ct.c_int, _ct.c_int, _ct.c_int]
+_lib.ost_png_read_rgba.restype = _ct.c_int
 _lib.ost_bg_config_init.argtypes = [_ct.POINTER(_BGConfig), _ct.c_int, _ct.c_int]
 _lib.ost_bg_config_init.restype = _ct.c_int
 _lib.ost_bg_rgba_to_gray16.argtypes = [_ct.POINTER(_ct.c_uint16), _ct.POINTER(_ct.c_ubyte), _ct.c_int, _ct.c_int]
@@ -253,6 +258,20 @@ def _b(path):
 def load_config(filename):
     """Load and return a ``Config``."""
     return Config.load(filename)
+
+def read_png_rgba(filename):
+    """Read a PNG with libpng and return ``width, height, rgba_bytes``."""
+    width = _ct.c_int()
+    height = _ct.c_int()
+    path = _b(filename)
+    if _lib.ost_png_dimensions(path, _ct.byref(width), _ct.byref(height)) < 0:
+        raise OSError(filename)
+    n = 4 * width.value * height.value
+    rgba = (_ct.c_ubyte * n)()
+    if _lib.ost_png_read_rgba(path, rgba, width.value, height.value,
+                              4 * width.value) < 0:
+        raise OSError(filename)
+    return width.value, height.value, bytes(rgba)
 
 class StarDB:
     """Resizable Python-owned ``StarDB`` storage for the OST C API."""
@@ -590,7 +609,7 @@ class ImagePipeline:
         dropped = _ct.c_int(0)
         fit_n = _lib.ost_bg_fit_stars(_ct.byref(self.bg_cfg), self.gray,
                                       self.cfg.IMG_X, _ct.byref(self.bg_stats),
-                                      self.components, n, 10,
+                                      self.components, n, 3,
                                       _ct.byref(self.fit_work),
                                       self.bg_cfg.max_stars,
                                       self.fit_params, self.fit_cov,
@@ -644,7 +663,7 @@ class Tracker:
     def measurements_to_db(self, measurements, ids_from_index=False):
         return StarDB.from_measurements(self.cfg, measurements, ids_from_index)
 
-    def match_catalog_stars(self, measurements, min_p=0.9):
+    def match_catalog_stars(self, measurements, max_false_p=1e-7):
         """Return catalog ids for ``(x, y, mag)`` image measurements."""
         if self.global_db is None:
             raise RuntimeError("call prepare_catalog first")
@@ -653,7 +672,7 @@ class Tracker:
         img_cdb = ConstellationDB.from_image(bright, self.cfg.MAX_FALSE_STARS + 2)
         winner = match(self.cfg, self.global_db, img_cdb)
         ids = [-1] * len(img)
-        if winner.p_match <= min_p:
+        if 1.0 - winner.p_match > max_false_p:
             return ids
 
         min_flux = self.cfg.THRESH_FACTOR * self.cfg.IMAGE_VARIANCE

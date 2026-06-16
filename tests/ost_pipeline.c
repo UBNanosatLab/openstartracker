@@ -88,7 +88,7 @@ static int process_image(Pipeline *p, const char *filename, FILE *stars_file)
     if (n < 0)
         return -1;
     fit_n = ost_bg_fit_stars(&p->bg_cfg, p->gray, p->bg_cfg.width,
-                             &p->bg_stats, p->components, n, 10,
+                             &p->bg_stats, p->components, n, 3,
                              &p->fit_work, p->bg_cfg.max_stars,
                              p->fit_params, p->fit_cov, &dropped);
     if (fit_n < 0)

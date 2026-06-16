@@ -52,6 +52,10 @@ extern "C" {
         (b)               = ost_swap_tmp; \
     } while (0)
 
+#ifndef OST_MIN_COMPONENT_AREA
+#define OST_MIN_COMPONENT_AREA 4
+#endif
+
 /* Binary fields are area/sums; weighted fields are flux moments. */
 typedef struct OSTCCComponent {
     int area;
@@ -161,6 +165,9 @@ typedef struct OSTBGFitWorkspace {
     double *dropped;
 } OSTBGFitWorkspace;
 
+int ost_png_dimensions(const char *filename, int *width, int *height);
+int ost_png_read_rgba(const char *filename, unsigned char *dst,
+                      int width, int height, int stride);
 int ost_bg_config_init(OSTBGConfig *cfg, int width, int height);
 void ost_bg_rgba_to_gray16(uint16_t *dst, const unsigned char *rgba,
                            int width, int height);
@@ -538,7 +545,7 @@ static int component_finish(OSTCCComponent *c)
     double det;
     double d;
 
-    if (c->area <= 0 || c->wsum <= 0 || !c->signal ||
+    if (c->area < OST_MIN_COMPONENT_AREA || c->wsum <= 0 || !c->signal ||
         c->min_x >= c->max_x || c->min_y >= c->max_y)
         return 0;
 
@@ -1117,9 +1124,9 @@ int ost_bg_config_init(OSTBGConfig *cfg, int width, int height)
     cfg->tile_size = 64;
     cfg->map_width = (width + cfg->tile_size - 1) / cfg->tile_size;
     cfg->map_height = (height + cfg->tile_size - 1) / cfg->tile_size;
-    cfg->max_stars = 1000;
+    cfg->max_stars = 256;
     cfg->max_pixel_brightness = 255 * 4;
-    cfg->sample_radius = 7;
+    cfg->sample_radius = 2;
     cfg->threshold_sigma = 5.0;
     cfg->detect_sigma = 1.5;
     return 0;
@@ -1523,10 +1530,9 @@ static int ost_bg_fit_init(const OSTBGConfig *cfg,
         params[3 * n + 0] = x;
         params[3 * n + 1] = y;
         params[3 * n + 2] = components[i].wsum;
+        eig_sum += components[i].eig_min;
         n++;
     }
-    for (int i = 0; i < n; i++)
-        eig_sum += components[i].eig_min;
     params[3 * n] = sqrt(fmax(eig_sum / (n ? n : 1), 1.0 / 12.0));
     return n;
 }
@@ -1602,7 +1608,7 @@ static int build_fit_model(const OSTBGConfig *cfg, const uint16_t *image,
                 var = fmax((double)image[(size_t)y * (size_t)stride + (size_t)x] *
                            poisson, 0.0) + var;
                 psf_eval(x0, y0, I, sigma, x, y, &pred, J);
-                if (!(pred < cfg->max_pixel_brightness && pred > sqrt(var)))
+                if (pred >= cfg->max_pixel_brightness)
                     continue;
                 n_valid++;
                 if (var == 0.0) {
@@ -1628,7 +1634,7 @@ static int build_fit_model(const OSTBGConfig *cfg, const uint16_t *image,
                 }
             }
         }
-        if (n_valid < 4 || bad_var) {
+        if (n_valid < OST_MIN_COMPONENT_AREA || bad_var) {
             if (*dropped_count < max_dropped) {
                 dropped[3 * *dropped_count + 0] = params[3 * i + 0];
                 dropped[3 * *dropped_count + 1] = params[3 * i + 1];
