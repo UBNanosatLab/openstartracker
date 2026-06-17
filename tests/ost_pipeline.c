@@ -18,8 +18,7 @@ typedef struct Pipeline {
     double *bg_mean, *bg_var, *bg_poisson;
     int *x_edge, *y_edge, *hist;
     OSTCCComponent *cc_work, *components;
-    int *parent, *label_live, *free_after_row, *touched_stamp, *seen_stamp;
-    OSTCCRun *prev_runs, *curr_runs;
+    int *parent, *col_label, *active_count, *free_after_row;
     OSTBGFitWorkspace fit_work;
     double *fit_params, *fit_cov, *stars;
     int *result;
@@ -190,16 +189,11 @@ int main(int argc, char **argv)
     p.cc_work = (OSTCCComponent *)malloc(cc_sizes.components *
                                          sizeof(*p.cc_work));
     p.parent = (int *)malloc(cc_sizes.parent * sizeof(*p.parent));
-    p.label_live = (int *)malloc(cc_sizes.label_live * sizeof(*p.label_live));
+    p.col_label = (int *)malloc(cc_sizes.col_label * sizeof(*p.col_label));
+    p.active_count = (int *)malloc(cc_sizes.active_count *
+                                   sizeof(*p.active_count));
     p.free_after_row = (int *)malloc(cc_sizes.free_after_row *
                                      sizeof(*p.free_after_row));
-    p.touched_stamp = (int *)malloc(cc_sizes.touched_stamp *
-                                    sizeof(*p.touched_stamp));
-    p.seen_stamp = (int *)malloc(cc_sizes.seen_stamp * sizeof(*p.seen_stamp));
-    p.prev_runs = (OSTCCRun *)malloc(cc_sizes.prev_runs *
-                                     sizeof(*p.prev_runs));
-    p.curr_runs = (OSTCCRun *)malloc(cc_sizes.curr_runs *
-                                     sizeof(*p.curr_runs));
     p.components = (OSTCCComponent *)malloc((size_t)max_stars *
                                            sizeof(*p.components));
     p.fit_work.stars1 = (OSTBGFitStar *)malloc((size_t)max_stars *
@@ -234,10 +228,10 @@ int main(int argc, char **argv)
 
     if (!fov_mask || !p.rgba || !p.gray || !p.bg_mean ||
         !p.bg_var || !p.bg_poisson || !p.x_edge || !p.y_edge || !p.hist ||
-        !p.cc_work || !p.parent || !p.label_live || !p.free_after_row ||
-        !p.touched_stamp || !p.seen_stamp || !p.prev_runs || !p.curr_runs ||
-        !p.components || !p.fit_work.stars1 || !p.fit_work.stars2 ||
-        !p.fit_work.params1 || !p.fit_work.params2 || !p.fit_work.normal ||
+        !p.cc_work || !p.parent || !p.col_label || !p.active_count ||
+        !p.free_after_row || !p.components || !p.fit_work.stars1 ||
+        !p.fit_work.stars2 || !p.fit_work.params1 ||
+        !p.fit_work.params2 || !p.fit_work.normal ||
         !p.fit_work.sigma_col || !p.fit_work.rhs ||
         !p.fit_work.sigma_solve || !p.fit_work.rhs_solve ||
         !p.fit_work.cov_xy || !p.fit_work.dropped || !p.fit_params ||
@@ -251,9 +245,8 @@ int main(int argc, char **argv)
     p.bg_stats.poisson = p.bg_poisson;
     p.bg_stats.x_edge = p.x_edge;
     p.bg_stats.y_edge = p.y_edge;
-    if (ost_cc_init(&p.cc, width, p.cc_work, p.parent, p.label_live,
-                    p.free_after_row, p.touched_stamp, p.seen_stamp,
-                    p.prev_runs, p.curr_runs) < 0)
+    if (ost_cc_init(&p.cc, width, p.cc_work, p.parent, p.col_label,
+                    p.active_count, p.free_after_row) < 0)
         goto done;
     if (prepare_catalog(p.tracker, fov_mask, catalog_path,
                         (float)atof(argv[arg + 1])) < 0)
@@ -289,12 +282,9 @@ done:
     free(p.fit_work.stars2);
     free(p.fit_work.stars1);
     free(p.components);
-    free(p.curr_runs);
-    free(p.prev_runs);
-    free(p.seen_stamp);
-    free(p.touched_stamp);
     free(p.free_after_row);
-    free(p.label_live);
+    free(p.active_count);
+    free(p.col_label);
     free(p.parent);
     free(p.cc_work);
     free(p.hist);

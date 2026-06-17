@@ -139,9 +139,8 @@ int main(int argc, char **argv)
     double *fit_params1, *fit_params2, *fit_params, *fit_cov;
     double *fit_normal, *fit_sigma_col, *fit_rhs;
     double *fit_sigma_solve, *fit_rhs_solve, *fit_cov_xy, *fit_dropped;
-    int *parent, *label_live, *free_after_row, *touched_stamp, *seen_stamp;
+    int *parent, *col_label, *active_count, *free_after_row;
     int *x_edge, *y_edge, *hist;
-    OSTCCRun *prev_runs, *curr_runs;
     unsigned char threshold;
     size_t pixels;
     int bg_mode;
@@ -190,12 +189,9 @@ int main(int argc, char **argv)
     hist = (int *)malloc(65536 * sizeof(*hist));
     work_comp = (OSTCCComponent *)malloc(sizes.components * sizeof(*work_comp));
     parent = (int *)malloc(sizes.parent * sizeof(*parent));
-    label_live = (int *)malloc(sizes.label_live * sizeof(*label_live));
+    col_label = (int *)malloc(sizes.col_label * sizeof(*col_label));
+    active_count = (int *)malloc(sizes.active_count * sizeof(*active_count));
     free_after_row = (int *)malloc(sizes.free_after_row * sizeof(*free_after_row));
-    touched_stamp = (int *)malloc(sizes.touched_stamp * sizeof(*touched_stamp));
-    seen_stamp = (int *)malloc(sizes.seen_stamp * sizeof(*seen_stamp));
-    prev_runs = (OSTCCRun *)malloc(sizes.prev_runs * sizeof(*prev_runs));
-    curr_runs = (OSTCCRun *)malloc(sizes.curr_runs * sizeof(*curr_runs));
     stars = (OSTCCComponent *)malloc(IMG_MAX_STARS * sizeof(*stars));
     fit_stars1 = (OSTBGFitStar *)malloc(bg_cfg.max_stars * sizeof(*fit_stars1));
     fit_stars2 = (OSTBGFitStar *)malloc(bg_cfg.max_stars * sizeof(*fit_stars2));
@@ -214,8 +210,7 @@ int main(int argc, char **argv)
     if (!median_rgba || !image_rgba || !gray || !gray16 ||
         !bg_mean || !bg_var || !bg_poisson || !x_edge || !y_edge || !hist ||
         !work_comp ||
-        !parent || !label_live || !free_after_row || !touched_stamp ||
-        !seen_stamp || !prev_runs || !curr_runs || !stars ||
+        !parent || !col_label || !active_count || !free_after_row || !stars ||
         !fit_stars1 || !fit_stars2 || !fit_params1 || !fit_params2 ||
         !fit_params || !fit_cov || !fit_normal || !fit_sigma_col ||
         !fit_rhs || !fit_sigma_solve || !fit_rhs_solve || !fit_cov_xy ||
@@ -234,9 +229,8 @@ int main(int argc, char **argv)
     fit_work.rhs_solve = fit_rhs_solve;
     fit_work.cov_xy = fit_cov_xy;
     fit_work.dropped = fit_dropped;
-    if (ost_cc_init(&cc, cfg.width, work_comp, parent, label_live,
-                    free_after_row, touched_stamp, seen_stamp,
-                    prev_runs, curr_runs) < 0)
+    if (ost_cc_init(&cc, cfg.width, work_comp, parent, col_label,
+                    active_count, free_after_row) < 0)
         goto done;
     if (!image_mode && read_png_rgba(argv[2], cfg.width, cfg.height, median_rgba) < 0)
         goto done;
@@ -391,12 +385,9 @@ done:
     free(fit_stars2);
     free(fit_stars1);
     free(stars);
-    free(curr_runs);
-    free(prev_runs);
-    free(seen_stamp);
-    free(touched_stamp);
     free(free_after_row);
-    free(label_live);
+    free(active_count);
+    free(col_label);
     free(parent);
     free(work_comp);
     free(hist);

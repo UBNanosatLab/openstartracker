@@ -168,27 +168,20 @@ class _CCComponent(_ct.Structure):
                 ("wxx", _ct.c_double), ("wyy", _ct.c_double),
                 ("wxy", _ct.c_double), ("eig_min", _ct.c_double)]
 
-class _CCRun(_ct.Structure):
-    _fields_ = [("x0", _ct.c_int), ("x1", _ct.c_int), ("label", _ct.c_int)]
-
 class _CCBufferSizes(_ct.Structure):
-    _fields_ = [("max_labels", _ct.c_int), ("max_runs", _ct.c_int),
+    _fields_ = [("max_labels", _ct.c_int),
                 ("components", _ct.c_size_t), ("parent", _ct.c_size_t),
-                ("label_live", _ct.c_size_t), ("free_after_row", _ct.c_size_t),
-                ("touched_stamp", _ct.c_size_t), ("seen_stamp", _ct.c_size_t),
-                ("prev_runs", _ct.c_size_t), ("curr_runs", _ct.c_size_t),
+                ("col_label", _ct.c_size_t), ("active_count", _ct.c_size_t),
+                ("free_after_row", _ct.c_size_t),
                 ("total_bytes", _ct.c_size_t)]
 
 class _CCContext(_ct.Structure):
     _fields_ = [("width", _ct.c_int), ("max_labels", _ct.c_int),
-                ("max_runs", _ct.c_int), ("components", _ct.POINTER(_CCComponent)),
+                ("components", _ct.POINTER(_CCComponent)),
                 ("parent", _ct.POINTER(_ct.c_int)),
-                ("label_live", _ct.POINTER(_ct.c_int)),
-                ("free_after_row", _ct.POINTER(_ct.c_int)),
-                ("touched_stamp", _ct.POINTER(_ct.c_int)),
-                ("seen_stamp", _ct.POINTER(_ct.c_int)),
-                ("prev_runs", _ct.POINTER(_CCRun)),
-                ("curr_runs", _ct.POINTER(_CCRun))]
+                ("col_label", _ct.POINTER(_ct.c_int)),
+                ("active_count", _ct.POINTER(_ct.c_int)),
+                ("free_after_row", _ct.POINTER(_ct.c_int))]
 
 class _BGConfig(_ct.Structure):
     _fields_ = [("width", _ct.c_int), ("height", _ct.c_int),
@@ -226,8 +219,7 @@ _lib.ost_cc_buffer_sizes.restype = _ct.c_int
 _lib.ost_cc_init.argtypes = [_ct.POINTER(_CCContext), _ct.c_int,
                              _ct.POINTER(_CCComponent), _ct.POINTER(_ct.c_int),
                              _ct.POINTER(_ct.c_int), _ct.POINTER(_ct.c_int),
-                             _ct.POINTER(_ct.c_int), _ct.POINTER(_ct.c_int),
-                             _ct.POINTER(_CCRun), _ct.POINTER(_CCRun)]
+                             _ct.POINTER(_ct.c_int)]
 _lib.ost_cc_init.restype = _ct.c_int
 _lib.ost_png_dimensions.argtypes = [_ct.c_char_p, _ct.POINTER(_ct.c_int), _ct.POINTER(_ct.c_int)]
 _lib.ost_png_dimensions.restype = _ct.c_int
@@ -551,12 +543,9 @@ class ImagePipeline:
         self.hist = (_ct.c_int * 65536)()
         self.cc_components = (_CCComponent * sizes.components)()
         self.parent = (_ct.c_int * sizes.parent)()
-        self.label_live = (_ct.c_int * sizes.label_live)()
+        self.col_label = (_ct.c_int * sizes.col_label)()
+        self.active_count = (_ct.c_int * sizes.active_count)()
         self.free_after_row = (_ct.c_int * sizes.free_after_row)()
-        self.touched_stamp = (_ct.c_int * sizes.touched_stamp)()
-        self.seen_stamp = (_ct.c_int * sizes.seen_stamp)()
-        self.prev_runs = (_CCRun * sizes.prev_runs)()
-        self.curr_runs = (_CCRun * sizes.curr_runs)()
         self.components = (_CCComponent * max_stars)()
         self.fit_stars1 = (_BGFitStar * max_stars)()
         self.fit_stars2 = (_BGFitStar * max_stars)()
@@ -582,9 +571,8 @@ class ImagePipeline:
                                         self.dropped_work)
         if _lib.ost_cc_init(_ct.byref(self.cc), cfg.IMG_X,
                             self.cc_components, self.parent,
-                            self.label_live, self.free_after_row,
-                            self.touched_stamp, self.seen_stamp,
-                            self.prev_runs, self.curr_runs) < 0:
+                            self.col_label, self.active_count,
+                            self.free_after_row) < 0:
             raise RuntimeError("connected-component init failed")
 
     def measure_rgba(self, rgba):

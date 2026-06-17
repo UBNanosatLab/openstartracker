@@ -75,47 +75,32 @@ typedef struct OSTCCComponent {
     double eig_min;
 } OSTCCComponent;
 
-typedef struct OSTCCRun {
-    int x0;
-    int x1;
-    int label;
-} OSTCCRun;
-
-/* Workspace is width-bounded: runs are row-local and labels are recycled. */
+/* Workspace is width-bounded: labels are recycled when components close. */
 typedef struct OSTCCBufferSizes {
     int max_labels;
-    int max_runs;
     size_t components;
     size_t parent;
-    size_t label_live;
+    size_t col_label;
+    size_t active_count;
     size_t free_after_row;
-    size_t touched_stamp;
-    size_t seen_stamp;
-    size_t prev_runs;
-    size_t curr_runs;
     size_t total_bytes;
 } OSTCCBufferSizes;
 
 typedef struct OSTCCContext {
     int width;
     int max_labels;
-    int max_runs;
     OSTCCComponent *components;
     int *parent;
-    int *label_live;
+    int *col_label;
+    int *active_count;
     int *free_after_row;
-    int *touched_stamp;
-    int *seen_stamp;
-    OSTCCRun *prev_runs;
-    OSTCCRun *curr_runs;
 } OSTCCContext;
 
 int ost_cc_buffer_sizes(int width, OSTCCBufferSizes *sizes);
 int ost_cc_init(OSTCCContext *ctx, int width,
                 OSTCCComponent *components, int *parent,
-                int *label_live, int *free_after_row,
-                int *touched_stamp, int *seen_stamp,
-                OSTCCRun *prev_runs, OSTCCRun *curr_runs);
+                int *col_label, int *active_count,
+                int *free_after_row);
 int ost_cc_threshold_4(const unsigned char *image,
                        int width, int height, int stride,
                        unsigned char threshold,
@@ -414,21 +399,7 @@ static inline void ost_chol_inv_diag(const double *l, int n, double *d,
 #define OST_CC_RESTRICT
 #endif
 
-#if defined(__GNUC__)
-#define OST_CC_NOINLINE __attribute__((noinline))
-#else
-#define OST_CC_NOINLINE
-#endif
-
-typedef struct OSTCCBinaryComponent {
-    int area;
-    int sum_x;
-    int sum_y;
-} OSTCCBinaryComponent;
-
 typedef double (*OSTCCBackgroundFn)(void *opaque, int x, int y, double *var);
-typedef int (*OSTCCRunFn)(void *opaque, const unsigned short *row,
-                          int y, int width, OSTCCRun *runs);
 
 static void clear_components(OSTCCComponent *p, int n)
 {
@@ -487,50 +458,48 @@ static void component_merge(OSTCCComponent *keep, const OSTCCComponent *merge)
     keep->wxy += merge->wxy;
 }
 
-/* Background-subtracted moments are additive, so runs can merge exactly. */
-static void component_add_weighted_run(OSTCCComponent *c,
-                                       const unsigned short *image,
-                                       int stride, int x0, int x1, int y,
-                                       OSTCCBackgroundFn background,
-                                       void *background_opaque,
-                                       double signal_sigma)
+static void component_add_binary_pixel(OSTCCComponent *c, int x, int y)
 {
-    int len;
-
-    len = x1 - x0 + 1;
     if (c->area <= 0) {
-        c->min_x = x0;
-        c->max_x = x1;
+        c->min_x = x;
+        c->max_x = x;
         c->min_y = y;
         c->max_y = y;
     } else {
-        if (x0 < c->min_x) c->min_x = x0;
-        if (x1 > c->max_x) c->max_x = x1;
+        if (x < c->min_x) c->min_x = x;
+        if (x > c->max_x) c->max_x = x;
         if (y < c->min_y) c->min_y = y;
         if (y > c->max_y) c->max_y = y;
     }
-    c->area += len;
-    c->sum_x += (x0 + x1) * len / 2;
-    c->sum_y += y * len;
+    c->area++;
+    c->sum_x += x;
+    c->sum_y += y;
+}
 
-    for (int x = x0; x <= x1; x++) {
-        double var;
-        double mu;
-        double v;
+static void component_add_weighted_pixel(OSTCCComponent *c,
+                                         const unsigned short *image,
+                                         int stride, int x, int y,
+                                         OSTCCBackgroundFn background,
+                                         void *background_opaque,
+                                         double signal_sigma)
+{
+    double var;
+    double mu;
+    double v;
 
-        mu = background(background_opaque, x, y, &var);
-        v = (double)image[(size_t)y * (size_t)stride + (size_t)x] - mu;
-        if (v > signal_sigma * sqrt(var))
-            c->signal = 1;
-        if (v <= 0)
-            continue;
-        c->wsum += v;
-        c->wx += v * x;
-        c->wy += v * y;
-        c->wxx += v * x * x;
-        c->wyy += v * y * y;
-        c->wxy += v * x * y;
-    }
+    component_add_binary_pixel(c, x, y);
+    mu = background(background_opaque, x, y, &var);
+    v = (double)image[(size_t)y * (size_t)stride + (size_t)x] - mu;
+    if (v > signal_sigma * sqrt(var))
+        c->signal = 1;
+    if (v <= 0.0)
+        return;
+    c->wsum += v;
+    c->wx += v * x;
+    c->wy += v * y;
+    c->wxx += v * x * x;
+    c->wyy += v * y * y;
+    c->wxy += v * x * y;
 }
 
 static int component_finish(OSTCCComponent *c)
@@ -605,8 +574,7 @@ static int alloc_label(OSTCCContext *ctx, int row, int *next_free_label)
     start = *next_free_label;
     label = start;
     do {
-        if (!ctx->label_live[label] && ctx->free_after_row[label] < row) {
-            ctx->label_live[label] = 1;
+        if (ctx->active_count[label] == 0 && ctx->free_after_row[label] < row) {
             ctx->parent[label] = label;
             component_clear(&ctx->components[label]);
 
@@ -634,10 +602,6 @@ static int merge_roots(OSTCCContext *ctx, int a, int b, int row)
 
     ra = root_compress(ctx->parent, a);
     rb = root_compress(ctx->parent, b);
-    if (!ra)
-        return rb;
-    if (!rb)
-        return ra;
     if (ra == rb)
         return ra;
 
@@ -646,133 +610,77 @@ static int merge_roots(OSTCCContext *ctx, int a, int b, int row)
 
     component_merge(&ctx->components[keep], &ctx->components[merge]);
     ctx->parent[merge] = keep;
+    ctx->active_count[keep] += ctx->active_count[merge];
+    ctx->active_count[merge] = 0;
     component_clear(&ctx->components[merge]);
-    ctx->label_live[merge] = 0;
     ctx->free_after_row[merge] = row + 1;
 
     return keep;
 }
 
-static int alloc_binary_label(OSTCCBinaryComponent *OST_CC_RESTRICT components,
-                              int *OST_CC_RESTRICT parent,
-                              int *OST_CC_RESTRICT label_live,
-                              int *OST_CC_RESTRICT free_after_row,
-                              int max_labels, int row,
-                              int *next_free_label)
+static void close_binary_column(OSTCCContext *ctx, int x, int row,
+                                OSTCCComponent *out, int *count,
+                                int out_max)
 {
-    int start;
     int label;
+    int root;
 
-    start = *next_free_label;
-    label = start;
-    do {
-        if (!label_live[label] && free_after_row[label] < row) {
-            label_live[label] = 1;
-            parent[label] = label;
-            components[label].area = 0;
-            components[label].sum_x = 0;
-            components[label].sum_y = 0;
+    label = ctx->col_label[x];
+    if (!label)
+        return;
 
-            label++;
-            if (label >= max_labels)
-                label = 1;
-            *next_free_label = label;
-            return label == 1 ? max_labels - 1 : label - 1;
-        }
-
-        label++;
-        if (label >= max_labels)
-            label = 1;
-    } while (label != start);
-
-    return 0;
-}
-
-static int merge_binary_roots(OSTCCBinaryComponent *OST_CC_RESTRICT components,
-                              int *OST_CC_RESTRICT parent,
-                              int *OST_CC_RESTRICT label_live,
-                              int *OST_CC_RESTRICT free_after_row,
-                              int a, int b, int row)
-{
-    int ra;
-    int rb;
-    int keep;
-    int merge;
-
-    ra = root_compress(parent, a);
-    rb = root_compress(parent, b);
-    if (ra == rb)
-        return ra;
-
-    keep = (ra < rb) ? ra : rb;
-    merge = (ra < rb) ? rb : ra;
-
-    components[keep].area += components[merge].area;
-    components[keep].sum_x += components[merge].sum_x;
-    components[keep].sum_y += components[merge].sum_y;
-    parent[merge] = keep;
-    components[merge].area = 0;
-    components[merge].sum_x = 0;
-    components[merge].sum_y = 0;
-    label_live[merge] = 0;
-    free_after_row[merge] = row + 1;
-
-    return keep;
-}
-
-static OST_CC_NOINLINE int extract_runs_thresh(const unsigned char *OST_CC_RESTRICT row,
-                                               int width, unsigned char threshold,
-                                               OSTCCRun *OST_CC_RESTRICT runs)
-{
-    int nr;
-    int x;
-
-    nr = 0;
-    x = 0;
-    while (x < width) {
-        while (x < width && row[x] <= threshold)
-            x++;
-        if (x >= width)
-            break;
-
-        runs[nr].x0 = x;
-        while (x + 1 < width && row[x + 1] > threshold)
-            x++;
-        runs[nr].x1 = x;
-        runs[nr].label = 0;
-        nr++;
-        x++;
+    ctx->col_label[x] = 0;
+    root = root_compress(ctx->parent, label);
+    if (--ctx->active_count[root] == 0) {
+        insert_component(out, count, out_max,
+                         ctx->components[root].area,
+                         ctx->components[root].sum_x,
+                         ctx->components[root].sum_y);
+        component_clear(&ctx->components[root]);
+        ctx->parent[root] = root;
+        ctx->free_after_row[root] = row - 1;
     }
-    return nr;
+}
+
+static void close_weighted_column(OSTCCContext *ctx, int x, int row,
+                                  OSTCCComponent *out, int *count,
+                                  int out_max)
+{
+    int label;
+    int root;
+
+    label = ctx->col_label[x];
+    if (!label)
+        return;
+
+    ctx->col_label[x] = 0;
+    root = root_compress(ctx->parent, label);
+    if (--ctx->active_count[root] == 0) {
+        insert_weighted_component(out, count, out_max, ctx->components[root]);
+        component_clear(&ctx->components[root]);
+        ctx->parent[root] = root;
+        ctx->free_after_row[root] = row - 1;
+    }
 }
 
 int ost_cc_buffer_sizes(int width, OSTCCBufferSizes *sizes)
 {
     int max_labels;
-    int max_runs;
 
     if (!sizes || width <= 0)
         return -1;
 
-    /* A row has at most ceil(width/2) runs; width+1 labels cover live runs. */
     max_labels = width + 1;
-    max_runs = (width + 1) / 2;
-
     sizes->max_labels = max_labels;
-    sizes->max_runs = max_runs;
     sizes->components = (size_t)max_labels;
     sizes->parent = (size_t)max_labels;
-    sizes->label_live = (size_t)max_labels;
+    sizes->col_label = (size_t)width;
+    sizes->active_count = (size_t)max_labels;
     sizes->free_after_row = (size_t)max_labels;
-    sizes->touched_stamp = (size_t)max_labels;
-    sizes->seen_stamp = (size_t)max_labels;
-    sizes->prev_runs = (size_t)max_runs;
-    sizes->curr_runs = (size_t)max_runs;
     sizes->total_bytes =
         sizes->components * sizeof(OSTCCComponent) +
-        (sizes->parent + sizes->label_live + sizes->free_after_row +
-         sizes->touched_stamp + sizes->seen_stamp) * sizeof(int) +
-        (sizes->prev_runs + sizes->curr_runs) * sizeof(OSTCCRun);
+        (sizes->parent + sizes->col_label + sizes->active_count +
+         sizes->free_after_row) * sizeof(int);
 
     return 0;
 }
@@ -780,32 +688,25 @@ int ost_cc_buffer_sizes(int width, OSTCCBufferSizes *sizes)
 int ost_cc_init(OSTCCContext *ctx, int width,
                 OSTCCComponent *components,
                 int *parent,
-                int *label_live,
-                int *free_after_row,
-                int *touched_stamp,
-                int *seen_stamp,
-                OSTCCRun *prev_runs,
-                OSTCCRun *curr_runs)
+                int *col_label,
+                int *active_count,
+                int *free_after_row)
 {
     OSTCCBufferSizes sizes;
 
-    if (!ctx || !components || !parent || !label_live || !free_after_row ||
-        !touched_stamp || !seen_stamp || !prev_runs || !curr_runs)
+    if (!ctx || !components || !parent || !col_label || !active_count ||
+        !free_after_row)
         return -1;
     if (ost_cc_buffer_sizes(width, &sizes) < 0)
         return -1;
 
     ctx->width = width;
     ctx->max_labels = sizes.max_labels;
-    ctx->max_runs = sizes.max_runs;
     ctx->components = components;
     ctx->parent = parent;
-    ctx->label_live = label_live;
+    ctx->col_label = col_label;
+    ctx->active_count = active_count;
     ctx->free_after_row = free_after_row;
-    ctx->touched_stamp = touched_stamp;
-    ctx->seen_stamp = seen_stamp;
-    ctx->prev_runs = prev_runs;
-    ctx->curr_runs = curr_runs;
     return 0;
 }
 
@@ -815,293 +716,62 @@ int ost_cc_threshold_4(const unsigned char *image,
                        OSTCCComponent *out, int out_max,
                        OSTCCContext *ctx)
 {
-    OSTCCBinaryComponent *components;
-    int *parent;
-    int *label_live;
-    int *free_after_row;
-    int *touched_stamp;
-    int *seen_stamp;
-    OSTCCRun *prev_runs;
-    OSTCCRun *curr_runs;
     int count;
     int next_free_label;
-    int nr_prev;
 
     if (!image || !ctx || !out || width <= 0 || height < 0 ||
         stride < width || out_max < 0 || ctx->width != width)
         return -1;
 
-    components = (OSTCCBinaryComponent *)ctx->components;
-    parent = ctx->parent;
-    label_live = ctx->label_live;
-    free_after_row = ctx->free_after_row;
-    touched_stamp = ctx->touched_stamp;
-    seen_stamp = ctx->seen_stamp;
-    prev_runs = ctx->prev_runs;
-    curr_runs = ctx->curr_runs;
     count = 0;
     next_free_label = 1;
-    nr_prev = 0;
-
-    memset(label_live, 0, (size_t)ctx->max_labels * sizeof(int));
-    memset(free_after_row, -1, (size_t)ctx->max_labels * sizeof(int));
-    memset(touched_stamp, 0, (size_t)ctx->max_labels * sizeof(int));
-    memset(seen_stamp, 0, (size_t)ctx->max_labels * sizeof(int));
+    clear_components(out, out_max);
+    memset(ctx->col_label, 0, (size_t)width * sizeof(int));
+    memset(ctx->active_count, 0, (size_t)ctx->max_labels * sizeof(int));
+    memset(ctx->free_after_row, -1,
+           (size_t)ctx->max_labels * sizeof(int));
 
     for (int y = 0; y < height; y++) {
         const unsigned char *row;
-        int stamp;
-        int nr_curr;
-        int p;
+        int left;
 
         row = image + (size_t)y * (size_t)stride;
-        stamp = y + 1;
-        nr_curr = extract_runs_thresh(row, width, threshold, curr_runs);
-        p = 0;
+        left = 0;
+        for (int x = 0; x < width; x++) {
+            int top_label;
+            int top;
+            int label;
 
-        for (int j = 0; j < nr_curr; j++) {
-            /* For 4-connectivity, adjacent-row runs connect iff x-intervals overlap. */
-            OSTCCRun *cr;
-            int assigned;
-            int len;
-
-            cr = &curr_runs[j];
-            assigned = 0;
-            len = cr->x1 - cr->x0 + 1;
-
-            while (p < nr_prev && prev_runs[p].x1 < cr->x0)
-                p++;
-
-            for (int q = p; q < nr_prev && prev_runs[q].x0 <= cr->x1; q++) {
-                int root;
-
-                root = root_compress(parent, prev_runs[q].label);
-                touched_stamp[root] = stamp;
-                if (!assigned)
-                    assigned = root;
-                else
-                    assigned = merge_binary_roots(components, parent,
-                                                  label_live, free_after_row,
-                                                  assigned, root, y);
-            }
-
-            if (!assigned) {
-                assigned = alloc_binary_label(components, parent, label_live,
-                                              free_after_row, ctx->max_labels,
-                                              y, &next_free_label);
-                if (!assigned) {
-                    ctx->prev_runs = prev_runs;
-                    ctx->curr_runs = curr_runs;
-                    return -2;
-                }
-            }
-
-            cr->label = assigned;
-            label_live[assigned] = 1;
-            components[assigned].area += len;
-            components[assigned].sum_x += (cr->x0 + cr->x1) * len / 2;
-            components[assigned].sum_y += y * len;
-        }
-
-        for (int i = 0; i < nr_prev; i++) {
-            int root;
-
-            root = root_compress(parent, prev_runs[i].label);
-            if (seen_stamp[root] == stamp)
+            top_label = ctx->col_label[x];
+            if (row[x] <= threshold) {
+                left = 0;
+                close_binary_column(ctx, x, y, out, &count, out_max);
                 continue;
-            seen_stamp[root] = stamp;
-
-            if (touched_stamp[root] != stamp) {
-                /* Untouched previous-row roots cannot be reached by future rows. */
-                insert_component(out, &count, out_max,
-                                 components[root].area,
-                                 components[root].sum_x,
-                                 components[root].sum_y);
-                components[root].area = 0;
-                components[root].sum_x = 0;
-                components[root].sum_y = 0;
-                label_live[root] = 0;
-                free_after_row[root] = y;
-                parent[root] = root;
-            }
-        }
-
-        OST_SWAP(OSTCCRun *, prev_runs, curr_runs);
-        nr_prev = nr_curr;
-    }
-
-    {
-        int stamp;
-
-        stamp = height + 1;
-        for (int i = 0; i < nr_prev; i++) {
-            int root;
-
-            root = root_compress(parent, prev_runs[i].label);
-            if (seen_stamp[root] == stamp)
-                continue;
-            seen_stamp[root] = stamp;
-
-            insert_component(out, &count, out_max,
-                             components[root].area,
-                             components[root].sum_x,
-                             components[root].sum_y);
-            components[root].area = 0;
-            components[root].sum_x = 0;
-            components[root].sum_y = 0;
-            label_live[root] = 0;
-            free_after_row[root] = height;
-            parent[root] = root;
-        }
-    }
-
-    ctx->prev_runs = prev_runs;
-    ctx->curr_runs = curr_runs;
-    return count;
-}
-
-static int cc_weighted_core(const unsigned short *image,
-                            int width, int height, int stride,
-                            OSTCCRunFn extract_runs, void *extract_opaque,
-                            OSTCCBackgroundFn background,
-                            void *background_opaque,
-                            double signal_sigma,
-                            OSTCCComponent *out, int out_max,
-                            OSTCCContext *ctx)
-{
-    int count;
-    int next_free_label;
-    int nr_prev;
-    int i;
-    int y;
-
-    if (!extract_runs || !image || !background || !ctx || !out || width <= 0 ||
-        height < 0 || stride < width || out_max < 0 || ctx->width != width)
-        return -1;
-
-    count = 0;
-    next_free_label = 1;
-    nr_prev = 0;
-
-    clear_components(out, out_max);
-    clear_components(ctx->components, ctx->max_labels);
-    memset(ctx->label_live, 0, (size_t)ctx->max_labels * sizeof(int));
-    memset(ctx->free_after_row, -1, (size_t)ctx->max_labels * sizeof(int));
-    memset(ctx->touched_stamp, 0, (size_t)ctx->max_labels * sizeof(int));
-    memset(ctx->seen_stamp, 0, (size_t)ctx->max_labels * sizeof(int));
-
-    for (i = 0; i < ctx->max_labels; i++)
-        ctx->parent[i] = i;
-
-    for (y = 0; y < height; y++) {
-        int stamp;
-        int nr_curr;
-        int p;
-        int j;
-
-        stamp = y + 1;
-        nr_curr = extract_runs(extract_opaque,
-                               image + (size_t)y * (size_t)stride,
-                               y, width, ctx->curr_runs);
-        p = 0;
-
-        for (j = 0; j < nr_curr; j++) {
-            OSTCCRun *cr;
-            int assigned;
-            int q;
-
-            cr = &ctx->curr_runs[j];
-            assigned = 0;
-
-            while (p < nr_prev && ctx->prev_runs[p].x1 < cr->x0)
-                p++;
-
-            for (q = p; q < nr_prev && ctx->prev_runs[q].x0 <= cr->x1; q++) {
-                int root;
-
-                root = root_compress(ctx->parent, ctx->prev_runs[q].label);
-                ctx->touched_stamp[root] = stamp;
-
-                if (!assigned)
-                    assigned = root;
-                else
-                    assigned = merge_roots(ctx, assigned, root, y);
             }
 
-            if (!assigned) {
-                assigned = alloc_label(ctx, y, &next_free_label);
-                if (!assigned)
+            top = top_label ? root_compress(ctx->parent, top_label) : 0;
+            if (left)
+                label = (top && top != left) ?
+                    merge_roots(ctx, left, top, y) : left;
+            else if (top)
+                label = top;
+            else {
+                label = alloc_label(ctx, y, &next_free_label);
+                if (!label)
                     return -2;
             }
 
-            assigned = root_compress(ctx->parent, assigned);
-            cr->label = assigned;
-            ctx->label_live[assigned] = 1;
-            component_add_weighted_run(&ctx->components[assigned], image, stride,
-                                       cr->x0, cr->x1, y, background,
-                                       background_opaque, signal_sigma);
-        }
-
-        for (i = 0; i < nr_prev; i++) {
-            int root;
-
-            root = root_compress(ctx->parent, ctx->prev_runs[i].label);
-            if (ctx->seen_stamp[root] == stamp)
-                continue;
-            ctx->seen_stamp[root] = stamp;
-
-            if (ctx->touched_stamp[root] != stamp) {
-                insert_weighted_component(out, &count, out_max,
-                                          ctx->components[root]);
-                component_clear(&ctx->components[root]);
-                ctx->label_live[root] = 0;
-                ctx->free_after_row[root] = y;
-                ctx->parent[root] = root;
-            }
-        }
-
-        OST_SWAP(OSTCCRun *, ctx->prev_runs, ctx->curr_runs);
-        nr_prev = nr_curr;
-    }
-
-    {
-        int stamp;
-
-        stamp = height + 1;
-        for (i = 0; i < nr_prev; i++) {
-            int root;
-
-            root = root_compress(ctx->parent, ctx->prev_runs[i].label);
-            if (ctx->seen_stamp[root] == stamp)
-                continue;
-            ctx->seen_stamp[root] = stamp;
-
-            insert_weighted_component(out, &count, out_max,
-                                      ctx->components[root]);
-            component_clear(&ctx->components[root]);
-            ctx->label_live[root] = 0;
-            ctx->free_after_row[root] = height;
-            ctx->parent[root] = root;
+            if (!top_label)
+                ctx->active_count[label]++;
+            ctx->col_label[x] = label;
+            component_add_binary_pixel(&ctx->components[label], x, y);
+            left = label;
         }
     }
 
+    for (int x = 0; x < width; x++)
+        close_binary_column(ctx, x, height, out, &count, out_max);
     return count;
-}
-
-static int ost_cc_weighted_runs_4(const unsigned short *image,
-                                  int width, int height, int stride,
-                                  OSTCCRunFn extract_runs,
-                                  void *extract_opaque,
-                                  OSTCCBackgroundFn background,
-                                  void *background_opaque,
-                                  double signal_sigma,
-                                  OSTCCComponent *out, int out_max,
-                                  OSTCCContext *ctx)
-{
-    return cc_weighted_core(image, width, height, stride, extract_runs,
-                            extract_opaque, background,
-                            background_opaque, signal_sigma,
-                            out, out_max, ctx);
 }
 
 /* background and fitting */
@@ -1369,108 +1039,19 @@ static double bg_threshold_y(const OSTBGThresholdTest *t, int tx,
     return a * (1.0 - fy) + b * fy;
 }
 
-/* Emit thresholded runs directly, avoiding a temporary foreground image. */
-static int bg_threshold_runs(void *opaque, const unsigned short *row,
-                             int y, int width, OSTCCRun *runs)
-{
-    OSTBGThresholdTest *t = (OSTBGThresholdTest *)opaque;
-    double gy = y * t->sy;
-    int mh = t->cfg->map_height;
-    int mw = t->cfg->map_width;
-    int y0 = (int)floor(gy);
-    int y1;
-    double fy;
-    int nr = 0;
-    int x = 0;
-    int in_run = 0;
-    int x0 = 0;
-
-    if (y0 < 0)
-        y0 = 0;
-    if (y0 > mh - 1)
-        y0 = mh - 1;
-    y1 = y0 + 1 < mh ? y0 + 1 : y0;
-    fy = gy - y0;
-
-    if (t->sx <= 0.0) {
-        double th = bg_threshold_y(t, 0, y0, y1, fy);
-
-        while (x < width) {
-            while (x < width && row[x] <= th)
-                x++;
-            if (x >= width)
-                break;
-            runs[nr].x0 = x;
-            while (x + 1 < width && row[x + 1] > th)
-                x++;
-            runs[nr].x1 = x;
-            runs[nr].label = 0;
-            nr++;
-            x++;
-        }
-        return nr;
-    }
-
-    while (x < width) {
-        double gx = x * t->sx;
-        int tx = (int)floor(gx);
-        int tx1;
-        int x_end;
-        double a;
-        double b;
-        double th;
-        double dth;
-
-        if (tx < 0)
-            tx = 0;
-        if (tx > mw - 1)
-            tx = mw - 1;
-        tx1 = tx + 1 < mw ? tx + 1 : tx;
-        x_end = tx + 1 < mw ? (int)ceil((tx + 1) / t->sx) : width;
-        if (x_end > width)
-            x_end = width;
-        a = bg_threshold_y(t, tx, y0, y1, fy);
-        b = bg_threshold_y(t, tx1, y0, y1, fy);
-        th = a + (b - a) * (gx - tx);
-        dth = (b - a) * t->sx;
-
-        while (x < x_end) {
-            int above = row[x] > th;
-
-            if (above) {
-                if (!in_run) {
-                    x0 = x;
-                    in_run = 1;
-                }
-            } else if (in_run) {
-                runs[nr].x0 = x0;
-                runs[nr].x1 = x - 1;
-                runs[nr].label = 0;
-                nr++;
-                in_run = 0;
-            }
-            x++;
-            th += dth;
-        }
-    }
-    if (in_run) {
-        runs[nr].x0 = x0;
-        runs[nr].x1 = width - 1;
-        runs[nr].label = 0;
-        nr++;
-    }
-    return nr;
-}
-
 int ost_bg_extract_fused(const OSTBGConfig *cfg, const uint16_t *image,
                          int stride, OSTBGStats *stats, OSTCCContext *cc,
                          OSTCCComponent *stars, int stars_max)
 {
     /* Thresholding, connected components, and first-pass photometry are fused. */
     OSTBGThresholdTest test;
+    int count;
+    int next_free_label;
 
-    if (!cfg || !image || !stats || !cc || !stars)
+    if (!cfg || !image || !stats || !cc || !stars ||
+        stride < cfg->width || stars_max < 0 || cc->width != cfg->width)
         return -1;
+
     test.cfg = cfg;
     test.mean = stats->mean;
     test.var = stats->var;
@@ -1478,10 +1059,113 @@ int ost_bg_extract_fused(const OSTBGConfig *cfg, const uint16_t *image,
         (double)(cfg->map_width - 1) / (cfg->width - 1) : 0.0;
     test.sy = cfg->height > 1 ?
         (double)(cfg->map_height - 1) / (cfg->height - 1) : 0.0;
-    return ost_cc_weighted_runs_4(image, cfg->width, cfg->height, stride,
-                                  bg_threshold_runs, &test,
-                                  ost_bg_interpolate, stats,
-                                  cfg->threshold_sigma, stars, stars_max, cc);
+    count = 0;
+    next_free_label = 1;
+
+    clear_components(stars, stars_max);
+    memset(cc->col_label, 0, (size_t)cfg->width * sizeof(int));
+    memset(cc->active_count, 0, (size_t)cc->max_labels * sizeof(int));
+    memset(cc->free_after_row, -1, (size_t)cc->max_labels * sizeof(int));
+
+    for (int y = 0; y < cfg->height; y++) {
+        const uint16_t *row;
+        double gy;
+        int mh;
+        int mw;
+        int y0;
+        int y1;
+        double fy;
+        int x;
+        int left;
+
+        row = image + (size_t)y * (size_t)stride;
+        gy = y * test.sy;
+        mh = cfg->map_height;
+        mw = cfg->map_width;
+        y0 = (int)floor(gy);
+        if (y0 < 0)
+            y0 = 0;
+        if (y0 > mh - 1)
+            y0 = mh - 1;
+        y1 = y0 + 1 < mh ? y0 + 1 : y0;
+        fy = gy - y0;
+        x = 0;
+        left = 0;
+
+        while (x < cfg->width) {
+            int tx;
+            int tx1;
+            int x_end;
+            double gx;
+            double a;
+            double b;
+            double th;
+            double dth;
+
+            if (test.sx <= 0.0) {
+                tx = 0;
+                tx1 = 0;
+                x_end = cfg->width;
+                gx = 0.0;
+            } else {
+                gx = x * test.sx;
+                tx = (int)floor(gx);
+                if (tx < 0)
+                    tx = 0;
+                if (tx > mw - 1)
+                    tx = mw - 1;
+                tx1 = tx + 1 < mw ? tx + 1 : tx;
+                x_end = tx + 1 < mw ? (int)ceil((tx + 1) / test.sx) : cfg->width;
+                if (x_end > cfg->width)
+                    x_end = cfg->width;
+            }
+            a = bg_threshold_y(&test, tx, y0, y1, fy);
+            b = bg_threshold_y(&test, tx1, y0, y1, fy);
+            th = a + (b - a) * (gx - tx);
+            dth = (b - a) * test.sx;
+
+            while (x < x_end) {
+                int top_label;
+
+                top_label = cc->col_label[x];
+                if (row[x] <= th) {
+                    left = 0;
+                    if (top_label)
+                        close_weighted_column(cc, x, y, stars, &count, stars_max);
+                } else {
+                    int top;
+                    int label;
+
+                    top = top_label ? root_compress(cc->parent, top_label) : 0;
+                    if (left)
+                        label = (top && top != left) ?
+                            merge_roots(cc, left, top, y) : left;
+                    else if (top)
+                        label = top;
+                    else {
+                        label = alloc_label(cc, y, &next_free_label);
+                        if (!label)
+                            return -2;
+                    }
+
+                    if (!top_label)
+                        cc->active_count[label]++;
+                    cc->col_label[x] = label;
+                    component_add_weighted_pixel(&cc->components[label], image,
+                                                 stride, x, y,
+                                                 ost_bg_interpolate, stats,
+                                                 cfg->threshold_sigma);
+                    left = label;
+                }
+                x++;
+                th += dth;
+            }
+        }
+    }
+
+    for (int x = 0; x < cfg->width; x++)
+        close_weighted_column(cc, x, cfg->height, stars, &count, stars_max);
+    return count;
 }
 
 static void bg_at(const OSTBGStats *s, int x, int y,
