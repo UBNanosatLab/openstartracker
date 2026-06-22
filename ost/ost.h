@@ -39,6 +39,8 @@
 #endif
 #endif
 
+#define QMETHOD_ITER 0
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -51,6 +53,88 @@ extern "C" {
         (a)               = (b);          \
         (b)               = ost_swap_tmp; \
     } while (0)
+
+#define OST_KD_COORD(base, elem_size, key_offset, idx, dim) \
+    (*(float *)((char *)(base) + (size_t)(idx) * (elem_size) + \
+                (key_offset) + (size_t)(dim) * sizeof(float)))
+
+typedef int (*OSTKDVisit)(void *base, int idx, void *ctx);
+
+static inline void ost_kdselect(void *base, size_t elem_size, size_t key_offset,
+                                int l, int r, int k, int dim)
+{
+    r--;
+    while (l < r) {
+        float p = OST_KD_COORD(base, elem_size, key_offset, (l + r) >> 1, dim);
+        int i = l, j = r;
+        while (i <= j) {
+            while (OST_KD_COORD(base, elem_size, key_offset, i, dim) < p) i++;
+            while (OST_KD_COORD(base, elem_size, key_offset, j, dim) > p) j--;
+            if (i <= j) {
+                char *a = (char *)base + (size_t)i * elem_size;
+                char *b = (char *)base + (size_t)j * elem_size;
+                for (size_t n = 0; n < elem_size; n++) {
+                    char t = a[n];
+                    a[n] = b[n];
+                    b[n] = t;
+                }
+                i++;
+                j--;
+            }
+        }
+        if (k <= j) r = j;
+        else if (k >= i) l = i;
+        else break;
+    }
+}
+
+static inline void ost_kdbuild(void *base, size_t elem_size, size_t key_offset,
+                               int min, int max, int bucket, int dim, int dims)
+{
+    int mid;
+    if (max - min <= bucket || dims <= 0)
+        return;
+    mid = (min + max) / 2;
+    ost_kdselect(base, elem_size, key_offset, min, max, mid, dim);
+    ost_kdbuild(base, elem_size, key_offset, min, mid, bucket,
+                (dim + 1) % dims, dims);
+    ost_kdbuild(base, elem_size, key_offset, mid + 1, max, bucket,
+                (dim + 1) % dims, dims);
+}
+
+static inline int ost_kdsearch(void *base, size_t elem_size, size_t key_offset,
+                               int min, int max, int bucket, int dim, int dims,
+                               const float *p, const float *r,
+                               OSTKDVisit visit, void *ctx)
+{
+    int mid, rc;
+    if (max <= min || dims <= 0)
+        return 0;
+    if (max - min <= bucket) {
+        for (int i = min; i < max; i++) {
+            rc = visit(base, i, ctx);
+            if (rc)
+                return rc;
+        }
+        return 0;
+    }
+    mid = (min + max) / 2;
+    if (min < mid && p[dim] - r[dim] <=
+        OST_KD_COORD(base, elem_size, key_offset, mid, dim)) {
+        rc = ost_kdsearch(base, elem_size, key_offset, min, mid, bucket,
+                          (dim + 1) % dims, dims, p, r, visit, ctx);
+        if (rc < 0)
+            return rc;
+    }
+    rc = visit(base, mid, ctx);
+    if (rc)
+        return rc;
+    if (mid + 1 < max && OST_KD_COORD(base, elem_size, key_offset, mid, dim)
+        <= p[dim] + r[dim])
+        return ost_kdsearch(base, elem_size, key_offset, mid + 1, max, bucket,
+                            (dim + 1) % dims, dims, p, r, visit, ctx);
+    return 0;
+}
 
 #ifndef OST_MIN_COMPONENT_AREA
 #define OST_MIN_COMPONENT_AREA 4
@@ -117,6 +201,7 @@ typedef struct OSTBGConfig {
     int max_stars;
     int max_pixel_brightness;
     int sample_radius;
+    double psf_sigma;
     double threshold_sigma;
     double detect_sigma;
 } OSTBGConfig;
@@ -142,9 +227,7 @@ typedef struct OSTBGFitWorkspace {
     double *params1;
     double *params2;
     double *normal;
-    double *sigma_col;
     double *rhs;
-    double *sigma_solve;
     double *rhs_solve;
     double *cov_xy;
     double *dropped;
@@ -182,7 +265,7 @@ typedef struct Config {
     int IMG_X, IMG_Y, MAX_FALSE_STARS, DB_REDUNDANCY, REQUIRED_STARS;
     int KDBUCKET_SIZE;
     float PIXSCALE, DOUBLE_STAR_PX, BASE_FLUX, IMAGE_VARIANCE;
-    float THRESH_FACTOR, POS_VARIANCE, POS_ERR_SIGMA;
+    float THRESH_FACTOR, POS_VARIANCE, POS_ERR_SIGMA, PSF_SIGMA;
     float MAXFOV, MINFOV, MATCH_VALUE, PIXX_TANGENT, PIXY_TANGENT;
 } Config;
 
@@ -288,6 +371,26 @@ void ost_match_work_init(MatchWork *mw, CPair *candidates, int candidate_cap,
                          int *fov_mask, int *collision, int collision_cap,
                          float *fov_px, float *fov_py, float *scores,
                          int *match_map, int *work_map);
+int fov_init(StarFov *fov, StarDB *stars, float db_max_variance,
+             const Config *c, MatchWork *w);
+float fov_score(StarFov *fov, int id, float px, float py);
+int fov_resolve(StarFov *fov, int id, float px, float py);
+int fov_get_id(StarFov *fov, const Config *c, float px, float py);
+void mr_init(MatchResult *m, CDB *db, CDB *img, StarFov *mask, int *map);
+void mr_set_pair(MatchResult *m, Constellation db, Constellation img);
+void mr_copy(MatchResult *dst, MatchResult *src);
+int weighted_wahba_vectors(Mat3 R, const Star *db_stars, const Star *img_stars,
+                           const int *db_idx, const int *img_idx, int n,
+                           int iter);
+void weighted_wahba(MatchResult *m, int iter);
+void weighted_triad(MatchResult *m);
+void compute_score(MatchResult *m, const Config *c, MatchWork *w);
+int related(MatchResult *winner, CPair *p);
+int ost_chol(const double *a, int n, double *l);
+void ost_chol_solve(const double *l, int n, const double *b,
+                    double *x, double *y);
+void ost_chol_inv_diag(const double *l, int n, double *d,
+                       double *e, double *x, double *y);
 int ost_copy_n_brightest(StarDB *dst, StarDB *src, Star *tmp, int n);
 
 #ifdef __cplusplus
@@ -347,7 +450,7 @@ static inline void ost_mat_mul_bt_f(float *OST_RESTRICT c,
             c[i * n + j] = s;
         }
 }
-static inline int ost_chol(const double *a, int n, double *l)
+OST_DEF int ost_chol(const double *a, int n, double *l)
 {
     for (int i = 0; i < n; i++)
         for (int j = 0; j <= i; j++) {
@@ -363,8 +466,8 @@ static inline int ost_chol(const double *a, int n, double *l)
         }
     return 0;
 }
-static inline void ost_chol_solve(const double *l, int n, const double *b,
-                           double *x, double *y)
+OST_DEF void ost_chol_solve(const double *l, int n, const double *b,
+                            double *x, double *y)
 {
     for (int i = 0; i < n; i++) {
         double s = b[i];
@@ -379,8 +482,8 @@ static inline void ost_chol_solve(const double *l, int n, const double *b,
         x[i] = s / l[ost_tri_idx(i, i)];
     }
 }
-static inline void ost_chol_inv_diag(const double *l, int n, double *d,
-                              double *e, double *x, double *y)
+OST_DEF void ost_chol_inv_diag(const double *l, int n, double *d,
+                               double *e, double *x, double *y)
 {
     for (int i = 0; i < n; i++) {
         for (int j = 0; j < n; j++)
@@ -797,6 +900,7 @@ int ost_bg_config_init(OSTBGConfig *cfg, int width, int height)
     cfg->max_stars = 256;
     cfg->max_pixel_brightness = 255 * 4;
     cfg->sample_radius = 2;
+    cfg->psf_sigma = 0.0;
     cfg->threshold_sigma = 5.0;
     cfg->detect_sigma = 1.5;
     return 0;
@@ -1180,13 +1284,12 @@ static void bg_at(const OSTBGStats *s, int x, int y,
     *poisson = bilinear_grid(s->poisson, cfg->map_width, cfg->map_height, gx, gy);
 }
 
-/* Weighted moments seed x, y, flux, and a shared initial PSF width. */
+/* Weighted moments seed x, y, and flux; calibration supplies PSF width. */
 static int ost_bg_fit_init(const OSTBGConfig *cfg,
                            const OSTCCComponent *components,
                            int component_count, OSTBGFitStar *stars,
                            double *params, int max_stars)
 {
-    double eig_sum = 0.0;
     int n = 0;
 
     if (!cfg || !components || !stars || !params || max_stars <= 0)
@@ -1214,10 +1317,9 @@ static int ost_bg_fit_init(const OSTBGConfig *cfg,
         params[3 * n + 0] = x;
         params[3 * n + 1] = y;
         params[3 * n + 2] = components[i].wsum;
-        eig_sum += components[i].eig_min;
         n++;
     }
-    params[3 * n] = sqrt(fmax(eig_sum / (n ? n : 1), 1.0 / 12.0));
+    params[3 * n] = cfg->psf_sigma;
     return n;
 }
 
@@ -1246,8 +1348,6 @@ static void psf_eval(double x0, double y0, double I, double sigma,
     J[0] = -norm * ey * (e1 - e2);
     J[1] = -norm * ex * (e3 - e4);
     J[2] = I != 0.0 ? *pred / I : 0.0;
-    J[3] = -sqrt2 * norm *
-        (ex * (e3 * y1 - e4 * y2) + ey * (e1 * x1 - e2 * x2));
 }
 
 /* Weighted least squares uses background plus Poisson-scaled image variance. */
@@ -1256,22 +1356,16 @@ static int build_fit_model(const OSTBGConfig *cfg, const uint16_t *image,
                            const OSTBGFitStar *stars, const double *params,
                            int n, double sigma,
                            OSTBGFitStar *stars_out, double *params_out,
-                           double *normal, double *sigma_col, double *rhs,
-                           double *sigma_normal, double *sigma_rhs,
+                           double *normal, double *rhs,
                            double *dropped, int *dropped_count,
                            int max_dropped)
 {
     int m = 0;
     int r = cfg->sample_radius;
 
-    *sigma_normal = 0.0;
-    *sigma_rhs = 0.0;
     for (int i = 0; i < n; i++) {
         OSTSym3 B = {0, 0, 0, 0, 0, 0};
-        OSTDVec3 g = {0, 0, 0};
         OSTDVec3 b = {0, 0, 0};
-        double gs = 0.0;
-        double bs = 0.0;
         double x0 = params[3 * i + 0];
         double y0 = params[3 * i + 1];
         double I = params[3 * i + 2];
@@ -1285,7 +1379,7 @@ static int build_fit_model(const OSTBGConfig *cfg, const uint16_t *image,
                 double poisson;
                 double obs;
                 double pred;
-                double J[4];
+                double J[3];
 
                 bg_at(stats, x, y, &mu, &var, &poisson);
                 obs = (double)image[(size_t)y * (size_t)stride + (size_t)x] - mu;
@@ -1307,14 +1401,9 @@ static int build_fit_model(const OSTBGConfig *cfg, const uint16_t *image,
                     B[3] += J[2] * w * J[0];
                     B[4] += J[2] * w * J[1];
                     B[5] += J[2] * w * J[2];
-                    g[0] += J[0] * w * J[3];
-                    g[1] += J[1] * w * J[3];
-                    g[2] += J[2] * w * J[3];
                     b[0] += J[0] * w * e;
                     b[1] += J[1] * w * e;
                     b[2] += J[2] * w * e;
-                    gs += J[3] * w * J[3];
-                    bs += J[3] * w * e;
                 }
             }
         }
@@ -1333,65 +1422,32 @@ static int build_fit_model(const OSTBGConfig *cfg, const uint16_t *image,
         params_out[3 * m + 2] = params[3 * i + 2];
         if (normal) {
             memcpy(normal + 6 * m, B, sizeof(B));
-            memcpy(sigma_col + 3 * m, g, sizeof(g));
             memcpy(rhs + 3 * m, b, sizeof(b));
         }
-        *sigma_normal += gs;
-        *sigma_rhs += bs;
         m++;
     }
     params_out[3 * m] = sigma;
     return m;
 }
 
-static int solve_fit(double *params, int n, double *normal, double *sigma_col,
-                     double *rhs, double sigma_normal, double sigma_rhs,
-                     double *sigma_solve, double *rhs_solve,
-                     double *cov_xy, int compute_cov)
+static int solve_fit(double *params, int n, double *normal, double *rhs,
+                     double *rhs_solve, double *cov_xy, int compute_cov)
 {
-    double S = sigma_normal;
-    double bs = sigma_rhs;
-    double cov_s;
-
     for (int i = 0; i < n; i++) {
         OSTSym3 l;
         OSTDVec3 y;
 
         if (ost_chol(normal + 6 * i, 3, l) < 0)
             return -1;
-        ost_chol_solve(l, 3, sigma_col + 3 * i, sigma_solve + 3 * i, y);
         ost_chol_solve(l, 3, rhs + 3 * i, rhs_solve + 3 * i, y);
-        S -= sigma_col[3 * i + 0] * sigma_solve[3 * i + 0] +
-             sigma_col[3 * i + 1] * sigma_solve[3 * i + 1] +
-             sigma_col[3 * i + 2] * sigma_solve[3 * i + 2];
-        bs -= sigma_col[3 * i + 0] * rhs_solve[3 * i + 0] +
-              sigma_col[3 * i + 1] * rhs_solve[3 * i + 1] +
-              sigma_col[3 * i + 2] * rhs_solve[3 * i + 2];
+        params[3 * i + 0] += 0.5 * rhs_solve[3 * i + 0];
+        params[3 * i + 1] += 0.5 * rhs_solve[3 * i + 1];
+        params[3 * i + 2] += 0.5 * rhs_solve[3 * i + 2];
         if (compute_cov) {
             OSTDVec3 d, e, x;
             ost_chol_inv_diag(l, 3, d, e, x, y);
             cov_xy[2 * i + 0] = d[0];
             cov_xy[2 * i + 1] = d[1];
-        }
-    }
-    if (S <= 0.0)
-        return -1;
-    cov_s = 1.0 / S;
-    params[3 * n] += 0.5 * bs * cov_s;
-    for (int i = 0; i < n; i++) {
-        double ds = bs * cov_s;
-
-        params[3 * i + 0] +=
-            0.5 * (rhs_solve[3 * i + 0] - sigma_solve[3 * i + 0] * ds);
-        params[3 * i + 1] +=
-            0.5 * (rhs_solve[3 * i + 1] - sigma_solve[3 * i + 1] * ds);
-        params[3 * i + 2] +=
-            0.5 * (rhs_solve[3 * i + 2] - sigma_solve[3 * i + 2] * ds);
-        if (compute_cov) {
-            cov_xy[2 * i + 0] += sigma_solve[3 * i + 0] *
-                                 sigma_solve[3 * i + 0] * cov_s;
-            cov_xy[2 * i + 1] += sigma_solve[3 * i + 1] *
-                                 sigma_solve[3 * i + 1] * cov_s;
         }
     }
     return 0;
@@ -1413,7 +1469,7 @@ int ost_bg_fit_stars(const OSTBGConfig *cfg, const uint16_t *image, int stride,
 
     if (!cfg || !image || !stats || !components || !work || !params_out ||
         !cov_xy_out || !dropped_count_out || stride < cfg->width ||
-        max_stars <= 0)
+        max_stars <= 0 || cfg->psf_sigma <= 0.0)
         return -1;
 
     stars = work->stars1;
@@ -1421,8 +1477,7 @@ int ost_bg_fit_stars(const OSTBGConfig *cfg, const uint16_t *image, int stride,
     params = work->params1;
     params_next = work->params2;
     if (!stars || !stars_next || !params || !params_next || !work->normal ||
-        !work->sigma_col || !work->rhs || !work->sigma_solve ||
-        !work->rhs_solve || !work->cov_xy || !work->dropped)
+        !work->rhs || !work->rhs_solve || !work->cov_xy || !work->dropped)
         return -1;
 
     n = ost_bg_fit_init(cfg, components, component_count, stars, params, max_stars);
@@ -1432,21 +1487,16 @@ int ost_bg_fit_stars(const OSTBGConfig *cfg, const uint16_t *image, int stride,
     }
 
     for (int it = 0; it < num_iter; it++) {
-        double sigma = fmax(params[3 * n], sqrt(1.0 / 12.0));
-        double sigma_normal;
-        double sigma_rhs;
+        double sigma = cfg->psf_sigma;
         int compute_cov = it == num_iter - 1;
         int m;
 
         m = build_fit_model(cfg, image, stride, stats, stars, params, n, sigma,
-                            stars_next, params_next, work->normal,
-                            work->sigma_col, work->rhs,
-                            &sigma_normal, &sigma_rhs, work->dropped,
-                            &dropped_count, max_stars);
+                            stars_next, params_next, work->normal, work->rhs,
+                            work->dropped, &dropped_count, max_stars);
         if (m <= 0)
             break;
-        if (solve_fit(params_next, m, work->normal, work->sigma_col, work->rhs,
-                      sigma_normal, sigma_rhs, work->sigma_solve,
+        if (solve_fit(params_next, m, work->normal, work->rhs,
                       work->rhs_solve, work->cov_xy, compute_cov) < 0)
             return -2;
         {
@@ -1461,15 +1511,12 @@ int ost_bg_fit_stars(const OSTBGConfig *cfg, const uint16_t *image, int stride,
     }
 
     {
-        double sigma = fmax(params[3 * n], sqrt(1.0 / 12.0));
-        double sigma_normal;
-        double sigma_rhs;
+        double sigma = cfg->psf_sigma;
         int m;
 
         m = build_fit_model(cfg, image, stride, stats, stars, params, n, sigma,
-                            stars_next, params_next, NULL, NULL, NULL,
-                            &sigma_normal, &sigma_rhs, work->dropped,
-                            &dropped_count, max_stars);
+                            stars_next, params_next, NULL, NULL,
+                            work->dropped, &dropped_count, max_stars);
         if (m > 0) {
             memcpy(params_out, params_next, (size_t)(3 * m + 1) * sizeof(*params_out));
             for (int i = 0; i < m; i++) {
@@ -1501,6 +1548,7 @@ OST_DEF int ost_load_config(Config *c, const char *filename)
         else if (!strcmp(k, "IMG_Y")) c->IMG_Y = atoi(v);
         else if (!strcmp(k, "PIXSCALE")) c->PIXSCALE = (float)atof(v);
         else if (!strcmp(k, "POS_ERR_SIGMA")) c->POS_ERR_SIGMA = (float)atof(v);
+        else if (!strcmp(k, "PSF_SIGMA")) c->PSF_SIGMA = (float)atof(v);
         else if (!strcmp(k, "POS_VARIANCE")) c->POS_VARIANCE = (float)atof(v);
         else if (!strcmp(k, "IMAGE_VARIANCE")) c->IMAGE_VARIANCE = (float)atof(v);
         else if (!strcmp(k, "THRESH_FACTOR")) c->THRESH_FACTOR = (float)atof(v);
@@ -1511,6 +1559,10 @@ OST_DEF int ost_load_config(Config *c, const char *filename)
         else if (!strcmp(k, "BASE_FLUX")) c->BASE_FLUX = (float)atof(v);
     }
     fclose(f);
+    if (c->PSF_SIGMA <= 0.0f) {
+        fprintf(stderr, "%s: missing or invalid PSF_SIGMA\n", filename);
+        return -1;
+    }
     c->MAXFOV = c->PIXSCALE * sqrt(c->IMG_X * c->IMG_X + c->IMG_Y * c->IMG_Y);
     c->MINFOV = c->PIXSCALE * c->IMG_Y;
     c->MATCH_VALUE = 4 * log(1.0 / (c->IMG_X * c->IMG_Y)) + log(2 * PI);
@@ -1665,53 +1717,6 @@ static int cmp_flux_desc(const void *a, const void *b)
     return (d < 0) ? -1 : (d > 0);
 }
 
-static void sort_flux_desc(Star *a, int n)
-{
-    for (int i = 1; i < n; i++) {
-        Star s = a[i];
-        int j = i;
-        while (j > 0 && s.flux > a[j - 1].flux) {
-            a[j] = a[j - 1];
-            j--;
-        }
-        a[j] = s;
-    }
-}
-
-static inline void kdselect(Star *a, int l, int r, int k, int dim)
-{
-    r--;
-    while (l < r) {
-        float p = a[(l + r) >> 1].v[dim];
-        int i = l, j = r;
-        while (i <= j) {
-            while (a[i].v[dim] < p) i++;
-            while (a[j].v[dim] > p) j--;
-            if (i <= j) {
-                OST_SWAP(Star, a[i], a[j]);
-                i++;
-                j--;
-            }
-        }
-        if (k <= j) r = j;
-        else if (k >= i) l = i;
-        else break;
-    }
-}
-
-static void kdbuild(Star *a, int min, int max, int bucket, int dim)
-{
-    int mid = (min + max) / 2;
-    if (min + 1 < max) {
-        int next = dim < 2 ? dim + 1 : 0;
-        kdselect(a, min, max, mid, dim);
-        if (mid - min > bucket) kdbuild(a, min, mid, bucket, next);
-        else sort_flux_desc(a + min, mid - min);
-        if (max - (mid + 1) > bucket) kdbuild(a, mid + 1, max, bucket, next);
-        else sort_flux_desc(a + mid + 1, max - (mid + 1));
-    }
-}
-
 OST_DEF void ost_query_init(Query *q, StarDB *db, Star *map, int *res, signed char *mask)
 {
     q->map = map;
@@ -1747,20 +1752,31 @@ OST_DEF void ost_query_sort_flux(Query *q)
 OST_DEF void ost_query_kdsort(Query *q, const Config *c)
 {
     if (!q->kdsorted) {
-        kdbuild(q->map, 0, q->n, c->KDBUCKET_SIZE, 0);
+        ost_kdbuild(q->map, sizeof(q->map[0]), 0, 0, q->n,
+                    c->KDBUCKET_SIZE, 0, 3);
         q->kdsorted = 1;
     }
 }
 
-static inline void kdcheck(Query *q, int idx, const float p[3], float r, float min_flux)
+typedef struct OSTQuerySearchCtx {
+    Query *q;
+    const float *p;
+    float r;
+    float r2;
+    float min_flux;
+} OSTQuerySearchCtx;
+
+static inline int kdcheck(void *base, int idx, void *vctx)
 {
-    Star *s = &q->map[idx];
-    float dx = p[0] - s->v[0], dy = p[1] - s->v[1], dz = p[2] - s->v[2];
-    if (dx - r <= 0 && 0 <= dx + r &&
-        dy - r <= 0 && 0 <= dy + r &&
-        dz - r <= 0 && 0 <= dz + r &&
-        min_flux <= s->flux && q->kdmask[idx] == 0 &&
-        dx * dx + dy * dy + dz * dz <= r * r) {
+    OSTQuerySearchCtx *ctx = (OSTQuerySearchCtx *)vctx;
+    Query *q = ctx->q;
+    Star *s = &((Star *)base)[idx];
+    float dx = ctx->p[0] - s->v[0], dy = ctx->p[1] - s->v[1], dz = ctx->p[2] - s->v[2];
+    if (dx - ctx->r <= 0 && 0 <= dx + ctx->r &&
+        dy - ctx->r <= 0 && 0 <= dy + ctx->r &&
+        dz - ctx->r <= 0 && 0 <= dz + ctx->r &&
+        ctx->min_flux <= s->flux && q->kdmask[idx] == 0 &&
+        dx * dx + dy * dy + dz * dz <= ctx->r2) {
         int n = q->kdresults_size++;
         q->kdmask[idx] = 1;
         while (n > 0 && s->flux > q->map[q->kdresults[n - 1]].flux) {
@@ -1772,62 +1788,35 @@ static inline void kdcheck(Query *q, int idx, const float p[3], float r, float m
             q->kdresults_size = q->kdresults_maxsize;
             q->kdmask[q->kdresults[q->kdresults_size]] = 0;
         }
+        if (q->kdresults_size == q->kdresults_maxsize)
+            ctx->min_flux = q->map[q->kdresults[q->kdresults_size - 1]].flux;
     }
-}
-
-static void kdsearch(Query *q, const float p[3], float r, float min_flux,
-                     int min, int max, int bucket, int dim)
-{
-    int mid = (min + max) / 2;
-    int next = dim < 2 ? dim + 1 : 0;
-    float t = p[dim];
-    if (min < mid && t - r <= q->map[mid].v[dim]) {
-        if (mid - min > bucket) {
-            kdsearch(q, p, r, min_flux, min, mid, bucket, next);
-        } else {
-            for (int i = min; i < mid && min_flux <= q->map[i].flux; i++) {
-                kdcheck(q, i, p, r, min_flux);
-                if (q->kdresults_size == q->kdresults_maxsize)
-                    min_flux = q->map[q->kdresults[q->kdresults_size - 1]].flux;
-            }
-        }
-    }
-    if (mid < max)
-        kdcheck(q, mid, p, r, min_flux);
-    if (q->kdresults_size == q->kdresults_maxsize)
-        min_flux = q->map[q->kdresults[q->kdresults_size - 1]].flux;
-    if (mid + 1 < max && q->map[mid].v[dim] <= t + r) {
-        if (max - (mid + 1) > bucket) {
-            kdsearch(q, p, r, min_flux, mid + 1, max, bucket, next);
-        } else {
-            if (q->kdresults_size == q->kdresults_maxsize)
-                min_flux = q->map[q->kdresults[q->kdresults_size - 1]].flux;
-            for (int i = mid + 1; i < max && min_flux <= q->map[i].flux; i++) {
-                kdcheck(q, i, p, r, min_flux);
-                if (q->kdresults_size == q->kdresults_maxsize)
-                    min_flux = q->map[q->kdresults[q->kdresults_size - 1]].flux;
-            }
-        }
-    }
+    return 0;
 }
 
 OST_DEF void ost_query_search(Query *q, const Config *c, const float p[3],
                          float arcsec, float min_flux)
 {
-    float r = arcsec / 3600.0f * (float)PI / 180.0f;
+    float a = arcsec / 3600.0f * (float)PI / 180.0f;
+    float r = 2.0f * fabsf(sinf(a / 2.0f));
+    float rv[3] = {r, r, r};
+    OSTQuerySearchCtx ctx = {q, p, r, r * r, min_flux};
     ost_query_kdsort(q, c);
-    kdsearch(q, p, 2.0f * fabsf(sinf(r / 2.0f)), min_flux, 0, q->n,
-             c->KDBUCKET_SIZE, 0);
+    ost_kdsearch(q->map, sizeof(q->map[0]), 0, 0, q->n,
+                 c->KDBUCKET_SIZE, 0, 3, p, rv, kdcheck, &ctx);
 }
 
 OST_DEF void ost_query_search_range(Query *q, const Config *c, const float p[3],
                                   float arcsec, float min_flux, int min,
                                   int max, int dim)
 {
-    float r = arcsec / 3600.0f * (float)PI / 180.0f;
+    float a = arcsec / 3600.0f * (float)PI / 180.0f;
+    float r = 2.0f * fabsf(sinf(a / 2.0f));
+    float rv[3] = {r, r, r};
+    OSTQuerySearchCtx ctx = {q, p, r, r * r, min_flux};
     ost_query_kdsort(q, c);
-    kdsearch(q, p, 2 * fabsf(sinf(r / 2.0f)), min_flux, min, max,
-             c->KDBUCKET_SIZE, dim);
+    ost_kdsearch(q->map, sizeof(q->map[0]), 0, min, max,
+                 c->KDBUCKET_SIZE, dim, 3, p, rv, kdcheck, &ctx);
 }
 
 OST_DEF void ost_query_mask_filter(Query *q, const Config *c)
@@ -2003,8 +1992,8 @@ static void constellation_range(Constellation *a, int n, float p0, float p1, int
     *hi = l;
 }
 
-static int fov_init(StarFov *fov, StarDB *stars, float db_max_variance,
-                    const Config *c, MatchWork *w)
+OST_DEF int fov_init(StarFov *fov, StarDB *stars, float db_max_variance,
+                     const Config *c, MatchWork *w)
 {
     /* Rasterize image-star acceptance regions for fast projected-star scoring. */
     fov->mask = w->fov_mask;
@@ -2059,7 +2048,7 @@ static int fov_init(StarFov *fov, StarDB *stars, float db_max_variance,
     return 0;
 }
 
-static inline float fov_score(StarFov *fov, int id, float px, float py)
+OST_DEF float fov_score(StarFov *fov, int id, float px, float py)
 {
     float dx = px - fov->s_px[id], dy = py - fov->s_py[id];
     if (dx < -0.5f) dx += 1.0f;
@@ -2068,7 +2057,7 @@ static inline float fov_score(StarFov *fov, int id, float px, float py)
            (2.0f * fov->sigma_sq);
 }
 
-static int fov_resolve(StarFov *fov, int id, float px, float py)
+OST_DEF int fov_resolve(StarFov *fov, int id, float px, float py)
 {
     /* Colliding acceptance regions are resolved by whichever star scores better. */
     int id1, id2;
@@ -2080,7 +2069,7 @@ static int fov_resolve(StarFov *fov, int id, float px, float py)
     return fov_score(fov, id1, px, py) > fov_score(fov, id2, px, py) ? id1 : id2;
 }
 
-static int fov_get_id(StarFov *fov, const Config *c, float px, float py)
+OST_DEF int fov_get_id(StarFov *fov, const Config *c, float px, float py)
 {
     int nx = (int)(px + c->IMG_X / 2.0f);
     int ny = (int)(py + c->IMG_Y / 2.0f);
@@ -2094,7 +2083,7 @@ static int fov_get_id(StarFov *fov, const Config *c, float px, float py)
     return fov_resolve(fov, id, px, py);
 }
 
-static void mr_init(MatchResult *m, CDB *db, CDB *img, StarFov *mask, int *map)
+OST_DEF void mr_init(MatchResult *m, CDB *db, CDB *img, StarFov *mask, int *map)
 {
     memset(m, 0, sizeof(*m));
     m->db = db; m->img = img; m->img_mask = mask; m->map = map;
@@ -2102,7 +2091,7 @@ static void mr_init(MatchResult *m, CDB *db, CDB *img, StarFov *mask, int *map)
     m->match.totalscore = -FLT_MAX;
 }
 
-static void mr_set_pair(MatchResult *m, Constellation db, Constellation img)
+OST_DEF void mr_set_pair(MatchResult *m, Constellation db, Constellation img)
 {
     m->match.img_s1 = img.s1;
     m->match.img_s2 = img.s2;
@@ -2110,7 +2099,7 @@ static void mr_set_pair(MatchResult *m, Constellation db, Constellation img)
     m->match.db_s2 = db.s2;
 }
 
-static void mr_copy(MatchResult *dst, MatchResult *src)
+OST_DEF void mr_copy(MatchResult *dst, MatchResult *src)
 {
     CDB *db = dst->db, *img = dst->img;
     StarFov *mask = dst->img_mask;
@@ -2121,60 +2110,128 @@ static void mr_copy(MatchResult *dst, MatchResult *src)
     memcpy(dst->map, src->map, (size_t)map_size * sizeof(map[0]));
 }
 
-static void weighted_triad(MatchResult *m)
+static float ost_wahba_det3(const float *a, const float *b, const float *c,
+                            int i, int j, int k)
 {
-    /* One catalog/image pair correspondence gives a TRIAD-like attitude hypothesis. */
-    Star *db_s1 = &m->db->stars.v[m->match.db_s1], *db_s2 = &m->db->stars.v[m->match.db_s2];
-    Star *img_s1 = &m->img->stars.v[m->match.img_s1], *img_s2 = &m->img->stars.v[m->match.img_s2];
-    const float *wa = db_s1->v, *wb = db_s2->v, *va = img_s1->v, *vb = img_s2->v;
-    float weightA = 1.0f / (db_s1->sigma_sq + img_s1->sigma_sq);
-    float weightB = 1.0f / (db_s2->sigma_sq + img_s2->sigma_sq);
-    float sumAB = weightA + weightB;
-    Vec3 wc, vc, waXwc, vaXvc, wbXwc, vbXvc;
-    Mat3 wbase, vbase, A, B;
-    float cz, sz, mz, cy, sy, my, cx, sx, mx;
-
-    ost_vec_cross3f(wc, wa, wb);
-    ost_vec_normalizef(wc, 3);
-    ost_vec_cross3f(vc, va, vb);
-    ost_vec_normalizef(vc, 3);
-    ost_vec_cross3f(waXwc, wa, wc);
-    ost_vec_cross3f(vaXvc, va, vc);
-    ost_mat_cols3f(wbase, wa, waXwc, wc);
-    ost_mat_cols3f(vbase, va, vaXvc, vc);
-    ost_mat_mul_bt_f(A[0], vbase[0], wbase[0], 3);
-
-    ost_vec_negf(wc, 3);
-    ost_vec_negf(vc, 3);
-    ost_vec_cross3f(wbXwc, wb, wc);
-    ost_vec_cross3f(vbXvc, vb, vc);
-    ost_mat_cols3f(wbase, wb, wbXwc, wc);
-    ost_mat_cols3f(vbase, vb, vbXvc, vc);
-    ost_mat_mul_bt_f(B[0], vbase[0], wbase[0], 3);
-
-    weightA /= sumAB; weightB /= sumAB;
-    cz = weightA * A[0][0] + weightB * B[0][0];
-    sz = weightA * A[1][0] + weightB * B[1][0];
-    mz = sqrtf(cz * cz + sz * sz); cz /= mz; sz /= mz;
-    cy = weightA * sqrtf(A[2][1] * A[2][1] + A[2][2] * A[2][2]) +
-         weightB * sqrtf(B[2][1] * B[2][1] + B[2][2] * B[2][2]);
-    sy = -weightA * A[2][0] - weightB * B[2][0];
-    my = sqrtf(cy * cy + sy * sy); cy /= my; sy /= my;
-    cx = weightA * A[2][2] + weightB * B[2][2];
-    sx = weightA * A[2][1] + weightB * B[2][1];
-    mx = sqrtf(cx * cx + sx * sx); cx /= mx; sx /= mx;
-    m->R[0][0] = cy * cz;
-    m->R[0][1] = cz * sx * sy - cx * sz;
-    m->R[0][2] = sx * sz + cx * cz * sy;
-    m->R[1][0] = cy * sz;
-    m->R[1][1] = cx * cz + sx * sy * sz;
-    m->R[1][2] = cx * sy * sz - cz * sx;
-    m->R[2][0] = -sy;
-    m->R[2][1] = cy * sx;
-    m->R[2][2] = cx * cy;
+    return a[i] * (b[j] * c[k] - b[k] * c[j]) -
+           a[j] * (b[i] * c[k] - b[k] * c[i]) +
+           a[k] * (b[i] * c[j] - b[j] * c[i]);
 }
 
-static void compute_score(MatchResult *m, const Config *c, MatchWork *w)
+static int ost_wahba_null4(float q[4], const float a[4][4])
+{
+    float best[4] = {1.0f, 0.0f, 0.0f, 0.0f};
+    float bestn = -1.0f;
+    for (int skip = 0; skip < 4; skip++) {
+        const float *r[3];
+        float v[4], n;
+        int m = 0;
+        for (int i = 0; i < 4; i++)
+            if (i != skip)
+                r[m++] = a[i];
+        v[0] =  ost_wahba_det3(r[0], r[1], r[2], 1, 2, 3);
+        v[1] = -ost_wahba_det3(r[0], r[1], r[2], 0, 2, 3);
+        v[2] =  ost_wahba_det3(r[0], r[1], r[2], 0, 1, 3);
+        v[3] = -ost_wahba_det3(r[0], r[1], r[2], 0, 1, 2);
+        n = v[0] * v[0] + v[1] * v[1] + v[2] * v[2] + v[3] * v[3];
+        if (n > bestn) {
+            bestn = n;
+            memcpy(best, v, sizeof(best));
+        }
+    }
+    if (bestn <= 1e-30f)
+        return -1;
+    bestn = 1.0f / sqrtf(bestn);
+    for (int i = 0; i < 4; i++)
+        q[i] = best[i] * bestn;
+    return 0;
+}
+
+static void ost_wahba_quat_to_mat(Mat3 r, const float qin[4])
+{
+    float q0 = qin[0], q1 = qin[1], q2 = qin[2], q3 = qin[3];
+    float n = 1.0f / sqrtf(q0 * q0 + q1 * q1 + q2 * q2 + q3 * q3);
+    q0 *= n; q1 *= n; q2 *= n; q3 *= n;
+    r[0][0] = q0*q0 + q1*q1 - q2*q2 - q3*q3;
+    r[0][1] = 2.0f * (q1*q2 - q0*q3);
+    r[0][2] = 2.0f * (q1*q3 + q0*q2);
+    r[1][0] = 2.0f * (q1*q2 + q0*q3);
+    r[1][1] = q0*q0 - q1*q1 + q2*q2 - q3*q3;
+    r[1][2] = 2.0f * (q2*q3 - q0*q1);
+    r[2][0] = 2.0f * (q1*q3 - q0*q2);
+    r[2][1] = 2.0f * (q2*q3 + q0*q1);
+    r[2][2] = q0*q0 - q1*q1 - q2*q2 + q3*q3;
+}
+
+OST_DEF int weighted_wahba_vectors(Mat3 r, const Star *db_stars,
+                              const Star *img_stars, const int *db_idx,
+                              const int *img_idx, int n, int iter)
+{
+    float b[3][3] = {{0.0f}}, k[4][4] = {{0.0f}}, a[4][4], q[4];
+    float sw = 0.0f, tr, lambda;
+    if (!r || !db_stars || !img_stars || n < 2)
+        return -1;
+    if (iter < 0)
+        iter = 0;
+    if (iter > 8)
+        iter = 8;
+    for (int i = 0; i < n; i++) {
+        const Star *ds = &db_stars[db_idx ? db_idx[i] : i];
+        const Star *is = &img_stars[img_idx ? img_idx[i] : i];
+        float w = 1.0f / (ds->sigma_sq + is->sigma_sq);
+        sw += w;
+        for (int row = 0; row < 3; row++)
+            for (int col = 0; col < 3; col++)
+                b[row][col] += w * ds->v[row] * is->v[col];
+    }
+    if (sw <= 0.0f)
+        return -1;
+    tr = b[0][0] + b[1][1] + b[2][2];
+    k[0][0] = tr;
+    k[0][1] = k[1][0] = b[1][2] - b[2][1];
+    k[0][2] = k[2][0] = b[2][0] - b[0][2];
+    k[0][3] = k[3][0] = b[0][1] - b[1][0];
+    k[1][1] = b[0][0] - b[1][1] - b[2][2];
+    k[1][2] = k[2][1] = b[0][1] + b[1][0];
+    k[1][3] = k[3][1] = b[0][2] + b[2][0];
+    k[2][2] = -b[0][0] + b[1][1] - b[2][2];
+    k[2][3] = k[3][2] = b[1][2] + b[2][1];
+    k[3][3] = -b[0][0] - b[1][1] + b[2][2];
+
+    lambda = sw;
+    for (int it = 0; it <= iter; it++) {
+        for (int row = 0; row < 4; row++)
+            for (int col = 0; col < 4; col++)
+                a[row][col] = k[row][col] - (row == col ? lambda : 0.0f);
+        if (ost_wahba_null4(q, a) < 0)
+            return -1;
+        lambda = 0.0f;
+        for (int row = 0; row < 4; row++) {
+            float kq = 0.0f;
+            for (int col = 0; col < 4; col++)
+                kq += k[row][col] * q[col];
+            lambda += q[row] * kq;
+        }
+    }
+    ost_wahba_quat_to_mat(r, q);
+    return 0;
+}
+
+OST_DEF void weighted_wahba(MatchResult *m, int iter)
+{
+    int db_idx[2] = {m->match.db_s1, m->match.db_s2};
+    int img_idx[2] = {m->match.img_s1, m->match.img_s2};
+    if (weighted_wahba_vectors(m->R, m->db->stars.v, m->img->stars.v,
+                               db_idx, img_idx, 2, iter) < 0)
+        memset(m->R, 0, sizeof(m->R));
+}
+
+OST_DEF void weighted_triad(MatchResult *m)
+{
+    weighted_wahba(m, 0);
+}
+
+OST_DEF void compute_score(MatchResult *m, const Config *c, MatchWork *w)
 {
     /* Start with a false-star penalty, then add the best projected match per star. */
     m->match.totalscore = log(1.0 / (c->IMG_X * c->IMG_Y)) * (2 * m->map_size);
@@ -2203,7 +2260,7 @@ static void compute_score(MatchResult *m, const Config *c, MatchWork *w)
         m->match.totalscore += w->scores[i];
 }
 
-static int related(MatchResult *winner, CPair *p)
+OST_DEF int related(MatchResult *winner, CPair *p)
 {
     if (winner->match.totalscore == -FLT_MAX || p->totalscore == -FLT_MAX)
         return 0;
@@ -2237,7 +2294,7 @@ OST_DEF int ost_db_match(CDB *db, CDB *img, MatchResult *winner,
             continue;
         for (int o = lo; o < hi; o++) {
             mr_set_pair(&m, db->map[o], ic);
-            weighted_triad(&m);
+            weighted_wahba(&m, QMETHOD_ITER);
             if (db->results.kdsorted)
                 ost_query_search(&db->results, cfg, m.R[0], cfg->MAXFOV / 2,
                              cfg->THRESH_FACTOR * cfg->IMAGE_VARIANCE);
@@ -2257,7 +2314,7 @@ OST_DEF int ost_db_match(CDB *db, CDB *img, MatchResult *winner,
                 }
                 OST_SWAP(int, m.match.img_s1, m.match.img_s2);
                 if (flip == 0)
-                    weighted_triad(&m);
+                    weighted_wahba(&m, QMETHOD_ITER);
             }
             if (db->results.kdsorted)
                 ost_query_clear_results(&db->results);

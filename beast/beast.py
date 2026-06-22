@@ -36,7 +36,8 @@ class Config(_ct.Structure):
         ("PIXSCALE", _ct.c_float), ("DOUBLE_STAR_PX", _ct.c_float),
         ("BASE_FLUX", _ct.c_float), ("IMAGE_VARIANCE", _ct.c_float),
         ("THRESH_FACTOR", _ct.c_float), ("POS_VARIANCE", _ct.c_float),
-        ("POS_ERR_SIGMA", _ct.c_float), ("MAXFOV", _ct.c_float),
+        ("POS_ERR_SIGMA", _ct.c_float), ("PSF_SIGMA", _ct.c_float),
+        ("MAXFOV", _ct.c_float),
         ("MINFOV", _ct.c_float), ("MATCH_VALUE", _ct.c_float),
         ("PIXX_TANGENT", _ct.c_float), ("PIXY_TANGENT", _ct.c_float),
     ]

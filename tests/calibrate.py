@@ -5,6 +5,8 @@ import cv2
 import numpy as np
 import math
 from scipy.stats import poisson
+from scipy.optimize import least_squares
+from scipy.special import erf
 import sys
 from astropy.io import fits
 from astropy import wcs
@@ -75,6 +77,98 @@ def basename(filename):
 		filename=".".join(filename.split(".")[0:-1])
 	return filename
 
+
+def ost_gray_from_bgr(img):
+	# cv2 stores PNGs as BGR.  The native OST path uses R + 2*G + B.
+	return img[:,:,2] + 2.0*img[:,:,1] + img[:,:,0]
+
+
+def pixel_integrated_gaussian(xs, ys, x0, y0, flux, sigma):
+	s=math.sqrt(2.0)*sigma
+	ex=erf((xs-x0+0.5)/s)-erf((xs-x0-0.5)/s)
+	ey=erf((ys-y0+0.5)/s)-erf((ys-y0-0.5)/s)
+	return 0.25*flux*ex*ey
+
+
+def fit_star_psf_sigma(gray, x0, y0, image_variance, radius, max_sigma):
+	h,w=gray.shape
+	xi=int(math.floor(x0+0.5))
+	yi=int(math.floor(y0+0.5))
+	if xi < radius or xi >= w-radius or yi < radius or yi >= h-radius:
+		return None
+	xgrid,ygrid=np.meshgrid(np.arange(xi-radius, xi+radius+1, dtype=float),
+	                     np.arange(yi-radius, yi+radius+1, dtype=float))
+	vals=gray[yi-radius:yi+radius+1, xi-radius:xi+radius+1].astype(float)
+	border=(np.abs(xgrid-xi)==radius) | (np.abs(ygrid-yi)==radius)
+	bg=float(np.median(vals[border]))
+	obs=vals-bg
+	positive=np.clip(obs, 0.0, None)
+	flux0=float(np.sum(positive))
+	if flux0 <= image_variance:
+		return None
+	min_sigma=math.sqrt(1.0/12.0)
+	max_sigma=max(max_sigma, min_sigma*1.25)
+	sigma0=min(max(0.5, min_sigma*1.05), max_sigma*0.8)
+	weight=np.sqrt(np.maximum(np.abs(vals), image_variance))
+	p0=np.array([x0, y0, flux0, sigma0], dtype=float)
+	lo=np.array([x0-2.0, y0-2.0, 0.0, min_sigma], dtype=float)
+	hi=np.array([x0+2.0, y0+2.0, max(flux0*10.0, image_variance*100.0), max_sigma], dtype=float)
+	p0=np.minimum(np.maximum(p0, lo+1e-6), hi-1e-6)
+	def residual(p):
+		return ((pixel_integrated_gaussian(xgrid, ygrid, p[0], p[1], p[2], p[3])-obs)/weight).ravel()
+	try:
+		res=least_squares(residual, p0, bounds=(lo, hi), max_nfev=100)
+	except Exception:
+		return None
+	if not res.success:
+		return None
+	sigma=float(res.x[3])
+	if sigma <= min_sigma*1.001 or sigma >= max_sigma*0.999:
+		return None
+	if abs(res.x[0]-x0) > 1.75 or abs(res.x[1]-y0) > 1.75:
+		return None
+	return sigma
+
+
+def estimate_psf_sigma(images_by_name, astrometry_results, image_variance):
+	# Estimate a calibration-time PSF width from all matched astrometry stars.
+	# Each star gets an independent circular, pixel-integrated Gaussian fit in a
+	# small median-subtracted aperture.  The production tracker then uses the
+	# robust aggregate PSF sigma instead of re-estimating a shared sigma per frame.
+	radius=int(environ.get('PSF_SAMPLE_RADIUS', '3'))
+	max_sigma=float(environ.get('PSF_MAX_SIGMA', str(max(2.0, DOUBLE_STAR_PX))))
+	sigmas=[]
+	for name, rows in astrometry_results.items():
+		if name not in images_by_name or len(rows)==0:
+			continue
+		gray=ost_gray_from_bgr(images_by_name[name])
+		pos=np.asarray(rows[:,9:11], dtype=float)
+		if len(pos)>1:
+			tree=spatial.cKDTree(pos)
+			dist=tree.query(pos, k=2)[0][:,1]
+			isolated=dist > max(2.0*radius+1.0, DOUBLE_STAR_PX)
+		else:
+			isolated=np.ones(len(pos), dtype=bool)
+		for p, ok in zip(pos, isolated):
+			if not ok:
+				continue
+			sigma=fit_star_psf_sigma(gray, p[0], p[1], image_variance, radius, max_sigma)
+			if sigma is not None and np.isfinite(sigma):
+				sigmas.append(sigma)
+	if not sigmas:
+		raise RuntimeError("no usable PSF sigma fits")
+	sigmas=np.asarray(sigmas, dtype=float)
+	med=float(np.median(sigmas))
+	mad=float(np.median(np.abs(sigmas-med)))
+	if mad > 0:
+		keep=np.abs(sigmas-med) <= 3.0*1.4826*mad
+		if np.any(keep):
+			sigmas=sigmas[keep]
+	psf_sigma=float(np.median(sigmas))
+	print("PSF_SIGMA: ", psf_sigma, "from", len(sigmas), "matched stars")
+	return psf_sigma
+
+
 #only do this part if we were run as a python script
 if __name__ == '__main__':
 	samplepath=sys.argv[1]+"/samples"
@@ -129,6 +223,8 @@ if __name__ == '__main__':
 		if len(astrometry_results[i])>maxstars:
 			bestimage=i
 			maxstars=len(astrometry_results[i])
+	images_by_name={image_names[n]: images[n] for n in range(num_images)}
+	PSF_SIGMA=estimate_psf_sigma(images_by_name, astrometry_results, IMAGE_VARIANCE)
 	astrometry_results_all=np.vstack(list(astrometry_results.values()))
 	# Expicitly convert to a float array to prevent numpy error
 	astrometry_results_all = astrometry_results_all.astype('float')
@@ -162,6 +258,7 @@ if __name__ == '__main__':
 	f_calib.write("IMAGE_VARIANCE="+str(IMAGE_VARIANCE)+"\n")
 	f_calib.write("POS_ERR_SIGMA="+str(POS_ERR_SIGMA)+"\n")
 	f_calib.write("POS_VARIANCE="+str(POS_VARIANCE)+"\n")
+	f_calib.write("PSF_SIGMA="+str(PSF_SIGMA)+"\n")
 	f_calib.write("APERTURE="+str(APERTURE)+"\n")
 	f_calib.write("EXPOSURE_TIME="+str(EXPOSURE_TIME)+"\n")
 	f_calib.close()

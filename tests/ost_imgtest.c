@@ -12,7 +12,7 @@
 
 typedef struct {
     int width, height;
-    double image_variance, thresh_factor;
+    double image_variance, thresh_factor, psf_sigma;
 } ImgConfig;
 
 static int load_img_config(ImgConfig *cfg, const char *filename)
@@ -38,11 +38,14 @@ static int load_img_config(ImgConfig *cfg, const char *filename)
             cfg->image_variance = atof(val);
         else if (!strcmp(key, "THRESH_FACTOR"))
             cfg->thresh_factor = atof(val);
+        else if (!strcmp(key, "PSF_SIGMA"))
+            cfg->psf_sigma = atof(val);
     }
     fclose(f);
 
     if (cfg->width <= 0 || cfg->height <= 0 ||
-        cfg->image_variance <= 0 || cfg->thresh_factor <= 0) {
+        cfg->image_variance <= 0 || cfg->thresh_factor <= 0 ||
+        cfg->psf_sigma <= 0.0) {
         fprintf(stderr, "%s: missing required calibration keys\n", filename);
         return -1;
     }
@@ -137,8 +140,8 @@ int main(int argc, char **argv)
     OSTBGFitWorkspace fit_work;
     OSTBGFitStar *fit_stars1, *fit_stars2;
     double *fit_params1, *fit_params2, *fit_params, *fit_cov;
-    double *fit_normal, *fit_sigma_col, *fit_rhs;
-    double *fit_sigma_solve, *fit_rhs_solve, *fit_cov_xy, *fit_dropped;
+    double *fit_normal, *fit_rhs;
+    double *fit_rhs_solve, *fit_cov_xy, *fit_dropped;
     int *parent, *col_label, *active_count, *free_after_row;
     int *x_edge, *y_edge, *hist;
     unsigned char threshold;
@@ -170,6 +173,7 @@ int main(int argc, char **argv)
         return 1;
     if (ost_bg_config_init(&bg_cfg, cfg.width, cfg.height) < 0)
         return 1;
+    bg_cfg.psf_sigma = cfg.psf_sigma;
     if (ost_cc_buffer_sizes(cfg.width, &sizes) < 0)
         return 1;
 
@@ -200,9 +204,7 @@ int main(int argc, char **argv)
     fit_params = (double *)malloc((3 * bg_cfg.max_stars + 1) * sizeof(*fit_params));
     fit_cov = (double *)malloc(2 * bg_cfg.max_stars * sizeof(*fit_cov));
     fit_normal = (double *)malloc(6 * bg_cfg.max_stars * sizeof(*fit_normal));
-    fit_sigma_col = (double *)malloc(3 * bg_cfg.max_stars * sizeof(*fit_sigma_col));
     fit_rhs = (double *)malloc(3 * bg_cfg.max_stars * sizeof(*fit_rhs));
-    fit_sigma_solve = (double *)malloc(3 * bg_cfg.max_stars * sizeof(*fit_sigma_solve));
     fit_rhs_solve = (double *)malloc(3 * bg_cfg.max_stars * sizeof(*fit_rhs_solve));
     fit_cov_xy = (double *)malloc(2 * bg_cfg.max_stars * sizeof(*fit_cov_xy));
     fit_dropped = (double *)malloc(3 * bg_cfg.max_stars * sizeof(*fit_dropped));
@@ -212,9 +214,8 @@ int main(int argc, char **argv)
         !work_comp ||
         !parent || !col_label || !active_count || !free_after_row || !stars ||
         !fit_stars1 || !fit_stars2 || !fit_params1 || !fit_params2 ||
-        !fit_params || !fit_cov || !fit_normal || !fit_sigma_col ||
-        !fit_rhs || !fit_sigma_solve || !fit_rhs_solve || !fit_cov_xy ||
-        !fit_dropped) {
+        !fit_params || !fit_cov || !fit_normal || !fit_rhs ||
+        !fit_rhs_solve || !fit_cov_xy || !fit_dropped) {
         fprintf(stderr, "out of memory\n");
         goto done;
     }
@@ -223,9 +224,7 @@ int main(int argc, char **argv)
     fit_work.params1 = fit_params1;
     fit_work.params2 = fit_params2;
     fit_work.normal = fit_normal;
-    fit_work.sigma_col = fit_sigma_col;
     fit_work.rhs = fit_rhs;
-    fit_work.sigma_solve = fit_sigma_solve;
     fit_work.rhs_solve = fit_rhs_solve;
     fit_work.cov_xy = fit_cov_xy;
     fit_work.dropped = fit_dropped;
@@ -252,7 +251,7 @@ int main(int argc, char **argv)
             int kept = 0;
             int fit_n;
             int dropped_count;
-            double sigma = 0;
+            double sigma = bg_cfg.psf_sigma;
 
             t0 = now_sec();
             ost_bg_rgba_to_gray16(gray16, image_rgba, cfg.width, cfg.height);
@@ -320,10 +319,6 @@ int main(int argc, char **argv)
                     continue;
                 kept++;
             }
-            for (int i = 0; i < kept; i++)
-                sigma += stars[i].eig_min;
-            sigma = sqrt(fmax(sigma / (kept ? kept : 1), 1.0 / 12.0));
-
             printf("%s,%d,%.12g", argv[arg], kept, sigma);
             for (int i = 0; i < n; i++) {
                 double x = stars[i].wx / stars[i].wsum;
@@ -374,9 +369,7 @@ done:
     free(fit_dropped);
     free(fit_cov_xy);
     free(fit_rhs_solve);
-    free(fit_sigma_solve);
     free(fit_rhs);
-    free(fit_sigma_col);
     free(fit_normal);
     free(fit_cov);
     free(fit_params);

@@ -43,7 +43,8 @@ class Config(_ct.Structure):
         ("PIXSCALE", _ct.c_float), ("DOUBLE_STAR_PX", _ct.c_float),
         ("BASE_FLUX", _ct.c_float), ("IMAGE_VARIANCE", _ct.c_float),
         ("THRESH_FACTOR", _ct.c_float), ("POS_VARIANCE", _ct.c_float),
-        ("POS_ERR_SIGMA", _ct.c_float), ("MAXFOV", _ct.c_float),
+        ("POS_ERR_SIGMA", _ct.c_float), ("PSF_SIGMA", _ct.c_float),
+        ("MAXFOV", _ct.c_float),
         ("MINFOV", _ct.c_float), ("MATCH_VALUE", _ct.c_float),
         ("PIXX_TANGENT", _ct.c_float), ("PIXY_TANGENT", _ct.c_float),
     ]
@@ -188,6 +189,7 @@ class _BGConfig(_ct.Structure):
                 ("tile_size", _ct.c_int), ("map_width", _ct.c_int),
                 ("map_height", _ct.c_int), ("max_stars", _ct.c_int),
                 ("max_pixel_brightness", _ct.c_int), ("sample_radius", _ct.c_int),
+                ("psf_sigma", _ct.c_double),
                 ("threshold_sigma", _ct.c_double), ("detect_sigma", _ct.c_double)]
 
 class _BGStats(_ct.Structure):
@@ -207,9 +209,7 @@ class _BGFitWorkspace(_ct.Structure):
                 ("params1", _ct.POINTER(_ct.c_double)),
                 ("params2", _ct.POINTER(_ct.c_double)),
                 ("normal", _ct.POINTER(_ct.c_double)),
-                ("sigma_col", _ct.POINTER(_ct.c_double)),
                 ("rhs", _ct.POINTER(_ct.c_double)),
-                ("sigma_solve", _ct.POINTER(_ct.c_double)),
                 ("rhs_solve", _ct.POINTER(_ct.c_double)),
                 ("cov_xy", _ct.POINTER(_ct.c_double)),
                 ("dropped", _ct.POINTER(_ct.c_double))]
@@ -527,6 +527,7 @@ class ImagePipeline:
         self.bg_cfg = _BGConfig()
         if _lib.ost_bg_config_init(_ct.byref(self.bg_cfg), cfg.IMG_X, cfg.IMG_Y) < 0:
             raise ValueError("invalid image dimensions")
+        self.bg_cfg.psf_sigma = cfg.PSF_SIGMA
         sizes = _CCBufferSizes()
         if _lib.ost_cc_buffer_sizes(cfg.IMG_X, _ct.byref(sizes)) < 0:
             raise ValueError("invalid connected-component width")
@@ -552,9 +553,7 @@ class ImagePipeline:
         self.params1 = (_ct.c_double * (3 * max_stars + 1))()
         self.params2 = (_ct.c_double * (3 * max_stars + 1))()
         self.normal = (_ct.c_double * (6 * max_stars))()
-        self.sigma_col = (_ct.c_double * (3 * max_stars))()
         self.rhs = (_ct.c_double * (3 * max_stars))()
-        self.sigma_solve = (_ct.c_double * (3 * max_stars))()
         self.rhs_solve = (_ct.c_double * (3 * max_stars))()
         self.cov_xy = (_ct.c_double * (2 * max_stars))()
         self.dropped_work = (_ct.c_double * (3 * max_stars))()
@@ -565,8 +564,7 @@ class ImagePipeline:
         self.cc = _CCContext()
         self.fit_work = _BGFitWorkspace(self.fit_stars1, self.fit_stars2,
                                         self.params1, self.params2,
-                                        self.normal, self.sigma_col,
-                                        self.rhs, self.sigma_solve,
+                                        self.normal, self.rhs,
                                         self.rhs_solve, self.cov_xy,
                                         self.dropped_work)
         if _lib.ost_cc_init(_ct.byref(self.cc), cfg.IMG_X,

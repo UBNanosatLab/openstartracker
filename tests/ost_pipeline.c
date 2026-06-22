@@ -171,6 +171,7 @@ int main(int argc, char **argv)
     if (ost_bg_config_init(&p.bg_cfg, width, height) < 0 ||
         ost_cc_buffer_sizes(width, &cc_sizes) < 0)
         goto done;
+    p.bg_cfg.psf_sigma = p.tracker->cfg.PSF_SIGMA;
     max_stars = p.bg_cfg.max_stars;
     pixels = (size_t)width * (size_t)height;
     map_pixels = (size_t)p.bg_cfg.map_width * (size_t)p.bg_cfg.map_height;
@@ -206,12 +207,8 @@ int main(int argc, char **argv)
                                           sizeof(*p.fit_work.params2));
     p.fit_work.normal = (double *)malloc((size_t)(6 * max_stars) *
                                          sizeof(*p.fit_work.normal));
-    p.fit_work.sigma_col = (double *)malloc((size_t)(3 * max_stars) *
-                                            sizeof(*p.fit_work.sigma_col));
     p.fit_work.rhs = (double *)malloc((size_t)(3 * max_stars) *
                                       sizeof(*p.fit_work.rhs));
-    p.fit_work.sigma_solve = (double *)malloc((size_t)(3 * max_stars) *
-                                              sizeof(*p.fit_work.sigma_solve));
     p.fit_work.rhs_solve = (double *)malloc((size_t)(3 * max_stars) *
                                             sizeof(*p.fit_work.rhs_solve));
     p.fit_work.cov_xy = (double *)malloc((size_t)(2 * max_stars) *
@@ -231,10 +228,9 @@ int main(int argc, char **argv)
         !p.cc_work || !p.parent || !p.col_label || !p.active_count ||
         !p.free_after_row || !p.components || !p.fit_work.stars1 ||
         !p.fit_work.stars2 || !p.fit_work.params1 ||
-        !p.fit_work.params2 || !p.fit_work.normal ||
-        !p.fit_work.sigma_col || !p.fit_work.rhs ||
-        !p.fit_work.sigma_solve || !p.fit_work.rhs_solve ||
-        !p.fit_work.cov_xy || !p.fit_work.dropped || !p.fit_params ||
+        !p.fit_work.params2 || !p.fit_work.normal || !p.fit_work.rhs ||
+        !p.fit_work.rhs_solve || !p.fit_work.cov_xy ||
+        !p.fit_work.dropped || !p.fit_params ||
         !p.fit_cov || !p.stars || !p.result) {
         fprintf(stderr, "out of memory\n");
         goto done;
@@ -273,9 +269,7 @@ done:
     free(p.fit_work.dropped);
     free(p.fit_work.cov_xy);
     free(p.fit_work.rhs_solve);
-    free(p.fit_work.sigma_solve);
     free(p.fit_work.rhs);
-    free(p.fit_work.sigma_col);
     free(p.fit_work.normal);
     free(p.fit_work.params2);
     free(p.fit_work.params1);

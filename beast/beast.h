@@ -38,6 +38,7 @@ static inline float flux_from_mag(float mag) {
 #define THRESH_FACTOR (beast_compat_detail::cfg().THRESH_FACTOR)
 #define POS_VARIANCE (beast_compat_detail::cfg().POS_VARIANCE)
 #define POS_ERR_SIGMA (beast_compat_detail::cfg().POS_ERR_SIGMA)
+#define PSF_SIGMA (beast_compat_detail::cfg().PSF_SIGMA)
 #define MAXFOV (beast_compat_detail::cfg().MAXFOV)
 #define MINFOV (beast_compat_detail::cfg().MINFOV)
 #define MATCH_VALUE (beast_compat_detail::cfg().MATCH_VALUE)
