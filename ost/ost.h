@@ -102,6 +102,18 @@ static inline void ost_kdbuild(void *base, size_t elem_size, size_t key_offset,
                 (dim + 1) % dims, dims);
 }
 
+static inline int ost_kd_in_box(void *base, size_t elem_size,
+                                size_t key_offset, int idx, int dims,
+                                const float *p, const float *r)
+{
+    const float *x = (const float *)((const unsigned char *)base +
+                     (size_t)idx * elem_size + key_offset);
+    for (int d = 0; d < dims; d++)
+        if (fabsf(x[d] - p[d]) > r[d])
+            return 0;
+    return 1;
+}
+
 static inline int ost_kdsearch(void *base, size_t elem_size, size_t key_offset,
                                int min, int max, int bucket, int dim, int dims,
                                const float *p, const float *r,
@@ -112,6 +124,8 @@ static inline int ost_kdsearch(void *base, size_t elem_size, size_t key_offset,
         return 0;
     if (max - min <= bucket) {
         for (int i = min; i < max; i++) {
+            if (!ost_kd_in_box(base, elem_size, key_offset, i, dims, p, r))
+                continue;
             rc = visit(base, i, ctx);
             if (rc)
                 return rc;
@@ -126,9 +140,11 @@ static inline int ost_kdsearch(void *base, size_t elem_size, size_t key_offset,
         if (rc < 0)
             return rc;
     }
-    rc = visit(base, mid, ctx);
-    if (rc)
-        return rc;
+    if (ost_kd_in_box(base, elem_size, key_offset, mid, dims, p, r)) {
+        rc = visit(base, mid, ctx);
+        if (rc)
+            return rc;
+    }
     if (mid + 1 < max && OST_KD_COORD(base, elem_size, key_offset, mid, dim)
         <= p[dim] + r[dim])
         return ost_kdsearch(base, elem_size, key_offset, mid + 1, max, bucket,
@@ -166,7 +182,7 @@ typedef struct OSTCCBufferSizes {
     size_t parent;
     size_t col_label;
     size_t active_count;
-    size_t free_after_row;
+    size_t reuse_after_row;
     size_t total_bytes;
 } OSTCCBufferSizes;
 
@@ -177,14 +193,14 @@ typedef struct OSTCCContext {
     int *parent;
     int *col_label;
     int *active_count;
-    int *free_after_row;
+    int *reuse_after_row;
 } OSTCCContext;
 
 int ost_cc_buffer_sizes(int width, OSTCCBufferSizes *sizes);
 int ost_cc_init(OSTCCContext *ctx, int width,
                 OSTCCComponent *components, int *parent,
                 int *col_label, int *active_count,
-                int *free_after_row);
+                int *reuse_after_row);
 int ost_cc_threshold_4(const unsigned char *image,
                        int width, int height, int stride,
                        unsigned char threshold,
@@ -337,6 +353,176 @@ typedef struct MatchWork {
     int *match_map, *work_map;
 } MatchWork;
 
+#define OST_MAX_CONSTELLATION_STARS 5
+#define OST_MAX_CONSTELLATION_DIMS \
+    (OST_MAX_CONSTELLATION_STARS * (OST_MAX_CONSTELLATION_STARS - 1) / 2)
+#define OST_MAX_CONSTELLATION_PERMS 120
+
+typedef struct OSTConstellationEdge {
+    int star;
+} OSTConstellationEdge;
+
+typedef enum OSTConstellationDescriptorKind {
+    OST_CONSTELLATION_PAIRDIST = 0,
+    OST_CONSTELLATION_CROSSRATIO4 = 1,
+    OST_CONSTELLATION_CROSSRATIO5 = 2
+} OSTConstellationDescriptorKind;
+
+typedef struct OSTConstellationIndex {
+    CDB *pair;
+    unsigned char *map;
+    int map_size, cap, kd_ready, kd_bucket;
+    int k, dims, descriptor_kind;
+    size_t record_size;
+} OSTConstellationIndex;
+
+static inline float ost_vec_dot3(const float a[3], const float b[3])
+{
+    return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+}
+
+static inline void ost_vec_cross3(float r[3], const float a[3], const float b[3])
+{
+    r[0] = a[1] * b[2] - a[2] * b[1];
+    r[1] = a[2] * b[0] - a[0] * b[2];
+    r[2] = a[0] * b[1] - a[1] * b[0];
+}
+
+static inline int ost_vec_normalize3(float v[3])
+{
+    float n = sqrtf(ost_vec_dot3(v, v));
+    if (n <= 1e-20f)
+        return -1;
+    v[0] /= n;
+    v[1] /= n;
+    v[2] /= n;
+    return 0;
+}
+
+static inline float ost_star_chord(const Star *a, const Star *b)
+{
+    float dx = a->v[0] - b->v[0], dy = a->v[1] - b->v[1];
+    float dz = a->v[2] - b->v[2];
+    return sqrtf(dx * dx + dy * dy + dz * dz);
+}
+
+static inline float ost_star_dist_arcsec(const Star *a, const Star *b)
+{
+    float x = a->v[0] * b->v[1] - b->v[0] * a->v[1];
+    float y = a->v[0] * b->v[2] - b->v[0] * a->v[2];
+    float z = a->v[1] * b->v[2] - b->v[1] * a->v[2];
+    return (float)((3600.0 * 180.0 / PI) *
+                   asinf(sqrtf(x * x + y * y + z * z)));
+}
+
+static inline float ost_wahba_det3(const float *a, const float *b,
+                                          const float *c,
+                                          int i, int j, int k)
+{
+    return a[i] * (b[j] * c[k] - b[k] * c[j]) -
+           a[j] * (b[i] * c[k] - b[k] * c[i]) +
+           a[k] * (b[i] * c[j] - b[j] * c[i]);
+}
+
+static inline int ost_wahba_null4(float q[4], const float a[4][4])
+{
+    float best[4] = {1.0f, 0.0f, 0.0f, 0.0f};
+    float bestn = -1.0f;
+    for (int skip = 0; skip < 4; skip++) {
+        const float *r[3];
+        float v[4], n;
+        int m = 0;
+        for (int i = 0; i < 4; i++)
+            if (i != skip)
+                r[m++] = a[i];
+        v[0] =  ost_wahba_det3(r[0], r[1], r[2], 1, 2, 3);
+        v[1] = -ost_wahba_det3(r[0], r[1], r[2], 0, 2, 3);
+        v[2] =  ost_wahba_det3(r[0], r[1], r[2], 0, 1, 3);
+        v[3] = -ost_wahba_det3(r[0], r[1], r[2], 0, 1, 2);
+        n = v[0] * v[0] + v[1] * v[1] + v[2] * v[2] + v[3] * v[3];
+        if (n > bestn) {
+            bestn = n;
+            memcpy(best, v, sizeof(best));
+        }
+    }
+    if (bestn <= 1e-30f)
+        return -1;
+    bestn = 1.0f / sqrtf(bestn);
+    for (int i = 0; i < 4; i++)
+        q[i] = best[i] * bestn;
+    return 0;
+}
+
+static inline void ost_wahba_quat_to_mat(Mat3 r, const float qin[4])
+{
+    float q0 = qin[0], q1 = qin[1], q2 = qin[2], q3 = qin[3];
+    float n = 1.0f / sqrtf(q0 * q0 + q1 * q1 + q2 * q2 + q3 * q3);
+    q0 *= n; q1 *= n; q2 *= n; q3 *= n;
+    r[0][0] = q0*q0 + q1*q1 - q2*q2 - q3*q3;
+    r[0][1] = 2.0f * (q1*q2 - q0*q3);
+    r[0][2] = 2.0f * (q1*q3 + q0*q2);
+    r[1][0] = 2.0f * (q1*q2 + q0*q3);
+    r[1][1] = q0*q0 - q1*q1 + q2*q2 - q3*q3;
+    r[1][2] = 2.0f * (q2*q3 - q0*q1);
+    r[2][0] = 2.0f * (q1*q3 - q0*q2);
+    r[2][1] = 2.0f * (q2*q3 + q0*q1);
+    r[2][2] = q0*q0 - q1*q1 - q2*q2 + q3*q3;
+}
+
+static inline int weighted_wahba_vectors(
+        Mat3 r, const Star *db_stars, const Star *img_stars,
+        const int *db_idx, const int *img_idx, int n, int iter)
+{
+    float b[3][3] = {{0.0f}}, k[4][4] = {{0.0f}}, a[4][4], q[4];
+    float sw = 0.0f, tr, lambda;
+    if (!r || !db_stars || !img_stars || n < 2)
+        return -1;
+    if (iter < 0)
+        iter = 0;
+    if (iter > 8)
+        iter = 8;
+    for (int i = 0; i < n; i++) {
+        const Star *ds = &db_stars[db_idx ? db_idx[i] : i];
+        const Star *is = &img_stars[img_idx ? img_idx[i] : i];
+        float w = 1.0f / (ds->sigma_sq + is->sigma_sq);
+        sw += w;
+        for (int row = 0; row < 3; row++)
+            for (int col = 0; col < 3; col++)
+                b[row][col] += w * ds->v[row] * is->v[col];
+    }
+    if (sw <= 0.0f)
+        return -1;
+    tr = b[0][0] + b[1][1] + b[2][2];
+    k[0][0] = tr;
+    k[0][1] = k[1][0] = b[1][2] - b[2][1];
+    k[0][2] = k[2][0] = b[2][0] - b[0][2];
+    k[0][3] = k[3][0] = b[0][1] - b[1][0];
+    k[1][1] = b[0][0] - b[1][1] - b[2][2];
+    k[1][2] = k[2][1] = b[0][1] + b[1][0];
+    k[1][3] = k[3][1] = b[0][2] + b[2][0];
+    k[2][2] = -b[0][0] + b[1][1] - b[2][2];
+    k[2][3] = k[3][2] = b[1][2] + b[2][1];
+    k[3][3] = -b[0][0] - b[1][1] + b[2][2];
+
+    lambda = sw;
+    for (int it = 0; it <= iter; it++) {
+        for (int row = 0; row < 4; row++)
+            for (int col = 0; col < 4; col++)
+                a[row][col] = k[row][col] - (row == col ? lambda : 0.0f);
+        if (ost_wahba_null4(q, a) < 0)
+            return -1;
+        lambda = 0.0f;
+        for (int row = 0; row < 4; row++) {
+            float kq = 0.0f;
+            for (int col = 0; col < 4; col++)
+                kq += k[row][col] * q[col];
+            lambda += q[row] * kq;
+        }
+    }
+    ost_wahba_quat_to_mat(r, q);
+    return 0;
+}
+
 int ost_load_config(Config *c, const char *filename);
 Star ost_make_db_star(const Config *c, float x, float y, float z, float flux, int id);
 Star ost_make_img_star(const Config *c, float px, float py, float flux, int id);
@@ -365,8 +551,20 @@ int ost_db_from_catalog(CDB *cdb, StarDB *src, Star *star_storage, int star_cap,
                         Query *q, Star *query_map, int *query_results,
                         signed char *query_mask, Constellation *map, int map_cap,
                         int stars_per_fov, const Config *cfg, signed char *keep);
-int ost_db_match(CDB *db, CDB *img, MatchResult *winner,
-                 const Config *cfg, MatchWork *mw, float *p_match);
+size_t ost_constellation_record_size(int k, int descriptor_kind);
+int ost_constellation_index_init(OSTConstellationIndex *idx, CDB *pair,
+                                 int k, int descriptor_kind,
+                                 unsigned char *storage, int storage_cap);
+int ost_constellation_count(CDB *pair, int k, uint64_t *count,
+                            int *off, OSTConstellationEdge *edges,
+                            int *tmp, int *common);
+int ost_constellation_index_build(OSTConstellationIndex *idx, int *off,
+                                  OSTConstellationEdge *edges, int *tmp,
+                                  int *common);
+void ost_constellation_index_kdsort(OSTConstellationIndex *idx);
+int ost_db_match_constellations(OSTConstellationIndex *cat, CDB *img,
+                                MatchResult *winner, const Config *cfg,
+                                MatchWork *mw, float *p_match);
 void ost_match_work_init(MatchWork *mw, CPair *candidates, int candidate_cap,
                          int *fov_mask, int *collision, int collision_cap,
                          float *fov_px, float *fov_py, float *scores,
@@ -377,13 +575,7 @@ float fov_score(StarFov *fov, int id, float px, float py);
 int fov_resolve(StarFov *fov, int id, float px, float py);
 int fov_get_id(StarFov *fov, const Config *c, float px, float py);
 void mr_init(MatchResult *m, CDB *db, CDB *img, StarFov *mask, int *map);
-void mr_set_pair(MatchResult *m, Constellation db, Constellation img);
 void mr_copy(MatchResult *dst, MatchResult *src);
-int weighted_wahba_vectors(Mat3 R, const Star *db_stars, const Star *img_stars,
-                           const int *db_idx, const int *img_idx, int n,
-                           int iter);
-void weighted_wahba(MatchResult *m, int iter);
-void weighted_triad(MatchResult *m);
 void compute_score(MatchResult *m, const Config *c, MatchWork *w);
 int related(MatchResult *winner, CPair *p);
 int ost_chol(const double *a, int n, double *l);
@@ -400,56 +592,10 @@ int ost_copy_n_brightest(StarDB *dst, StarDB *src, Star *tmp, int n);
 #ifdef OST_IMPLEMENTATION
 
 /* utilities */
-typedef const float *OST_RESTRICT Vec3In;
-typedef float *OST_RESTRICT Vec3Out;
-typedef const Vec3 *OST_RESTRICT Mat3In;
-typedef Vec3 *OST_RESTRICT Mat3Out;
 typedef double OSTSym3[6]; /* packed lower: 00,10,11,20,21,22 */
 typedef double OSTDVec3[3];
 
 static inline int ost_tri_idx(int r, int c) { return r * (r + 1) / 2 + c; }
-static inline float ost_vec_dotf(Vec3In a, Vec3In b, int n)
-{
-    float s = 0.0f;
-    for (int i = 0; i < n; i++)
-        s += a[i] * b[i];
-    return s;
-}
-static inline void ost_vec_cross3f(Vec3Out r, Vec3In a, Vec3In b)
-{
-    r[0] = a[1] * b[2] - a[2] * b[1];
-    r[1] = a[2] * b[0] - a[0] * b[2];
-    r[2] = a[0] * b[1] - a[1] * b[0];
-}
-static inline void ost_vec_normalizef(Vec3Out v, int n)
-{
-    float m = sqrtf(ost_vec_dotf(v, v, n));
-    for (int i = 0; i < n; i++)
-        v[i] /= m;
-}
-static inline void ost_vec_negf(Vec3Out v, int n)
-{
-    for (int i = 0; i < n; i++)
-        v[i] = -v[i];
-}
-static inline void ost_mat_cols3f(Mat3Out m, Vec3In a, Vec3In b, Vec3In c)
-{
-    m[0][0] = a[0]; m[0][1] = b[0]; m[0][2] = c[0];
-    m[1][0] = a[1]; m[1][1] = b[1]; m[1][2] = c[1];
-    m[2][0] = a[2]; m[2][1] = b[2]; m[2][2] = c[2];
-}
-static inline void ost_mat_mul_bt_f(float *OST_RESTRICT c,
-                                    const float *OST_RESTRICT a,
-                                    const float *OST_RESTRICT b, int n)
-{
-    for (int i = 0; i < n; i++)
-        for (int j = 0; j < n; j++) {
-            float s = 0.0f;
-            for (int k = 0; k < n; k++)
-                s += a[i * n + k] * b[j * n + k];
-            c[i * n + j] = s;
-        }
-}
 OST_DEF int ost_chol(const double *a, int n, double *l)
 {
     for (int i = 0; i < n; i++)
@@ -669,22 +815,22 @@ static int root_compress(int *OST_CC_RESTRICT parent, int label)
     return root;
 }
 
-static int alloc_label(OSTCCContext *ctx, int row, int *next_free_label)
+static int alloc_label(OSTCCContext *ctx, int row, int *next_reuse_label)
 {
     int start;
     int label;
 
-    start = *next_free_label;
+    start = *next_reuse_label;
     label = start;
     do {
-        if (ctx->active_count[label] == 0 && ctx->free_after_row[label] < row) {
+        if (ctx->active_count[label] == 0 && ctx->reuse_after_row[label] < row) {
             ctx->parent[label] = label;
             component_clear(&ctx->components[label]);
 
             label++;
             if (label >= ctx->max_labels)
                 label = 1;
-            *next_free_label = label;
+            *next_reuse_label = label;
             return label == 1 ? ctx->max_labels - 1 : label - 1;
         }
 
@@ -716,7 +862,7 @@ static int merge_roots(OSTCCContext *ctx, int a, int b, int row)
     ctx->active_count[keep] += ctx->active_count[merge];
     ctx->active_count[merge] = 0;
     component_clear(&ctx->components[merge]);
-    ctx->free_after_row[merge] = row + 1;
+    ctx->reuse_after_row[merge] = row + 1;
 
     return keep;
 }
@@ -741,7 +887,7 @@ static void close_binary_column(OSTCCContext *ctx, int x, int row,
                          ctx->components[root].sum_y);
         component_clear(&ctx->components[root]);
         ctx->parent[root] = root;
-        ctx->free_after_row[root] = row - 1;
+        ctx->reuse_after_row[root] = row - 1;
     }
 }
 
@@ -762,7 +908,7 @@ static void close_weighted_column(OSTCCContext *ctx, int x, int row,
         insert_weighted_component(out, count, out_max, ctx->components[root]);
         component_clear(&ctx->components[root]);
         ctx->parent[root] = root;
-        ctx->free_after_row[root] = row - 1;
+        ctx->reuse_after_row[root] = row - 1;
     }
 }
 
@@ -779,11 +925,11 @@ int ost_cc_buffer_sizes(int width, OSTCCBufferSizes *sizes)
     sizes->parent = (size_t)max_labels;
     sizes->col_label = (size_t)width;
     sizes->active_count = (size_t)max_labels;
-    sizes->free_after_row = (size_t)max_labels;
+    sizes->reuse_after_row = (size_t)max_labels;
     sizes->total_bytes =
         sizes->components * sizeof(OSTCCComponent) +
         (sizes->parent + sizes->col_label + sizes->active_count +
-         sizes->free_after_row) * sizeof(int);
+         sizes->reuse_after_row) * sizeof(int);
 
     return 0;
 }
@@ -793,12 +939,12 @@ int ost_cc_init(OSTCCContext *ctx, int width,
                 int *parent,
                 int *col_label,
                 int *active_count,
-                int *free_after_row)
+                int *reuse_after_row)
 {
     OSTCCBufferSizes sizes;
 
     if (!ctx || !components || !parent || !col_label || !active_count ||
-        !free_after_row)
+        !reuse_after_row)
         return -1;
     if (ost_cc_buffer_sizes(width, &sizes) < 0)
         return -1;
@@ -809,7 +955,7 @@ int ost_cc_init(OSTCCContext *ctx, int width,
     ctx->parent = parent;
     ctx->col_label = col_label;
     ctx->active_count = active_count;
-    ctx->free_after_row = free_after_row;
+    ctx->reuse_after_row = reuse_after_row;
     return 0;
 }
 
@@ -820,18 +966,18 @@ int ost_cc_threshold_4(const unsigned char *image,
                        OSTCCContext *ctx)
 {
     int count;
-    int next_free_label;
+    int next_reuse_label;
 
     if (!image || !ctx || !out || width <= 0 || height < 0 ||
         stride < width || out_max < 0 || ctx->width != width)
         return -1;
 
     count = 0;
-    next_free_label = 1;
+    next_reuse_label = 1;
     clear_components(out, out_max);
     memset(ctx->col_label, 0, (size_t)width * sizeof(int));
     memset(ctx->active_count, 0, (size_t)ctx->max_labels * sizeof(int));
-    memset(ctx->free_after_row, -1,
+    memset(ctx->reuse_after_row, -1,
            (size_t)ctx->max_labels * sizeof(int));
 
     for (int y = 0; y < height; y++) {
@@ -859,7 +1005,7 @@ int ost_cc_threshold_4(const unsigned char *image,
             else if (top)
                 label = top;
             else {
-                label = alloc_label(ctx, y, &next_free_label);
+                label = alloc_label(ctx, y, &next_reuse_label);
                 if (!label)
                     return -2;
             }
@@ -1150,7 +1296,7 @@ int ost_bg_extract_fused(const OSTBGConfig *cfg, const uint16_t *image,
     /* Thresholding, connected components, and first-pass photometry are fused. */
     OSTBGThresholdTest test;
     int count;
-    int next_free_label;
+    int next_reuse_label;
 
     if (!cfg || !image || !stats || !cc || !stars ||
         stride < cfg->width || stars_max < 0 || cc->width != cfg->width)
@@ -1164,12 +1310,12 @@ int ost_bg_extract_fused(const OSTBGConfig *cfg, const uint16_t *image,
     test.sy = cfg->height > 1 ?
         (double)(cfg->map_height - 1) / (cfg->height - 1) : 0.0;
     count = 0;
-    next_free_label = 1;
+    next_reuse_label = 1;
 
     clear_components(stars, stars_max);
     memset(cc->col_label, 0, (size_t)cfg->width * sizeof(int));
     memset(cc->active_count, 0, (size_t)cc->max_labels * sizeof(int));
-    memset(cc->free_after_row, -1, (size_t)cc->max_labels * sizeof(int));
+    memset(cc->reuse_after_row, -1, (size_t)cc->max_labels * sizeof(int));
 
     for (int y = 0; y < cfg->height; y++) {
         const uint16_t *row;
@@ -1247,7 +1393,7 @@ int ost_bg_extract_fused(const OSTBGConfig *cfg, const uint16_t *image,
                     else if (top)
                         label = top;
                     else {
-                        label = alloc_label(cc, y, &next_free_label);
+                        label = alloc_label(cc, y, &next_reuse_label);
                         if (!label)
                             return -2;
                     }
@@ -1874,12 +2020,27 @@ OST_DEF int ost_db_from_results(StarDB *out, Query *q)
     return 0;
 }
 
-static float star_dist_arcsec(const Star *a, const Star *b)
+static int ost_constellation_before(const Star *stars, uint32_t a, uint32_t b)
 {
-    float x = a->v[0] * b->v[1] - b->v[0] * a->v[1];
-    float y = a->v[0] * b->v[2] - b->v[0] * a->v[2];
-    float z = a->v[1] * b->v[2] - b->v[1] * a->v[2];
-    return (float)((3600 * 180.0 / PI) * asinf(sqrtf(x * x + y * y + z * z)));
+    if (stars[a].flux > stars[b].flux)
+        return 1;
+    if (stars[a].flux < stars[b].flux)
+        return 0;
+    return a < b;
+}
+
+static void ost_constellation_canonicalize_ids(const Star *stars,
+                                               uint32_t *ids, int k)
+{
+    for (int i = 1; i < k; i++) {
+        uint32_t v = ids[i];
+        int j = i;
+        while (j > 0 && ost_constellation_before(stars, v, ids[j - 1])) {
+            ids[j] = ids[j - 1];
+            j--;
+        }
+        ids[j] = v;
+    }
 }
 
 static int cmp_constellation(const void *pa, const void *pb)
@@ -1914,7 +2075,7 @@ OST_DEF int ost_db_from_image(CDB *cdb, StarDB *src,
         for (int i = 0; i < j; i++) {
             if (idx >= cmap_cap)
                 return -1;
-            cdb->map[idx].p = star_dist_arcsec(&q->map[i], &q->map[j]);
+            cdb->map[idx].p = ost_star_dist_arcsec(&q->map[i], &q->map[j]);
             cdb->map[idx].s1 = q->map[i].star_idx;
             cdb->map[idx].s2 = q->map[j].star_idx;
             idx++;
@@ -1947,10 +2108,12 @@ OST_DEF int ost_db_from_catalog(CDB *cdb, StarDB *src,
                      cfg->MAXFOV, cfg->THRESH_FACTOR * cfg->IMAGE_VARIANCE);
         for (int j = 0; j < q->kdresults_size; j++) {
             int k = q->kdresults[j];
-            if (i != k && q->map[i].flux >= q->map[k].flux) {
+            if (i != k && ost_constellation_before(cdb->stars.v,
+                    (uint32_t)q->map[i].star_idx,
+                    (uint32_t)q->map[k].star_idx)) {
                 if (n >= cmap_cap)
                     return -1;
-                cmap[n].p = star_dist_arcsec(&q->map[i], &q->map[k]);
+                cmap[n].p = ost_star_dist_arcsec(&q->map[i], &q->map[k]);
                 cmap[n].s1 = q->map[i].star_idx;
                 cmap[n].s2 = q->map[k].star_idx;
                 n++;
@@ -1971,25 +2134,6 @@ OST_DEF int ost_db_from_catalog(CDB *cdb, StarDB *src,
     cdb->map = cmap;
     cdb->map_size = out;
     return 0;
-}
-
-static void constellation_range(Constellation *a, int n, float p0, float p1, int *lo, int *hi)
-{
-    /* Sorted separation ranges avoid testing every catalog pair for each image pair. */
-    int l = 0, r = n;
-    while (l < r) {
-        int m = (l + r) >> 1;
-        if (a[m].p < p0) l = m + 1;
-        else r = m;
-    }
-    *lo = l;
-    r = n;
-    while (l < r) {
-        int m = (l + r) >> 1;
-        if (a[m].p <= p1) l = m + 1;
-        else r = m;
-    }
-    *hi = l;
 }
 
 OST_DEF int fov_init(StarFov *fov, StarDB *stars, float db_max_variance,
@@ -2091,14 +2235,6 @@ OST_DEF void mr_init(MatchResult *m, CDB *db, CDB *img, StarFov *mask, int *map)
     m->match.totalscore = -FLT_MAX;
 }
 
-OST_DEF void mr_set_pair(MatchResult *m, Constellation db, Constellation img)
-{
-    m->match.img_s1 = img.s1;
-    m->match.img_s2 = img.s2;
-    m->match.db_s1 = db.s1;
-    m->match.db_s2 = db.s2;
-}
-
 OST_DEF void mr_copy(MatchResult *dst, MatchResult *src)
 {
     CDB *db = dst->db, *img = dst->img;
@@ -2108,127 +2244,6 @@ OST_DEF void mr_copy(MatchResult *dst, MatchResult *src)
     dst->db = db; dst->img = img; dst->img_mask = mask;
     dst->map = map; dst->map_size = map_size;
     memcpy(dst->map, src->map, (size_t)map_size * sizeof(map[0]));
-}
-
-static float ost_wahba_det3(const float *a, const float *b, const float *c,
-                            int i, int j, int k)
-{
-    return a[i] * (b[j] * c[k] - b[k] * c[j]) -
-           a[j] * (b[i] * c[k] - b[k] * c[i]) +
-           a[k] * (b[i] * c[j] - b[j] * c[i]);
-}
-
-static int ost_wahba_null4(float q[4], const float a[4][4])
-{
-    float best[4] = {1.0f, 0.0f, 0.0f, 0.0f};
-    float bestn = -1.0f;
-    for (int skip = 0; skip < 4; skip++) {
-        const float *r[3];
-        float v[4], n;
-        int m = 0;
-        for (int i = 0; i < 4; i++)
-            if (i != skip)
-                r[m++] = a[i];
-        v[0] =  ost_wahba_det3(r[0], r[1], r[2], 1, 2, 3);
-        v[1] = -ost_wahba_det3(r[0], r[1], r[2], 0, 2, 3);
-        v[2] =  ost_wahba_det3(r[0], r[1], r[2], 0, 1, 3);
-        v[3] = -ost_wahba_det3(r[0], r[1], r[2], 0, 1, 2);
-        n = v[0] * v[0] + v[1] * v[1] + v[2] * v[2] + v[3] * v[3];
-        if (n > bestn) {
-            bestn = n;
-            memcpy(best, v, sizeof(best));
-        }
-    }
-    if (bestn <= 1e-30f)
-        return -1;
-    bestn = 1.0f / sqrtf(bestn);
-    for (int i = 0; i < 4; i++)
-        q[i] = best[i] * bestn;
-    return 0;
-}
-
-static void ost_wahba_quat_to_mat(Mat3 r, const float qin[4])
-{
-    float q0 = qin[0], q1 = qin[1], q2 = qin[2], q3 = qin[3];
-    float n = 1.0f / sqrtf(q0 * q0 + q1 * q1 + q2 * q2 + q3 * q3);
-    q0 *= n; q1 *= n; q2 *= n; q3 *= n;
-    r[0][0] = q0*q0 + q1*q1 - q2*q2 - q3*q3;
-    r[0][1] = 2.0f * (q1*q2 - q0*q3);
-    r[0][2] = 2.0f * (q1*q3 + q0*q2);
-    r[1][0] = 2.0f * (q1*q2 + q0*q3);
-    r[1][1] = q0*q0 - q1*q1 + q2*q2 - q3*q3;
-    r[1][2] = 2.0f * (q2*q3 - q0*q1);
-    r[2][0] = 2.0f * (q1*q3 - q0*q2);
-    r[2][1] = 2.0f * (q2*q3 + q0*q1);
-    r[2][2] = q0*q0 - q1*q1 - q2*q2 + q3*q3;
-}
-
-OST_DEF int weighted_wahba_vectors(Mat3 r, const Star *db_stars,
-                              const Star *img_stars, const int *db_idx,
-                              const int *img_idx, int n, int iter)
-{
-    float b[3][3] = {{0.0f}}, k[4][4] = {{0.0f}}, a[4][4], q[4];
-    float sw = 0.0f, tr, lambda;
-    if (!r || !db_stars || !img_stars || n < 2)
-        return -1;
-    if (iter < 0)
-        iter = 0;
-    if (iter > 8)
-        iter = 8;
-    for (int i = 0; i < n; i++) {
-        const Star *ds = &db_stars[db_idx ? db_idx[i] : i];
-        const Star *is = &img_stars[img_idx ? img_idx[i] : i];
-        float w = 1.0f / (ds->sigma_sq + is->sigma_sq);
-        sw += w;
-        for (int row = 0; row < 3; row++)
-            for (int col = 0; col < 3; col++)
-                b[row][col] += w * ds->v[row] * is->v[col];
-    }
-    if (sw <= 0.0f)
-        return -1;
-    tr = b[0][0] + b[1][1] + b[2][2];
-    k[0][0] = tr;
-    k[0][1] = k[1][0] = b[1][2] - b[2][1];
-    k[0][2] = k[2][0] = b[2][0] - b[0][2];
-    k[0][3] = k[3][0] = b[0][1] - b[1][0];
-    k[1][1] = b[0][0] - b[1][1] - b[2][2];
-    k[1][2] = k[2][1] = b[0][1] + b[1][0];
-    k[1][3] = k[3][1] = b[0][2] + b[2][0];
-    k[2][2] = -b[0][0] + b[1][1] - b[2][2];
-    k[2][3] = k[3][2] = b[1][2] + b[2][1];
-    k[3][3] = -b[0][0] - b[1][1] + b[2][2];
-
-    lambda = sw;
-    for (int it = 0; it <= iter; it++) {
-        for (int row = 0; row < 4; row++)
-            for (int col = 0; col < 4; col++)
-                a[row][col] = k[row][col] - (row == col ? lambda : 0.0f);
-        if (ost_wahba_null4(q, a) < 0)
-            return -1;
-        lambda = 0.0f;
-        for (int row = 0; row < 4; row++) {
-            float kq = 0.0f;
-            for (int col = 0; col < 4; col++)
-                kq += k[row][col] * q[col];
-            lambda += q[row] * kq;
-        }
-    }
-    ost_wahba_quat_to_mat(r, q);
-    return 0;
-}
-
-OST_DEF void weighted_wahba(MatchResult *m, int iter)
-{
-    int db_idx[2] = {m->match.db_s1, m->match.db_s2};
-    int img_idx[2] = {m->match.img_s1, m->match.img_s2};
-    if (weighted_wahba_vectors(m->R, m->db->stars.v, m->img->stars.v,
-                               db_idx, img_idx, 2, iter) < 0)
-        memset(m->R, 0, sizeof(m->R));
-}
-
-OST_DEF void weighted_triad(MatchResult *m)
-{
-    weighted_wahba(m, 0);
 }
 
 OST_DEF void compute_score(MatchResult *m, const Config *c, MatchWork *w)
@@ -2242,9 +2257,9 @@ OST_DEF void compute_score(MatchResult *m, const Config *c, MatchWork *w)
     for (int i = 0; i < m->db->results.kdresults_size; i++) {
         Star *s = &m->db->results.map[m->db->results.kdresults[i]];
         int o = s->star_idx;
-        float x = ost_vec_dotf(s->v, m->R[0], 3);
-        float y = ost_vec_dotf(s->v, m->R[1], 3);
-        float z = ost_vec_dotf(s->v, m->R[2], 3);
+        float x = ost_vec_dot3(s->v, m->R[0]);
+        float y = ost_vec_dot3(s->v, m->R[1]);
+        float z = ost_vec_dot3(s->v, m->R[2]);
         float px = y / (x * c->PIXX_TANGENT);
         float py = z / (x * c->PIXY_TANGENT);
         int n = fov_get_id(m->img_mask, c, px, py);
@@ -2267,65 +2282,1038 @@ OST_DEF int related(MatchResult *winner, CPair *p)
     return winner->map[p->img_s1] == p->db_s1 && winner->map[p->img_s2] == p->db_s2;
 }
 
-OST_DEF int ost_db_match(CDB *db, CDB *img, MatchResult *winner,
-                    const Config *cfg, MatchWork *w, float *p_match)
+static void ost_sort_float_key(float *v, int n)
+{
+    for (int i = 1; i < n; i++) {
+        float x = v[i];
+        int j = i;
+        while (j > 0 && x < v[j - 1]) {
+            v[j] = v[j - 1];
+            j--;
+        }
+        v[j] = x;
+    }
+}
+
+static int ost_constellation_pairdist_key(const Star *stars,
+                                          const uint32_t *ids, int k,
+                                          float *out, int dims)
+{
+    int q = 0;
+    if (!stars || !ids || !out || dims != k * (k - 1) / 2)
+        return -1;
+    for (int j = 1; j < k; j++)
+        for (int i = 0; i < j; i++)
+            out[q++] = ost_star_dist_arcsec(&stars[ids[i]], &stars[ids[j]]);
+    return 0;
+}
+
+typedef struct OSTCpx {
+    double r, i;
+} OSTCpx;
+
+static int ost_double_finite(double x)
+{
+    return x == x && x <= DBL_MAX && x >= -DBL_MAX;
+}
+
+static OSTCpx ost_cpx_make(double r, double i)
+{
+    OSTCpx z;
+    z.r = r;
+    z.i = i;
+    return z;
+}
+
+static OSTCpx ost_cpx_add(OSTCpx a, OSTCpx b)
+{
+    return ost_cpx_make(a.r + b.r, a.i + b.i);
+}
+
+static OSTCpx ost_cpx_sub(OSTCpx a, OSTCpx b)
+{
+    return ost_cpx_make(a.r - b.r, a.i - b.i);
+}
+
+static OSTCpx ost_cpx_mul(OSTCpx a, OSTCpx b)
+{
+    return ost_cpx_make(a.r * b.r - a.i * b.i,
+                        a.r * b.i + a.i * b.r);
+}
+
+static double ost_cpx_abs2(OSTCpx z)
+{
+    return z.r * z.r + z.i * z.i;
+}
+
+static int ost_cpx_div(OSTCpx a, OSTCpx b, OSTCpx *out)
+{
+    double den = ost_cpx_abs2(b);
+    if (!out || den <= 1e-60 || !ost_double_finite(den))
+        return -1;
+    *out = ost_cpx_make((a.r * b.r + a.i * b.i) / den,
+                        (a.i * b.r - a.r * b.i) / den);
+    return ost_double_finite(out->r) && ost_double_finite(out->i) ? 0 : -1;
+}
+
+static int ost_constellation_crossratio_poly_complex(OSTCpx z, float *out)
+{
+    OSTCpx one = ost_cpx_make(1.0, 0.0);
+    OSTCpx z2 = ost_cpx_mul(z, z);
+    OSTCpx a = ost_cpx_add(ost_cpx_sub(z2, z), one);
+    OSTCpx num = ost_cpx_mul(ost_cpx_mul(a, a), a);
+    OSTCpx zm1 = ost_cpx_sub(z, one);
+    OSTCpx den = ost_cpx_mul(z2, ost_cpx_mul(zm1, zm1));
+    OSTCpx y;
+    if (!out || ost_cpx_div(num, den, &y) < 0 ||
+        fabs(y.r) > (double)FLT_MAX || fabs(y.i) > (double)FLT_MAX)
+        return -1;
+    out[0] = (float)y.r;
+    out[1] = (float)y.i;
+    return 0;
+}
+
+static int ost_constellation_crossratio_poly_real(double z, float *out)
+{
+    double a = z * z - z + 1.0;
+    double den = z * z * (z - 1.0) * (z - 1.0);
+    double y;
+    if (!out || fabs(den) <= 1e-60 || !ost_double_finite(den))
+        return -1;
+    y = (a * a * a) / den;
+    if (!ost_double_finite(y) || fabs(y) > (double)FLT_MAX)
+        return -1;
+    *out = (float)y;
+    return 0;
+}
+
+static void ost_constellation_chart_components(const float v[3], int axis,
+                                                double *u, double *a,
+                                                double *b)
+{
+    if (axis == 1) {
+        *u = v[1]; *a = v[2]; *b = v[0];
+    } else if (axis == 2) {
+        *u = v[2]; *a = v[0]; *b = v[1];
+    } else {
+        *u = v[0]; *a = v[1]; *b = v[2];
+    }
+}
+
+static int ost_constellation_stereo_axis(const Star *stars,
+                                         const uint32_t *ids, int k)
+{
+    int best_axis = -1;
+    double best_min_den = -1.0;
+    for (int axis = 0; axis < 3; axis++) {
+        double min_den = DBL_MAX;
+        for (int i = 0; i < k; i++) {
+            double u, a, b, den;
+            ost_constellation_chart_components(stars[ids[i]].v, axis,
+                                               &u, &a, &b);
+            den = 1.0 + u;
+            if (den < min_den)
+                min_den = den;
+        }
+        if (min_den > best_min_den) {
+            best_min_den = min_den;
+            best_axis = axis;
+        }
+    }
+    return best_min_den > 1e-12 ? best_axis : -1;
+}
+
+static int ost_constellation_stereo_project(const Star *stars,
+                                            const uint32_t *ids, int k,
+                                            OSTCpx *z)
+{
+    int axis;
+    if (!stars || !ids || !z)
+        return -1;
+    axis = ost_constellation_stereo_axis(stars, ids, k);
+    if (axis < 0)
+        return -1;
+    for (int i = 0; i < k; i++) {
+        double u, a, b, den;
+        ost_constellation_chart_components(stars[ids[i]].v, axis,
+                                           &u, &a, &b);
+        den = 1.0 + u;
+        if (den <= 1e-12)
+            return -1;
+        z[i] = ost_cpx_make(a / den, b / den);
+        if (!ost_double_finite(z[i].r) || !ost_double_finite(z[i].i))
+            return -1;
+    }
+    return 0;
+}
+
+static int ost_constellation_crossratio4_raw(const OSTCpx z[4], OSTCpx *cr)
+{
+    OSTCpx num, den;
+    if (!z || !cr)
+        return -1;
+    num = ost_cpx_mul(ost_cpx_sub(z[0], z[2]), ost_cpx_sub(z[1], z[3]));
+    den = ost_cpx_mul(ost_cpx_sub(z[1], z[2]), ost_cpx_sub(z[0], z[3]));
+    return ost_cpx_div(num, den, cr);
+}
+
+static int ost_constellation_crossratio4_key(const Star *stars,
+                                             const uint32_t *ids, int k,
+                                             float *out, int dims)
+{
+    OSTCpx z[4], cr;
+    if (!stars || !ids || !out || k != 4 || dims != 2 ||
+        ost_constellation_stereo_project(stars, ids, k, z) < 0 ||
+        ost_constellation_crossratio4_raw(z, &cr) < 0)
+        return -1;
+    return ost_constellation_crossratio_poly_complex(cr, out);
+}
+
+static double ost_det3_vec(const float a[3], const float b[3],
+                           const float c[3])
+{
+    return (double)a[0] * ((double)b[1] * c[2] - (double)b[2] * c[1]) -
+           (double)a[1] * ((double)b[0] * c[2] - (double)b[2] * c[0]) +
+           (double)a[2] * ((double)b[0] * c[1] - (double)b[1] * c[0]);
+}
+
+static int ost_constellation_crossratio5_raw_ordered(const Star *stars,
+        const uint32_t *ids, int i1, int i2, int i3, int i4, int i5,
+        double *out, double *quality)
+{
+    const float *x1 = stars[ids[i1]].v;
+    const float *x2 = stars[ids[i2]].v;
+    const float *x3 = stars[ids[i3]].v;
+    const float *x4 = stars[ids[i4]].v;
+    const float *x5 = stars[ids[i5]].v;
+    double d143 = ost_det3_vec(x1, x4, x3);
+    double d125 = ost_det3_vec(x1, x2, x5);
+    double num = ost_det3_vec(x1, x2, x4) * ost_det3_vec(x1, x5, x3);
+    double den = d143 * d125;
+    if (!out || fabs(den) <= 1e-60 || !ost_double_finite(num) ||
+        !ost_double_finite(den))
+        return -1;
+    *out = num / den;
+    if (quality)
+        *quality = fabs(den);
+    return ost_double_finite(*out) ? 0 : -1;
+}
+
+static int ost_constellation_crossratio5_anchor_key(const Star *stars,
+        const uint32_t *ids, int anchor, float *out)
+{
+    int other[4], no = 0;
+    double raw;
+    double best_q = -1.0;
+    float best = 0.0f;
+    int have = 0;
+    for (int i = 0; i < 5; i++)
+        if (i != anchor)
+            other[no++] = i;
+    if (ost_constellation_crossratio5_raw_ordered(stars, ids, anchor,
+            other[0], other[1], other[2], other[3], &raw, NULL) == 0 &&
+        ost_constellation_crossratio_poly_real(raw, out) == 0)
+        return 0;
+    for (int i2 = 0; i2 < 5; i2++) if (i2 != anchor)
+        for (int i3 = 0; i3 < 5; i3++) if (i3 != anchor && i3 != i2)
+            for (int i4 = 0; i4 < 5; i4++)
+                if (i4 != anchor && i4 != i2 && i4 != i3)
+                    for (int i5 = 0; i5 < 5; i5++)
+                        if (i5 != anchor && i5 != i2 && i5 != i3 &&
+                            i5 != i4) {
+                            double raw, q;
+                            float val;
+                            if (ost_constellation_crossratio5_raw_ordered(
+                                    stars, ids, anchor, i2, i3, i4, i5,
+                                    &raw, &q) < 0 ||
+                                ost_constellation_crossratio_poly_real(raw,
+                                    &val) < 0)
+                                continue;
+                            if (!have || q > best_q) {
+                                have = 1;
+                                best_q = q;
+                                best = val;
+                            }
+                        }
+    if (!have || !out)
+        return -1;
+    *out = best;
+    return 0;
+}
+
+static int ost_constellation_crossratio5_key(const Star *stars,
+                                             const uint32_t *ids, int k,
+                                             float *out, int dims)
+{
+    if (!stars || !ids || !out || k != 5 || dims != 5)
+        return -1;
+    for (int a = 0; a < 5; a++)
+        if (ost_constellation_crossratio5_anchor_key(stars, ids,
+                a, &out[a]) < 0)
+            return -1;
+    ost_sort_float_key(out, 5);
+    return 0;
+}
+
+static int ost_constellation_key(int descriptor_kind, const Star *stars,
+                                 const uint32_t *ids, int k,
+                                 float *out, int dims)
+{
+    switch (descriptor_kind) {
+    case OST_CONSTELLATION_PAIRDIST:
+        return ost_constellation_pairdist_key(stars, ids, k, out, dims);
+    case OST_CONSTELLATION_CROSSRATIO4:
+        return ost_constellation_crossratio4_key(stars, ids, k, out, dims);
+    case OST_CONSTELLATION_CROSSRATIO5:
+        return ost_constellation_crossratio5_key(stars, ids, k, out, dims);
+    default:
+        return -1;
+    }
+}
+
+static int ost_constellation_dims(int k, int descriptor_kind)
+{
+    if (k < 2 || k > OST_MAX_CONSTELLATION_STARS)
+        return 0;
+    switch (descriptor_kind) {
+    case OST_CONSTELLATION_PAIRDIST:
+        return k * (k - 1) / 2;
+    case OST_CONSTELLATION_CROSSRATIO4:
+        return k == 4 ? 2 : 0;
+    case OST_CONSTELLATION_CROSSRATIO5:
+        return k == 5 ? 5 : 0;
+    default:
+        return 0;
+    }
+}
+
+static int ost_constellation_descriptor_symmetric(int k, int descriptor_kind)
+{
+    return (descriptor_kind == OST_CONSTELLATION_PAIRDIST && k == 2) ||
+           (descriptor_kind == OST_CONSTELLATION_CROSSRATIO4 && k == 4) ||
+           (descriptor_kind == OST_CONSTELLATION_CROSSRATIO5 && k == 5);
+}
+
+OST_DEF size_t ost_constellation_record_size(int k, int descriptor_kind)
+{
+    int dims = ost_constellation_dims(k, descriptor_kind);
+    if (dims <= 0)
+        return 0;
+    return (size_t)dims * sizeof(float) + (size_t)k * sizeof(uint32_t);
+}
+
+OST_DEF int ost_constellation_index_init(OSTConstellationIndex *idx,
+        CDB *pair, int k, int descriptor_kind, unsigned char *storage,
+        int storage_cap)
+{
+    int dims = ost_constellation_dims(k, descriptor_kind);
+    size_t rec = ost_constellation_record_size(k, descriptor_kind);
+    if (!idx || !pair || !rec || storage_cap < 0 || dims <= 0 ||
+        dims > OST_MAX_CONSTELLATION_DIMS || (!storage && storage_cap > 0))
+        return -1;
+    memset(idx, 0, sizeof(*idx));
+    idx->pair = pair;
+    idx->map = storage;
+    idx->cap = storage_cap;
+    idx->k = k;
+    idx->dims = dims;
+    idx->descriptor_kind = descriptor_kind;
+    idx->record_size = rec;
+    idx->kd_bucket = 1 << (idx->k + 1);
+    return 0;
+}
+
+static unsigned char *ost_constellation_index_ptr(OSTConstellationIndex *idx,
+                                                  int row)
+{
+    return idx->map + (size_t)row * idx->record_size;
+}
+
+static float *ost_constellation_index_key(OSTConstellationIndex *idx, int row)
+{
+    return (float *)ost_constellation_index_ptr(idx, row);
+}
+
+static uint32_t *ost_constellation_index_stars(OSTConstellationIndex *idx,
+                                               int row)
+{
+    return (uint32_t *)(ost_constellation_index_ptr(idx, row) +
+                       (size_t)idx->dims * sizeof(float));
+}
+
+static int ost_constellation_edge_cmp(const void *pa, const void *pb)
+{
+    const OSTConstellationEdge *a = (const OSTConstellationEdge *)pa;
+    const OSTConstellationEdge *b = (const OSTConstellationEdge *)pb;
+    return (a->star > b->star) - (a->star < b->star);
+}
+
+static int ost_constellation_build_adj(CDB *pair, int *off,
+                                       OSTConstellationEdge *edges, int *tmp)
+{
+    int nstars, npairs;
+    if (!pair || !off || !edges || !tmp || pair->stars.n < 0 ||
+        pair->map_size < 0)
+        return -1;
+    nstars = pair->stars.n;
+    npairs = pair->map_size;
+    for (int i = 0; i <= nstars; i++)
+        off[i] = 0;
+    for (int i = 0; i < npairs; i++) {
+        int a = pair->map[i].s1, b = pair->map[i].s2;
+        if ((unsigned)a >= (unsigned)nstars || (unsigned)b >= (unsigned)nstars)
+            return -1;
+        off[a + 1]++;
+        off[b + 1]++;
+    }
+    for (int i = 0; i < nstars; i++) {
+        off[i + 1] += off[i];
+        tmp[i] = off[i];
+    }
+    for (int i = 0; i < npairs; i++) {
+        int a = pair->map[i].s1, b = pair->map[i].s2;
+        edges[tmp[a]++].star = b;
+        edges[tmp[b]++].star = a;
+    }
+    for (int i = 0; i < nstars; i++)
+        qsort(edges + off[i], (size_t)(off[i + 1] - off[i]),
+              sizeof(*edges), ost_constellation_edge_cmp);
+    return 0;
+}
+
+static int ost_constellation_adj_has(const int *off,
+                                     const OSTConstellationEdge *edges,
+                                     int a, int b)
+{
+    int l = off[a], r = off[a + 1];
+    while (l < r) {
+        int m = (l + r) >> 1;
+        if (edges[m].star < b) l = m + 1;
+        else r = m;
+    }
+    return l < off[a + 1] && edges[l].star == b;
+}
+
+static void ost_constellation_local_basis(const float v[3], float b0[3],
+                                          float b1[3])
+{
+    float ref[3] = {0.0f, 0.0f, 1.0f};
+    if (fabsf(v[2]) > 0.9f) {
+        ref[1] = 1.0f;
+        ref[2] = 0.0f;
+    }
+    ost_vec_cross3(b0, ref, v);
+    if (ost_vec_normalize3(b0) < 0) {
+        b0[0] = 1.0f;
+        b0[1] = b0[2] = 0.0f;
+    }
+    ost_vec_cross3(b1, v, b0);
+    ost_vec_normalize3(b1);
+}
+
+static void ost_constellation_perturb_catalog_star(const Config *cfg,
+        const Star *src, const float axis[3], float theta, Star *dst)
+{
+    float c = cosf(theta), s = sinf(theta);
+    *dst = *src;
+    dst->v[0] = src->v[0] * c + axis[0] * s;
+    dst->v[1] = src->v[1] * c + axis[1] * s;
+    dst->v[2] = src->v[2] * c + axis[2] * s;
+    ost_vec_normalize3(dst->v);
+    if (fabsf(dst->v[0]) > 1e-20f) {
+        dst->px = dst->v[1] / (dst->v[0] * cfg->PIXX_TANGENT);
+        dst->py = dst->v[2] / (dst->v[0] * cfg->PIXY_TANGENT);
+    }
+}
+
+static int ost_constellation_qerr_pairdist_fast(
+        const Config *cfg, const Star *stars, const uint32_t *ids, int k,
+        float db_max_variance, float *qkey, float *qerr)
+{
+    int q = 0;
+    if (!cfg || !stars || !ids || !qkey || !qerr ||
+        ost_constellation_pairdist_key(stars, ids, k, qkey,
+            k * (k - 1) / 2) < 0)
+        return -1;
+    for (int j = 1; j < k; j++)
+        for (int i = 0; i < j; i++) {
+            float v = stars[ids[i]].sigma_sq + stars[ids[j]].sigma_sq +
+                      2.0f * db_max_variance;
+            qerr[q++] = cfg->POS_ERR_SIGMA * cfg->PIXSCALE *
+                        sqrtf(fmaxf(0.0f, v));
+        }
+    return 0;
+}
+
+static int ost_constellation_ut_accum(int descriptor_kind, int k, int dims,
+        const Star *stars, const uint32_t *ids, int sign,
+        const float *center, float weight, float *sum, float *sumsq)
+{
+    float key[OST_MAX_CONSTELLATION_DIMS];
+    if (ost_constellation_key(descriptor_kind, stars, ids, k, key, dims) < 0)
+        return -1;
+    for (int d = 0; d < dims; d++) {
+        float delta = sign > 0 ? key[d] - center[d] : center[d] - key[d];
+        sum[d] += weight * delta;
+        sumsq[d] += weight * delta * delta;
+    }
+    return 0;
+}
+
+static int ost_constellation_qerr_ut(
+        const Config *cfg, int descriptor_kind,
+        const Star *stars, const uint32_t *ids, int k,
+        float db_max_variance, float *qkey, float *qerr)
+{
+    Star base[OST_MAX_CONSTELLATION_STARS];
+    Star pert[OST_MAX_CONSTELLATION_STARS];
+    uint32_t local_ids[OST_MAX_CONSTELLATION_STARS] = {0};
+    int dims = ost_constellation_dims(k, descriptor_kind);
+    if (k < 2 || k > OST_MAX_CONSTELLATION_STARS ||
+        dims <= 0 || dims > OST_MAX_CONSTELLATION_DIMS)
+        return -1;
+    if (descriptor_kind == OST_CONSTELLATION_PAIRDIST)
+        return ost_constellation_qerr_pairdist_fast(cfg, stars, ids, k,
+                                                    db_max_variance,
+                                                    qkey, qerr);
+    float sum[OST_MAX_CONSTELLATION_DIMS] = {0.0f};
+    float sumsq[OST_MAX_CONSTELLATION_DIMS] = {0.0f};
+    int nvar = 4 * k;
+    float root_n = sqrtf((float)nvar);
+    float weight = 1.0f / (float)(2 * nvar);
+    float cat_sigma_rad = cfg->PIXSCALE * sqrtf(fmaxf(0.0f, db_max_variance)) /
+                          ((float)(3600.0 * 180.0 / PI));
+
+    for (int i = 0; i < k; i++) {
+        base[i] = stars[ids[i]];
+        local_ids[i] = (uint32_t)i;
+    }
+    if (ost_constellation_key(descriptor_kind, base, local_ids, k,
+                              qkey, dims) < 0)
+        return -1;
+
+    for (int s = 0; s < k; s++) {
+        float img_sigma = sqrtf(fmaxf(0.0f, base[s].sigma_sq));
+        if (img_sigma > 0.0f) {
+            float amp = root_n * img_sigma;
+            for (int axis = 0; axis < 2; axis++) {
+                memcpy(pert, base, (size_t)k * sizeof(base[0]));
+                pert[s] = ost_make_img_star(cfg,
+                    base[s].px + (axis == 0 ? amp : 0.0f),
+                    base[s].py + (axis == 1 ? amp : 0.0f),
+                    base[s].flux, base[s].id);
+                pert[s].star_idx = base[s].star_idx;
+                if (ost_constellation_ut_accum(descriptor_kind, k, dims, pert, local_ids, 1,
+                        qkey, weight, sum, sumsq) < 0)
+                    return -1;
+                memcpy(pert, base, (size_t)k * sizeof(base[0]));
+                pert[s] = ost_make_img_star(cfg,
+                    base[s].px - (axis == 0 ? amp : 0.0f),
+                    base[s].py - (axis == 1 ? amp : 0.0f),
+                    base[s].flux, base[s].id);
+                pert[s].star_idx = base[s].star_idx;
+                if (ost_constellation_ut_accum(descriptor_kind, k, dims, pert, local_ids, 1,
+                        qkey, weight, sum, sumsq) < 0)
+                    return -1;
+            }
+        }
+        if (cat_sigma_rad > 0.0f) {
+            float b0[3], b1[3], amp = root_n * cat_sigma_rad;
+            ost_constellation_local_basis(base[s].v, b0, b1);
+            for (int axis = 0; axis < 2; axis++) {
+                const float *b = axis == 0 ? b0 : b1;
+                memcpy(pert, base, (size_t)k * sizeof(base[0]));
+                ost_constellation_perturb_catalog_star(cfg, &base[s], b,
+                                                       amp, &pert[s]);
+                if (ost_constellation_ut_accum(descriptor_kind, k, dims, pert, local_ids, -1,
+                        qkey, weight, sum, sumsq) < 0)
+                    return -1;
+                memcpy(pert, base, (size_t)k * sizeof(base[0]));
+                ost_constellation_perturb_catalog_star(cfg, &base[s], b,
+                                                       -amp, &pert[s]);
+                if (ost_constellation_ut_accum(descriptor_kind, k, dims, pert, local_ids, -1,
+                        qkey, weight, sum, sumsq) < 0)
+                    return -1;
+            }
+        }
+    }
+    for (int d = 0; d < dims; d++)
+        qerr[d] = cfg->POS_ERR_SIGMA *
+            sqrtf(fmaxf(0.0f, sumsq[d] - sum[d] * sum[d]));
+    return 0;
+}
+
+typedef struct OSTConstellationCliqueCtx {
+    OSTConstellationIndex *out;
+    const int *off;
+    const OSTConstellationEdge *edges;
+    int *common;
+    int common_count, k;
+    uint32_t chosen[OST_MAX_CONSTELLATION_STARS];
+    uint64_t count;
+} OSTConstellationCliqueCtx;
+
+static int ost_constellation_add(OSTConstellationIndex *idx,
+                                 const uint32_t *ids)
+{
+    uint32_t ordered[OST_MAX_CONSTELLATION_STARS];
+    memcpy(ordered, ids, (size_t)idx->k * sizeof(ordered[0]));
+    ost_constellation_canonicalize_ids(idx->pair->stars.v, ordered, idx->k);
+    if (idx->map_size >= idx->cap)
+        return -2;
+    if (ost_constellation_key(idx->descriptor_kind, idx->pair->stars.v,
+            ordered, idx->k, ost_constellation_index_key(idx, idx->map_size),
+            idx->dims) < 0)
+        return 0;
+    memcpy(ost_constellation_index_stars(idx, idx->map_size), ordered,
+           (size_t)idx->k * sizeof(ordered[0]));
+    idx->map_size++;
+    return 0;
+}
+
+static int ost_constellation_clique_rec(OSTConstellationCliqueCtx *c,
+                                        int start, int depth)
+{
+    if (depth == c->k) {
+        c->count++;
+        return c->out ? ost_constellation_add(c->out, c->chosen) : 0;
+    }
+    if (depth >= OST_MAX_CONSTELLATION_STARS)
+        return -1;
+    for (int p = start; p <= c->common_count - (c->k - depth); p++) {
+        int star = c->common[p], ok = 1;
+        for (int i = 2; i < depth; i++)
+            if (!ost_constellation_adj_has(c->off, c->edges, star,
+                                           (int)c->chosen[i])) {
+                ok = 0;
+                break;
+            }
+        if (!ok)
+            continue;
+        c->chosen[depth] = (uint32_t)star;
+        ok = ost_constellation_clique_rec(c, p + 1, depth + 1);
+        if (ok < 0)
+            return ok;
+    }
+    return 0;
+}
+
+static int ost_constellation_for_each_clique(CDB *pair, int k,
+                                             OSTConstellationIndex *out,
+                                             uint64_t *count, int *off,
+                                             OSTConstellationEdge *edges,
+                                             int *tmp, int *common)
+{
+    if (!pair || k < 2 || k > OST_MAX_CONSTELLATION_STARS ||
+        pair->stars.n < k || pair->map_size < 0) {
+        if (count) *count = 0;
+        return pair && pair->stars.n < k ? 0 : -1;
+    }
+    if (count)
+        *count = 0;
+    if (k > 2 && (!off || !edges || !tmp || !common ||
+        ost_constellation_build_adj(pair, off, edges, tmp) < 0))
+        return -1;
+    for (int i = 0; i < pair->map_size; i++) {
+        int a = pair->map[i].s1, b = pair->map[i].s2;
+        if (k > 2 && ost_constellation_before(pair->stars.v,
+                (uint32_t)b, (uint32_t)a))
+            OST_SWAP(int, a, b);
+        OSTConstellationCliqueCtx c;
+        memset(&c, 0, sizeof(c));
+        c.out = out;
+        c.off = off;
+        c.edges = edges;
+        c.common = common;
+        c.k = k;
+        c.chosen[0] = (uint32_t)a;
+        c.chosen[1] = (uint32_t)b;
+        if (k > 2) {
+            int ia = off[a], ea = off[a + 1], ib = off[b], eb = off[b + 1];
+            while (ia < ea && ib < eb) {
+                int ca = edges[ia].star, cb = edges[ib].star;
+                if (ca == cb) {
+                    if (ost_constellation_before(pair->stars.v,
+                            (uint32_t)b, (uint32_t)ca))
+                        common[c.common_count++] = ca;
+                    ia++;
+                    ib++;
+                } else if (ca < cb) {
+                    ia++;
+                } else {
+                    ib++;
+                }
+            }
+        }
+        if (ost_constellation_clique_rec(&c, 0, 2) < 0)
+            return -2;
+        if (count)
+            *count += c.count;
+    }
+    return 0;
+}
+
+OST_DEF int ost_constellation_count(CDB *pair, int k, uint64_t *count,
+                                    int *off, OSTConstellationEdge *edges,
+                                    int *tmp, int *common)
+{
+    return count ? ost_constellation_for_each_clique(pair, k, NULL, count,
+                                                     off, edges, tmp, common)
+                 : -1;
+}
+
+OST_DEF int ost_constellation_index_build(OSTConstellationIndex *idx, int *off,
+                                          OSTConstellationEdge *edges, int *tmp,
+                                          int *common)
+{
+    uint64_t unused = 0;
+    if (!idx || !idx->pair || (!idx->map && idx->cap > 0))
+        return -1;
+    idx->map_size = 0;
+    idx->kd_ready = 0;
+    return ost_constellation_for_each_clique(idx->pair, idx->k, idx, &unused,
+                                             off, edges, tmp, common);
+}
+
+OST_DEF void ost_constellation_index_kdsort(OSTConstellationIndex *idx)
+{
+    if (idx && !idx->kd_ready) {
+        ost_kdbuild(idx->map, idx->record_size, 0, 0, idx->map_size,
+                    idx->kd_bucket, 0, idx->dims);
+        idx->kd_ready = 1;
+    }
+}
+
+typedef struct OSTConstellationSearchCtx {
+    OSTConstellationIndex *cat;
+    CDB *img;
+    MatchResult *m, *winner;
+    const Config *cfg;
+    MatchWork *w;
+    CPair *candidates;
+    int *nc;
+    int candidate_cap;
+    float qkey[OST_MAX_CONSTELLATION_DIMS];
+    float qerr[OST_MAX_CONSTELLATION_DIMS];
+    int img_perm_count, pair_dims;
+    int img_perms[OST_MAX_CONSTELLATION_PERMS][OST_MAX_CONSTELLATION_STARS];
+    float img_pair_key[OST_MAX_CONSTELLATION_PERMS][OST_MAX_CONSTELLATION_DIMS];
+    float img_pair_err[OST_MAX_CONSTELLATION_PERMS][OST_MAX_CONSTELLATION_DIMS];
+} OSTConstellationSearchCtx;
+
+static int ost_constellation_pairwise_ok(OSTConstellationSearchCtx *ctx,
+                                         const float *db_pair_key,
+                                         int perm_slot)
+{
+    if (ctx->cat->descriptor_kind == OST_CONSTELLATION_PAIRDIST)
+        return 1;
+    if (!db_pair_key || perm_slot < 0 || perm_slot >= ctx->img_perm_count ||
+        ctx->pair_dims <= 0 || ctx->pair_dims > OST_MAX_CONSTELLATION_DIMS)
+        return 0;
+    for (int d = 0; d < ctx->pair_dims; d++)
+        if (fabsf(db_pair_key[d] - ctx->img_pair_key[perm_slot][d]) >
+            ctx->img_pair_err[perm_slot][d])
+            return 0;
+    return 1;
+}
+
+static int ost_constellation_score_candidate(OSTConstellationSearchCtx *ctx,
+                                             const int *db_idx,
+                                             const int *img_idx)
+{
+    OSTConstellationIndex *cat = ctx->cat;
+    ctx->m->match.db_s1 = db_idx[0];
+    ctx->m->match.db_s2 = db_idx[1];
+    ctx->m->match.img_s1 = img_idx[0];
+    ctx->m->match.img_s2 = img_idx[1];
+    if (weighted_wahba_vectors(ctx->m->R, cat->pair->stars.v,
+                               ctx->img->stars.v, db_idx, img_idx,
+                               cat->k, QMETHOD_ITER) < 0)
+        return 0;
+    if (cat->pair->results.kdsorted)
+        ost_query_search(&cat->pair->results, ctx->cfg, ctx->m->R[0],
+                         ctx->cfg->MAXFOV / 2.0f,
+                         ctx->cfg->THRESH_FACTOR * ctx->cfg->IMAGE_VARIANCE);
+    compute_score(ctx->m, ctx->cfg, ctx->w);
+    if (ctx->m->match.totalscore > ctx->winner->match.totalscore) {
+        if (ctx->winner->match.totalscore != -FLT_MAX) {
+            if (*ctx->nc >= ctx->candidate_cap) {
+                if (cat->pair->results.kdsorted)
+                    ost_query_clear_results(&cat->pair->results);
+                return -1;
+            }
+            ctx->candidates[(*ctx->nc)++] = ctx->winner->match;
+        }
+        mr_copy(ctx->winner, ctx->m);
+    } else {
+        if (*ctx->nc >= ctx->candidate_cap) {
+            if (cat->pair->results.kdsorted)
+                ost_query_clear_results(&cat->pair->results);
+            return -1;
+        }
+        ctx->candidates[(*ctx->nc)++] = ctx->m->match;
+    }
+    if (cat->pair->results.kdsorted)
+        ost_query_clear_results(&cat->pair->results);
+    return 0;
+}
+
+static int ost_constellation_visit(void *base, int row, void *vctx)
+{
+    OSTConstellationSearchCtx *ctx = (OSTConstellationSearchCtx *)vctx;
+    OSTConstellationIndex *cat = ctx->cat;
+    float *key = (float *)((unsigned char *)base +
+                 (size_t)row * cat->record_size);
+    uint32_t *ids = (uint32_t *)((unsigned char *)key +
+                    (size_t)cat->dims * sizeof(float));
+    int db_idx[OST_MAX_CONSTELLATION_STARS];
+    float db_pair_key[OST_MAX_CONSTELLATION_DIMS];
+    for (int i = 0; i < cat->k; i++)
+        db_idx[i] = (int)ids[i];
+    if (cat->descriptor_kind != OST_CONSTELLATION_PAIRDIST &&
+        ost_constellation_pairdist_key(cat->pair->stars.v, ids, cat->k,
+            db_pair_key, ctx->pair_dims) < 0)
+        return 0;
+    for (int p = 0; p < ctx->img_perm_count; p++) {
+        int rc;
+        if (!ost_constellation_pairwise_ok(ctx, db_pair_key, p))
+            continue;
+        rc = ost_constellation_score_candidate(ctx, db_idx,
+                                               ctx->img_perms[p]);
+        if (rc < 0)
+            return rc;
+    }
+    return 0;
+}
+
+typedef struct OSTConstellationQueryVariant {
+    float key[OST_MAX_CONSTELLATION_DIMS];
+    float qerr[OST_MAX_CONSTELLATION_DIMS];
+    float pair_key[OST_MAX_CONSTELLATION_DIMS];
+    float pair_err[OST_MAX_CONSTELLATION_DIMS];
+    int img_idx[OST_MAX_CONSTELLATION_STARS];
+} OSTConstellationQueryVariant;
+
+static int ost_constellation_variant_same(
+        const OSTConstellationIndex *cat,
+        const OSTConstellationQueryVariant *a,
+        const OSTConstellationQueryVariant *b)
+{
+    for (int d = 0; d < cat->dims; d++)
+        if (fabsf(a->key[d] - b->key[d]) > 1e-5f ||
+            fabsf(a->qerr[d] - b->qerr[d]) > 1e-5f)
+            return 0;
+    return 1;
+}
+
+static int ost_constellation_search_variants(OSTConstellationSearchCtx *s,
+        OSTConstellationQueryVariant *variants, int variant_count)
+{
+    int used[OST_MAX_CONSTELLATION_PERMS] = {0};
+    s->pair_dims = ost_constellation_dims(s->cat->k,
+                                          OST_CONSTELLATION_PAIRDIST);
+    if (variant_count > OST_MAX_CONSTELLATION_PERMS)
+        return -1;
+    for (int i = 0; i < variant_count; i++) if (!used[i]) {
+        int rc;
+        memcpy(s->qkey, variants[i].key,
+               (size_t)s->cat->dims * sizeof(s->qkey[0]));
+        memcpy(s->qerr, variants[i].qerr,
+               (size_t)s->cat->dims * sizeof(s->qerr[0]));
+        s->img_perm_count = 0;
+        for (int j = i; j < variant_count; j++) {
+            if (used[j] || !ost_constellation_variant_same(s->cat,
+                                                           &variants[i],
+                                                           &variants[j]))
+                continue;
+            if (s->img_perm_count >= OST_MAX_CONSTELLATION_PERMS)
+                return -1;
+            memcpy(s->img_perms[s->img_perm_count], variants[j].img_idx,
+                   (size_t)s->cat->k * sizeof(s->img_perms[0][0]));
+            if (s->cat->descriptor_kind != OST_CONSTELLATION_PAIRDIST) {
+                memcpy(s->img_pair_key[s->img_perm_count], variants[j].pair_key,
+                       (size_t)s->pair_dims * sizeof(s->img_pair_key[0][0]));
+                memcpy(s->img_pair_err[s->img_perm_count], variants[j].pair_err,
+                       (size_t)s->pair_dims * sizeof(s->img_pair_err[0][0]));
+            }
+            s->img_perm_count++;
+            used[j] = 1;
+        }
+        rc = ost_kdsearch(s->cat->map, s->cat->record_size, 0,
+                          0, s->cat->map_size, s->cat->kd_bucket,
+                          0, s->cat->dims, s->qkey, s->qerr,
+                          ost_constellation_visit, s);
+        if (rc < 0)
+            return rc;
+    }
+    s->img_perm_count = 0;
+    return 0;
+}
+
+typedef struct OSTConstellationPermCtx {
+    OSTConstellationSearchCtx *search;
+    OSTConstellationQueryVariant *variants;
+    int variant_count, variant_cap, fixed_descriptor;
+    float fixed_key[OST_MAX_CONSTELLATION_DIMS];
+    float fixed_qerr[OST_MAX_CONSTELLATION_DIMS];
+    uint32_t ids[OST_MAX_CONSTELLATION_STARS];
+    uint32_t perm_ids[OST_MAX_CONSTELLATION_STARS];
+    int used[OST_MAX_CONSTELLATION_STARS];
+} OSTConstellationPermCtx;
+
+static int ost_constellation_query_perm_rec(OSTConstellationPermCtx *p,
+                                            int depth)
+{
+    OSTConstellationSearchCtx *s = p->search;
+    int k = s->cat->k;
+    if (depth == k) {
+        OSTConstellationQueryVariant *v;
+        if (p->variant_count >= p->variant_cap)
+            return -1;
+        v = &p->variants[p->variant_count];
+        if (p->fixed_descriptor) {
+            memcpy(v->key, p->fixed_key,
+                   (size_t)s->cat->dims * sizeof(v->key[0]));
+            memcpy(v->qerr, p->fixed_qerr,
+                   (size_t)s->cat->dims * sizeof(v->qerr[0]));
+        } else if (ost_constellation_qerr_ut(s->cfg, s->cat->descriptor_kind,
+                s->img->stars.v, p->perm_ids, k,
+                s->cat->pair->stars.max_variance, v->key, v->qerr) < 0)
+            return 0;
+        if (s->cat->descriptor_kind != OST_CONSTELLATION_PAIRDIST &&
+            ost_constellation_qerr_ut(s->cfg, OST_CONSTELLATION_PAIRDIST,
+                s->img->stars.v, p->perm_ids, k,
+                s->cat->pair->stars.max_variance,
+                v->pair_key, v->pair_err) < 0)
+            return 0;
+        for (int i = 0; i < k; i++)
+            v->img_idx[i] = (int)p->perm_ids[i];
+        p->variant_count++;
+        return 0;
+    }
+    for (int i = 0; i < k; i++) if (!p->used[i]) {
+        int rc;
+        p->used[i] = 1;
+        p->perm_ids[depth] = p->ids[i];
+        rc = ost_constellation_query_perm_rec(p, depth + 1);
+        p->used[i] = 0;
+        if (rc < 0)
+            return rc;
+    }
+    return 0;
+}
+
+static int ost_constellation_query_feature(OSTConstellationSearchCtx *s,
+                                           const uint32_t *ids)
+{
+    OSTConstellationQueryVariant variants[OST_MAX_CONSTELLATION_PERMS];
+    OSTConstellationPermCtx p;
+    memset(&p, 0, sizeof(p));
+    p.search = s;
+    p.variants = variants;
+    p.variant_cap = OST_MAX_CONSTELLATION_PERMS;
+    if (ost_constellation_descriptor_symmetric(s->cat->k,
+                                               s->cat->descriptor_kind)) {
+        if (ost_constellation_qerr_ut(s->cfg, s->cat->descriptor_kind,
+                s->img->stars.v, ids, s->cat->k,
+                s->cat->pair->stars.max_variance,
+                p.fixed_key, p.fixed_qerr) < 0)
+            return 0;
+        p.fixed_descriptor = 1;
+    }
+    memcpy(p.ids, ids, (size_t)s->cat->k * sizeof(p.ids[0]));
+    if (ost_constellation_query_perm_rec(&p, 0) < 0)
+        return -1;
+    if (p.variant_count <= 0)
+        return 0;
+    return ost_constellation_search_variants(s, variants, p.variant_count);
+}
+
+typedef struct OSTConstellationFeatureCtx {
+    OSTConstellationSearchCtx *search;
+    int anchor0, anchor1;
+    uint32_t extra[OST_MAX_CONSTELLATION_STARS];
+} OSTConstellationFeatureCtx;
+
+static int ost_constellation_feature_rec(OSTConstellationFeatureCtx *f,
+                                         int start, int depth)
+{
+    int need = f->search->cat->k - 2;
+    if (depth == need) {
+        uint32_t ids[OST_MAX_CONSTELLATION_STARS];
+        ids[0] = (uint32_t)f->anchor0;
+        ids[1] = (uint32_t)f->anchor1;
+        memcpy(ids + 2, f->extra, (size_t)need * sizeof(ids[0]));
+        ost_constellation_canonicalize_ids(f->search->img->stars.v, ids,
+                                           f->search->cat->k);
+        if (!((ids[0] == (uint32_t)f->anchor0 &&
+               ids[1] == (uint32_t)f->anchor1) ||
+              (ids[0] == (uint32_t)f->anchor1 &&
+               ids[1] == (uint32_t)f->anchor0)))
+            return 0;
+        return ost_constellation_query_feature(f->search, ids);
+    }
+    for (int i = start; i <= f->search->img->stars.n - (need - depth); i++) {
+        if (i == f->anchor0 || i == f->anchor1)
+            continue;
+        f->extra[depth] = (uint32_t)i;
+        if (ost_constellation_feature_rec(f, i + 1, depth + 1) < 0)
+            return -1;
+    }
+    return 0;
+}
+
+OST_DEF int ost_db_match_constellations(OSTConstellationIndex *cat, CDB *img,
+                                        MatchResult *winner,
+                                        const Config *cfg, MatchWork *w,
+                                        float *p_match)
 {
     StarFov fov;
     MatchResult m;
     CPair *candidates = w->candidates;
-    int candidate_cap = w->candidate_cap;
-    int nc = 0;
+    int candidate_cap = w->candidate_cap, nc = 0;
 
-    *p_match = 0.0f;
-    mr_init(winner, db, img, &fov, w->match_map);
-    if (db->stars.n < 3 || img->stars.n < 3)
-        return 0;
-    if (fov_init(&fov, &img->stars, db->stars.max_variance, cfg, w) < 0)
+    if (!cat || !cat->pair || !img || !winner || !cfg || !w || !p_match)
         return -1;
-    mr_init(&m, db, img, &fov, w->work_map);
+    *p_match = 0.0f;
+    mr_init(winner, cat->pair, img, &fov, w->match_map);
+    if (cat->pair->stars.n < cat->k || img->stars.n < cat->k ||
+        cat->map_size <= 0)
+        return 0;
+    if (fov_init(&fov, &img->stars, cat->pair->stars.max_variance, cfg, w) < 0)
+        return -1;
+    ost_constellation_index_kdsort(cat);
+    mr_init(&m, cat->pair, img, &fov, w->work_map);
     for (int n = 0; n < img->map_size; n++) {
         Constellation ic = img->map[n];
-        float err = cfg->POS_ERR_SIGMA * cfg->PIXSCALE *
-            sqrtf(img->stars.v[ic.s1].sigma_sq + img->stars.v[ic.s2].sigma_sq +
-                  2 * db->stars.max_variance);
-        int lo, hi;
-        constellation_range(db->map, db->map_size, ic.p - err, ic.p + err, &lo, &hi);
-        if (lo >= hi)
+        OSTConstellationSearchCtx search;
+        OSTConstellationFeatureCtx feat;
+        if ((unsigned)ic.s1 >= (unsigned)img->stars.n ||
+            (unsigned)ic.s2 >= (unsigned)img->stars.n)
             continue;
-        for (int o = lo; o < hi; o++) {
-            mr_set_pair(&m, db->map[o], ic);
-            weighted_wahba(&m, QMETHOD_ITER);
-            if (db->results.kdsorted)
-                ost_query_search(&db->results, cfg, m.R[0], cfg->MAXFOV / 2,
-                             cfg->THRESH_FACTOR * cfg->IMAGE_VARIANCE);
-            for (int flip = 0; flip < 2; flip++) {
-                compute_score(&m, cfg, w);
-                if (m.match.totalscore > winner->match.totalscore) {
-                    if (winner->match.totalscore != -FLT_MAX) {
-                        if (nc >= candidate_cap)
-                            return -1;
-                        candidates[nc++] = winner->match;
-                    }
-                    mr_copy(winner, &m);
-                } else {
-                    if (nc >= candidate_cap)
-                        return -1;
-                    candidates[nc++] = m.match;
-                }
-                OST_SWAP(int, m.match.img_s1, m.match.img_s2);
-                if (flip == 0)
-                    weighted_wahba(&m, QMETHOD_ITER);
-            }
-            if (db->results.kdsorted)
-                ost_query_clear_results(&db->results);
-        }
+        memset(&search, 0, sizeof(search));
+        search.cat = cat;
+        search.img = img;
+        search.m = &m;
+        search.winner = winner;
+        search.cfg = cfg;
+        search.w = w;
+        search.candidates = candidates;
+        search.nc = &nc;
+        search.candidate_cap = candidate_cap;
+        memset(&feat, 0, sizeof(feat));
+        feat.search = &search;
+        feat.anchor0 = ic.s1;
+        feat.anchor1 = ic.s2;
+        if (ost_constellation_feature_rec(&feat, 0, 0) < 0)
+            return -1;
     }
     if (winner->match.totalscore != -FLT_MAX) {
-        /* Softmax-like confidence over candidates not equivalent to the winner. */
         double p = 1.0;
         for (int i = 0; i < nc; i++)
             if (!related(winner, &candidates[i]))
-                p += exp((double)candidates[i].totalscore - winner->match.totalscore);
+                p += exp((double)candidates[i].totalscore -
+                         winner->match.totalscore);
         *p_match = (float)(1.0 / p);
     }
     return 0;

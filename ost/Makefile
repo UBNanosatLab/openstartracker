@@ -1,7 +1,7 @@
 .PHONY: all clean
 
 CC = gcc
-CFLAGS ?= -Ofast -g
+CFLAGS ?= -O3 -g
 LIBPNG_CFLAGS ?= $(shell pkg-config --cflags libpng)
 LIBPNG_LIBS ?= $(shell pkg-config --libs libpng)
 

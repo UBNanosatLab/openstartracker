@@ -19,11 +19,16 @@ __all__ = [
     "StarDB",
     "Query",
     "ConstellationDB",
+    "ConstellationIndex",
+    "OST_CONSTELLATION_PAIRDIST",
+    "OST_CONSTELLATION_CROSSRATIO4",
+    "OST_CONSTELLATION_CROSSRATIO5",
     "MatchResult",
     "ImagePipeline",
     "Tracker",
     "load_config",
     "match",
+    "match_constellations",
     "read_png_rgba",
 ]
 
@@ -101,6 +106,32 @@ class _CDB(_ct.Structure):
     _fields_ = [("stars", _StarDB), ("results", _Query),
                 ("map", _ct.POINTER(_Constellation)), ("map_size", _ct.c_int)]
 
+class _ConstellationEdge(_ct.Structure):
+    _fields_ = [("star", _ct.c_int)]
+
+OST_CONSTELLATION_PAIRDIST = 0
+OST_CONSTELLATION_CROSSRATIO4 = 1
+OST_CONSTELLATION_CROSSRATIO5 = 2
+
+_DESCRIPTOR_KINDS = {
+    None: OST_CONSTELLATION_PAIRDIST,
+    "pairdist": OST_CONSTELLATION_PAIRDIST,
+    b"pairdist": OST_CONSTELLATION_PAIRDIST,
+    "crossratio4": OST_CONSTELLATION_CROSSRATIO4,
+    b"crossratio4": OST_CONSTELLATION_CROSSRATIO4,
+    "crossratio5": OST_CONSTELLATION_CROSSRATIO5,
+    b"crossratio5": OST_CONSTELLATION_CROSSRATIO5,
+}
+
+class _ConstellationIndex(_ct.Structure):
+    _fields_ = [("pair", _ct.POINTER(_CDB)),
+                ("map", _ct.POINTER(_ct.c_ubyte)),
+                ("map_size", _ct.c_int), ("cap", _ct.c_int),
+                ("kd_ready", _ct.c_int), ("kd_bucket", _ct.c_int),
+                ("k", _ct.c_int), ("dims", _ct.c_int),
+                ("descriptor_kind", _ct.c_int),
+                ("record_size", _ct.c_size_t)]
+
 class _StarFov(_ct.Structure):
     pass
 
@@ -126,6 +157,8 @@ _PStar = _ct.POINTER(Star)
 _PStarDB = _ct.POINTER(_StarDB)
 _PQuery = _ct.POINTER(_Query)
 _PCDB = _ct.POINTER(_CDB)
+_PConstellationIndex = _ct.POINTER(_ConstellationIndex)
+_PConstellationEdge = _ct.POINTER(_ConstellationEdge)
 
 _lib.ost_load_config.argtypes = [_PConfig, _ct.c_char_p]
 _lib.ost_load_config.restype = _ct.c_int
@@ -157,9 +190,17 @@ _lib.ost_db_from_image.restype = _ct.c_int
 _lib.ost_db_from_catalog.argtypes = [_PCDB, _PStarDB, _PStar, _ct.c_int, _PQuery, _PStar, _ct.POINTER(_ct.c_int), _ct.POINTER(_ct.c_byte), _ct.POINTER(_Constellation), _ct.c_int, _ct.c_int, _PConfig, _ct.POINTER(_ct.c_byte)]
 _lib.ost_db_from_catalog.restype = _ct.c_int
 _lib.ost_match_work_init.argtypes = [_ct.POINTER(_MatchWork), _ct.POINTER(_CPair), _ct.c_int, _ct.POINTER(_ct.c_int), _ct.POINTER(_ct.c_int), _ct.c_int, _ct.POINTER(_ct.c_float), _ct.POINTER(_ct.c_float), _ct.POINTER(_ct.c_float), _ct.POINTER(_ct.c_int), _ct.POINTER(_ct.c_int)]
-_lib.ost_db_match.argtypes = [_PCDB, _PCDB, _ct.POINTER(_CMatchResult), _PConfig, _ct.POINTER(_MatchWork), _ct.POINTER(_ct.c_float)]
-_lib.ost_db_match.restype = _ct.c_int
-
+_lib.ost_constellation_record_size.argtypes = [_ct.c_int, _ct.c_int]
+_lib.ost_constellation_record_size.restype = _ct.c_size_t
+_lib.ost_constellation_index_init.argtypes = [_PConstellationIndex, _PCDB, _ct.c_int, _ct.c_int, _ct.POINTER(_ct.c_ubyte), _ct.c_int]
+_lib.ost_constellation_index_init.restype = _ct.c_int
+_lib.ost_constellation_count.argtypes = [_PCDB, _ct.c_int, _ct.POINTER(_ct.c_uint64), _ct.POINTER(_ct.c_int), _PConstellationEdge, _ct.POINTER(_ct.c_int), _ct.POINTER(_ct.c_int)]
+_lib.ost_constellation_count.restype = _ct.c_int
+_lib.ost_constellation_index_build.argtypes = [_PConstellationIndex, _ct.POINTER(_ct.c_int), _PConstellationEdge, _ct.POINTER(_ct.c_int), _ct.POINTER(_ct.c_int)]
+_lib.ost_constellation_index_build.restype = _ct.c_int
+_lib.ost_constellation_index_kdsort.argtypes = [_PConstellationIndex]
+_lib.ost_db_match_constellations.argtypes = [_PConstellationIndex, _PCDB, _ct.POINTER(_CMatchResult), _PConfig, _ct.POINTER(_MatchWork), _ct.POINTER(_ct.c_float)]
+_lib.ost_db_match_constellations.restype = _ct.c_int
 class _CCComponent(_ct.Structure):
     _fields_ = [("area", _ct.c_int), ("sum_x", _ct.c_int), ("sum_y", _ct.c_int),
                 ("min_x", _ct.c_int), ("max_x", _ct.c_int),
@@ -173,7 +214,7 @@ class _CCBufferSizes(_ct.Structure):
     _fields_ = [("max_labels", _ct.c_int),
                 ("components", _ct.c_size_t), ("parent", _ct.c_size_t),
                 ("col_label", _ct.c_size_t), ("active_count", _ct.c_size_t),
-                ("free_after_row", _ct.c_size_t),
+                ("reuse_after_row", _ct.c_size_t),
                 ("total_bytes", _ct.c_size_t)]
 
 class _CCContext(_ct.Structure):
@@ -182,7 +223,7 @@ class _CCContext(_ct.Structure):
                 ("parent", _ct.POINTER(_ct.c_int)),
                 ("col_label", _ct.POINTER(_ct.c_int)),
                 ("active_count", _ct.POINTER(_ct.c_int)),
-                ("free_after_row", _ct.POINTER(_ct.c_int))]
+                ("reuse_after_row", _ct.POINTER(_ct.c_int))]
 
 class _BGConfig(_ct.Structure):
     _fields_ = [("width", _ct.c_int), ("height", _ct.c_int),
@@ -469,6 +510,46 @@ class ConstellationDB:
     def _sync_results(self):
         self._c.results = self.results._c
 
+class ConstellationIndex:
+    """C-backed K-star constellation index over an OST pair catalog."""
+    def __init__(self, pair_db, k=3, descriptor="pairdist"):
+        self.pair_db = pair_db
+        self.k = int(k)
+        try:
+            self.descriptor_kind = _DESCRIPTOR_KINDS[descriptor]
+        except KeyError:
+            raise ValueError("unsupported constellation descriptor") from None
+        nstars = len(pair_db.stars)
+        npairs = int(pair_db._c.map_size)
+        self.off = (_ct.c_int * max(1, nstars + 1))()
+        self.edges = (_ConstellationEdge * max(1, 2 * npairs))()
+        self.tmp = (_ct.c_int * max(1, nstars))()
+        self.common = (_ct.c_int * max(1, nstars))()
+        count = _ct.c_uint64(0)
+        if _lib.ost_constellation_count(
+                _ct.byref(pair_db._c), self.k, _ct.byref(count), self.off,
+                self.edges, self.tmp, self.common) < 0:
+            raise RuntimeError("constellation count failed")
+        rec = int(_lib.ost_constellation_record_size(
+            self.k, self.descriptor_kind))
+        if count.value > (1 << 31) - 1 or rec <= 0:
+            raise MemoryError("constellation index too large")
+        self._storage = (_ct.c_ubyte * max(1, int(count.value) * rec))()
+        self._c = _ConstellationIndex()
+        if _lib.ost_constellation_index_init(
+                _ct.byref(self._c), _ct.byref(pair_db._c), self.k,
+                self.descriptor_kind, self._storage, int(count.value)) < 0:
+            raise RuntimeError("constellation index init failed")
+        if _lib.ost_constellation_index_build(
+                _ct.byref(self._c), self.off, self.edges, self.tmp,
+                self.common) < 0:
+            raise RuntimeError("constellation index build failed")
+        _lib.ost_constellation_index_kdsort(_ct.byref(self._c))
+
+    @property
+    def count(self):
+        return int(self._c.map_size)
+
 class MatchResult:
     """Result from matching two constellation databases."""
     def __init__(self, c_result, p_match):
@@ -500,25 +581,36 @@ class _Workspace:
                                  self.fov_px, self.fov_py, self.scores,
                                  self.match_map, self.work_map)
 
-def match(cfg, db, img):
-    """Match catalog/FOV ``db`` against image ``img`` and return ``MatchResult``."""
+def _match_with(cfg, db, img, call, candidate_scale=16):
     db._sync_results()
     img._sync_results()
-    candidate_cap = max(MAX_CANDIDATES, img._c.map_size * 16, 1)
+    candidate_cap = max(MAX_CANDIDATES, img._c.map_size * candidate_scale, 1)
     collision_cap = max(MAX_COLLISION, len(img.stars) * 8, 1)
     while True:
-        work = _Workspace(cfg, len(img.stars), img._c.map_size, candidate_cap, collision_cap)
+        work = _Workspace(cfg, len(img.stars), img._c.map_size,
+                          candidate_cap, collision_cap)
         c_result = _CMatchResult()
         p_match = _ct.c_float(0.0)
-        rc = _lib.ost_db_match(_ct.byref(db._c), _ct.byref(img._c),
-                               _ct.byref(c_result), _ct.byref(cfg),
-                               _ct.byref(work._c), _ct.byref(p_match))
+        rc = call(c_result, work, p_match)
         if rc == 0:
             return MatchResult(c_result, p_match.value)
         if db._c.results.kdsorted:
             _lib.ost_query_clear_results(_ct.byref(db._c.results))
         candidate_cap *= 2
         collision_cap *= 2
+
+def match(cfg, db, img):
+    """Match catalog/FOV ``db`` against image ``img`` and return ``MatchResult``."""
+    return match_constellations(cfg, ConstellationIndex(db, 2), img)
+
+def match_constellations(cfg, constellation_index, img):
+    """Match image pairs against a precomputed K-star constellation index."""
+    db = constellation_index.pair_db
+    return _match_with(cfg, db, img,
+        lambda c_result, work, p_match: _lib.ost_db_match_constellations(
+            _ct.byref(constellation_index._c), _ct.byref(img._c),
+            _ct.byref(c_result), _ct.byref(cfg), _ct.byref(work._c),
+            _ct.byref(p_match)))
 
 class ImagePipeline:
     """Image-to-measurement pipeline backed by ``ost_bg_*`` functions."""
@@ -546,7 +638,7 @@ class ImagePipeline:
         self.parent = (_ct.c_int * sizes.parent)()
         self.col_label = (_ct.c_int * sizes.col_label)()
         self.active_count = (_ct.c_int * sizes.active_count)()
-        self.free_after_row = (_ct.c_int * sizes.free_after_row)()
+        self.reuse_after_row = (_ct.c_int * sizes.reuse_after_row)()
         self.components = (_CCComponent * max_stars)()
         self.fit_stars1 = (_BGFitStar * max_stars)()
         self.fit_stars2 = (_BGFitStar * max_stars)()
@@ -570,7 +662,7 @@ class ImagePipeline:
         if _lib.ost_cc_init(_ct.byref(self.cc), cfg.IMG_X,
                             self.cc_components, self.parent,
                             self.col_label, self.active_count,
-                            self.free_after_row) < 0:
+                            self.reuse_after_row) < 0:
             raise RuntimeError("connected-component init failed")
 
     def measure_rgba(self, rgba):
@@ -623,16 +715,19 @@ class ImagePipeline:
 
 class Tracker:
     """Convenience wrapper matching the C test helper flow."""
-    def __init__(self, cfg):
+    def __init__(self, cfg, k=2, descriptor="pairdist"):
         self.cfg = cfg
+        self.k = int(k)
+        self.descriptor = descriptor
         self.catalog = None
         self.full_query = None
         self.filtered = None
         self.global_db = None
+        self.constellation_index = None
 
     @classmethod
-    def from_config_file(cls, filename):
-        return cls(load_config(filename))
+    def from_config_file(cls, filename, k=2, descriptor="pairdist"):
+        return cls(load_config(filename), k, descriptor)
 
     def prepare_catalog(self, catalog="hip_main.dat", year=1991.25):
         """Load, filter, and pair a catalog like ``prepare_catalog`` in tests."""
@@ -644,19 +739,21 @@ class Tracker:
         self.full_query.reset_mask()
         self.global_db = ConstellationDB.from_catalog(
             self.filtered, self.cfg, 2 + self.cfg.DB_REDUNDANCY)
+        self.constellation_index = ConstellationIndex(
+            self.global_db, self.k, self.descriptor)
         return self
 
     def measurements_to_db(self, measurements, ids_from_index=False):
         return StarDB.from_measurements(self.cfg, measurements, ids_from_index)
 
-    def match_catalog_stars(self, measurements, max_false_p=1e-7):
+    def match_catalog_stars(self, measurements, max_false_p=0.1):
         """Return catalog ids for ``(x, y, mag)`` image measurements."""
         if self.global_db is None:
             raise RuntimeError("call prepare_catalog first")
         img = self.measurements_to_db(measurements)
         bright = img.copy_n_brightest(self.cfg.MAX_FALSE_STARS + self.cfg.REQUIRED_STARS)
         img_cdb = ConstellationDB.from_image(bright, self.cfg.MAX_FALSE_STARS + 2)
-        winner = match(self.cfg, self.global_db, img_cdb)
+        winner = match_constellations(self.cfg, self.constellation_index, img_cdb)
         ids = [-1] * len(img)
         if 1.0 - winner.p_match > max_false_p:
             return ids
@@ -670,7 +767,9 @@ class Tracker:
         self.full_query.clear_results()
 
         img_full = ConstellationDB.from_image(img, self.cfg.MAX_FALSE_STARS + 2)
-        fov_winner = match(self.cfg, fov_db, img_full)
+        fov_winner = match_constellations(
+            self.cfg, ConstellationIndex(fov_db, self.k, self.descriptor),
+            img_full)
         for i, dbi in enumerate(fov_winner.map[:len(ids)]):
             ids[i] = int(fov_db.stars[dbi].id) if dbi >= 0 else -1
         return ids

@@ -35,7 +35,7 @@ def main(argv=None):
     import ost
 
     cfg = ost.load_config(args.calibration)
-    tracker = ost.Tracker(cfg).prepare_catalog(args.catalog, args.year)
+    tracker = ost.Tracker(cfg, k=3).prepare_catalog(args.catalog, args.year)
     pipeline = ost.ImagePipeline(cfg)
     stars_file = open(args.stars_out, "w") if args.stars_out else None
     try:

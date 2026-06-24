@@ -73,6 +73,20 @@ class CDB(_ct.Structure):
     _fields_ = [("stars", StarDB), ("results", Query),
                 ("map", _ct.POINTER(Constellation)), ("map_size", _ct.c_int)]
 
+class ConstellationEdge(_ct.Structure):
+    _fields_ = [("star", _ct.c_int)]
+
+OST_CONSTELLATION_PAIRDIST = 0
+
+class ConstellationIndex(_ct.Structure):
+    _fields_ = [("pair", _ct.POINTER(CDB)),
+                ("map", _ct.POINTER(_ct.c_ubyte)),
+                ("map_size", _ct.c_int), ("cap", _ct.c_int),
+                ("kd_ready", _ct.c_int), ("kd_bucket", _ct.c_int),
+                ("k", _ct.c_int), ("dims", _ct.c_int),
+                ("descriptor_kind", _ct.c_int),
+                ("record_size", _ct.c_size_t)]
+
 class StarFov(_ct.Structure):
     pass
 
@@ -98,6 +112,8 @@ PStar = _ct.POINTER(Star)
 PStarDB = _ct.POINTER(StarDB)
 PQuery = _ct.POINTER(Query)
 PCDB = _ct.POINTER(CDB)
+PConstellationIndex = _ct.POINTER(ConstellationIndex)
+PConstellationEdge = _ct.POINTER(ConstellationEdge)
 
 MAX_STARS = 1000
 MAX_CAT = 120000
@@ -148,8 +164,17 @@ _lib.ost_db_from_image.restype = _ct.c_int
 _lib.ost_db_from_catalog.argtypes = [PCDB, PStarDB, PStar, _ct.c_int, PQuery, PStar, _ct.POINTER(_ct.c_int), _ct.POINTER(_ct.c_byte), _ct.POINTER(Constellation), _ct.c_int, _ct.c_int, PConfig, _ct.POINTER(_ct.c_byte)]
 _lib.ost_db_from_catalog.restype = _ct.c_int
 _lib.ost_match_work_init.argtypes = [_ct.POINTER(MatchWork), _ct.POINTER(CPair), _ct.c_int, _ct.POINTER(_ct.c_int), _ct.POINTER(_ct.c_int), _ct.c_int, _ct.POINTER(_ct.c_float), _ct.POINTER(_ct.c_float), _ct.POINTER(_ct.c_float), _ct.POINTER(_ct.c_int), _ct.POINTER(_ct.c_int)]
-_lib.ost_db_match.argtypes = [PCDB, PCDB, _ct.POINTER(MatchResultC), PConfig, _ct.POINTER(MatchWork), _ct.POINTER(_ct.c_float)]
-_lib.ost_db_match.restype = _ct.c_int
+_lib.ost_constellation_record_size.argtypes = [_ct.c_int, _ct.c_int]
+_lib.ost_constellation_record_size.restype = _ct.c_size_t
+_lib.ost_constellation_count.argtypes = [PCDB, _ct.c_int, _ct.POINTER(_ct.c_uint64), _ct.POINTER(_ct.c_int), PConstellationEdge, _ct.POINTER(_ct.c_int), _ct.POINTER(_ct.c_int)]
+_lib.ost_constellation_count.restype = _ct.c_int
+_lib.ost_constellation_index_init.argtypes = [PConstellationIndex, PCDB, _ct.c_int, _ct.c_int, _ct.POINTER(_ct.c_ubyte), _ct.c_int]
+_lib.ost_constellation_index_init.restype = _ct.c_int
+_lib.ost_constellation_index_build.argtypes = [PConstellationIndex, _ct.POINTER(_ct.c_int), PConstellationEdge, _ct.POINTER(_ct.c_int), _ct.POINTER(_ct.c_int)]
+_lib.ost_constellation_index_build.restype = _ct.c_int
+_lib.ost_constellation_index_kdsort.argtypes = [PConstellationIndex]
+_lib.ost_db_match_constellations.argtypes = [PConstellationIndex, PCDB, _ct.POINTER(MatchResultC), PConfig, _ct.POINTER(MatchWork), _ct.POINTER(_ct.c_float)]
+_lib.ost_db_match_constellations.restype = _ct.c_int
 
 _cfg = Config()
 class _CVar:
@@ -490,6 +515,8 @@ class constellation_db:
         self.results._q = self._cdb.results
         self.map_size = self._cdb.map_size
         self.map = self._map
+        self._k2_index = None
+        self._k2_storage = None
     def _sync_results(self):
         self._cdb.results = self.results._q
 
@@ -500,6 +527,31 @@ def _arr(key, typ, n):
         a = (typ * max(1, n))()
         _workspace[key] = a
     return a
+
+def _k2_index(db):
+    if getattr(db, "_k2_index", None) is not None:
+        return db._k2_index, db._k2_storage
+    count = _ct.c_uint64(0)
+    if _lib.ost_constellation_count(_ct.byref(db._cdb), 2, _ct.byref(count),
+                                    None, None, None, None) < 0:
+        raise RuntimeError("constellation index")
+    rec = int(_lib.ost_constellation_record_size(
+        2, OST_CONSTELLATION_PAIRDIST))
+    if count.value > (1 << 31) - 1 or rec <= 0:
+        raise MemoryError("constellation index")
+    storage = (_ct.c_ubyte * max(1, int(count.value) * rec))()
+    idx = ConstellationIndex()
+    if (_lib.ost_constellation_index_init(_ct.byref(idx),
+                                          _ct.byref(db._cdb), 2,
+                                          OST_CONSTELLATION_PAIRDIST,
+                                          storage, int(count.value)) < 0 or
+        _lib.ost_constellation_index_build(_ct.byref(idx), None, None,
+                                           None, None) < 0):
+        raise RuntimeError("constellation index")
+    _lib.ost_constellation_index_kdsort(_ct.byref(idx))
+    db._k2_index = idx
+    db._k2_storage = storage
+    return idx, storage
 
 class match_result:
     """Best match returned by :class:`db_match`.
@@ -561,6 +613,7 @@ class db_match:
         n = img.stars.size()
         candidate_cap = max(INITIAL_CANDIDATES, img._cdb.map_size * 16, 1)
         collision_cap = max(INITIAL_COLLISION, n * 8, 1)
+        idx, idx_storage = _k2_index(db)
         while True:
             candidates = _arr('candidates', CPair, candidate_cap)
             fov_mask = _arr('fov_mask', _ct.c_int, cvar.IMG_X * cvar.IMG_Y)
@@ -574,8 +627,8 @@ class db_match:
             _lib.ost_match_work_init(_ct.byref(work), candidates, len(candidates), fov_mask, collision, len(collision), fov_px, fov_py, scores, match_map, work_map)
             cwin = MatchResultC()
             p = _ct.c_float(0)
-            rc = _lib.ost_db_match(
-                _ct.byref(db._cdb),
+            rc = _lib.ost_db_match_constellations(
+                _ct.byref(idx),
                 _ct.byref(img._cdb),
                 _ct.byref(cwin),
                 _ct.byref(_cfg),

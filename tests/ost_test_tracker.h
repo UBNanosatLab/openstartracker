@@ -11,6 +11,35 @@ static OST_UNUSED void work_match_init(Work *w, MatchWork *mw)
                            w->match_map, w->work_map);
 }
 
+static OST_UNUSED int work_match_pairs(CDB *db, CDB *img,
+                                       MatchResult *winner,
+                                       MatchWork *mw, const Config *cfg,
+                                       float *p_match)
+{
+    OSTConstellationIndex idx;
+    uint64_t count = 0;
+    size_t rec;
+    unsigned char *storage;
+    int rc;
+    if (ost_constellation_count(db, 2, &count, NULL, NULL, NULL, NULL) < 0 ||
+        count > 2147483647u)
+        return -1;
+    rec = ost_constellation_record_size(2, OST_CONSTELLATION_PAIRDIST);
+    storage = (unsigned char *)calloc((size_t)count + 1u, rec);
+    if (!storage)
+        return -1;
+    if (ost_constellation_index_init(&idx, db, 2, OST_CONSTELLATION_PAIRDIST,
+                                     storage, (int)count) < 0 ||
+        ost_constellation_index_build(&idx, NULL, NULL, NULL, NULL) < 0) {
+        free(storage);
+        return -1;
+    }
+    ost_constellation_index_kdsort(&idx);
+    rc = ost_db_match_constellations(&idx, img, winner, cfg, mw, p_match);
+    free(storage);
+    return rc;
+}
+
 static OST_UNUSED int star_measurements_to_img_db(Work *w, StarDB *db, Star *storage,
                                        const double *stars, int len,
                                        int ids_from_index)
@@ -56,7 +85,7 @@ static OST_UNUSED int match_catalog_stars(Work *w, Query *full_q, CDB *global,
                                w->q_img_mask, w->img_cmap, 16,
                                w->cfg.MAX_FALSE_STARS + 2) < 0)
         return -1;
-    if (ost_db_match(global, &img_cdb, &winner, &w->cfg, &mw, &p_match) < 0)
+    if (work_match_pairs(global, &img_cdb, &winner, &mw, &w->cfg, &p_match) < 0)
         return -1;
     if (p_match > 0.9f) {
         ost_query_search(full_q, &w->cfg, winner.R[0],
@@ -81,8 +110,8 @@ static OST_UNUSED int match_catalog_stars(Work *w, Query *full_q, CDB *global,
                                    MAX_STARS * (MAX_STARS - 1) / 2,
                                    w->cfg.MAX_FALSE_STARS + 2) < 0)
             return -1;
-        if (ost_db_match(&fov_cdb, &img_full_cdb, &fov_winner,
-                     &w->cfg, &mw, &p_match) < 0)
+        if (work_match_pairs(&fov_cdb, &img_full_cdb, &fov_winner,
+                     &mw, &w->cfg, &p_match) < 0)
             return -1;
         for (int i = 0; i < len; i++) {
             int dbi = fov_winner.map[i];
@@ -134,8 +163,8 @@ static OST_UNUSED int match_relative_stars(Work *w,
                                w->cfg.MAX_FALSE_STARS + 2) < 0)
         return -1;
 
-    if (ost_db_match(&reference_cdb, &current_cdb, &winner,
-                 &w->cfg, &mw, p_match) < 0)
+    if (work_match_pairs(&reference_cdb, &current_cdb, &winner,
+                 &mw, &w->cfg, p_match) < 0)
         return -1;
     if (*p_match > 0.0f) {
         for (int i = 0; i < current_len; i++) {

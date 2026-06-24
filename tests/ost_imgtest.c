@@ -142,7 +142,7 @@ int main(int argc, char **argv)
     double *fit_params1, *fit_params2, *fit_params, *fit_cov;
     double *fit_normal, *fit_rhs;
     double *fit_rhs_solve, *fit_cov_xy, *fit_dropped;
-    int *parent, *col_label, *active_count, *free_after_row;
+    int *parent, *col_label, *active_count, *reuse_after_row;
     int *x_edge, *y_edge, *hist;
     unsigned char threshold;
     size_t pixels;
@@ -195,7 +195,7 @@ int main(int argc, char **argv)
     parent = (int *)malloc(sizes.parent * sizeof(*parent));
     col_label = (int *)malloc(sizes.col_label * sizeof(*col_label));
     active_count = (int *)malloc(sizes.active_count * sizeof(*active_count));
-    free_after_row = (int *)malloc(sizes.free_after_row * sizeof(*free_after_row));
+    reuse_after_row = (int *)malloc(sizes.reuse_after_row * sizeof(*reuse_after_row));
     stars = (OSTCCComponent *)malloc(IMG_MAX_STARS * sizeof(*stars));
     fit_stars1 = (OSTBGFitStar *)malloc(bg_cfg.max_stars * sizeof(*fit_stars1));
     fit_stars2 = (OSTBGFitStar *)malloc(bg_cfg.max_stars * sizeof(*fit_stars2));
@@ -212,7 +212,7 @@ int main(int argc, char **argv)
     if (!median_rgba || !image_rgba || !gray || !gray16 ||
         !bg_mean || !bg_var || !bg_poisson || !x_edge || !y_edge || !hist ||
         !work_comp ||
-        !parent || !col_label || !active_count || !free_after_row || !stars ||
+        !parent || !col_label || !active_count || !reuse_after_row || !stars ||
         !fit_stars1 || !fit_stars2 || !fit_params1 || !fit_params2 ||
         !fit_params || !fit_cov || !fit_normal || !fit_rhs ||
         !fit_rhs_solve || !fit_cov_xy || !fit_dropped) {
@@ -229,7 +229,7 @@ int main(int argc, char **argv)
     fit_work.cov_xy = fit_cov_xy;
     fit_work.dropped = fit_dropped;
     if (ost_cc_init(&cc, cfg.width, work_comp, parent, col_label,
-                    active_count, free_after_row) < 0)
+                    active_count, reuse_after_row) < 0)
         goto done;
     if (!image_mode && read_png_rgba(argv[2], cfg.width, cfg.height, median_rgba) < 0)
         goto done;
@@ -378,7 +378,7 @@ done:
     free(fit_stars2);
     free(fit_stars1);
     free(stars);
-    free(free_after_row);
+    free(reuse_after_row);
     free(active_count);
     free(col_label);
     free(parent);

@@ -500,6 +500,20 @@ private:
                                         std::max<size_t>(65536, (size_t)img->map_size * 16));
         size_t collision_cap = std::max(ctx.collision.size(),
                                         std::max<size_t>(16384, (size_t)n * 8));
+        OSTConstellationIndex idx;
+        uint64_t count = 0;
+        size_t rec;
+        if (ost_constellation_count(&db->cdb, 2, &count, NULL, NULL, NULL, NULL) < 0 ||
+            count > 2147483647u)
+            return;
+        rec = ost_constellation_record_size(2, OST_CONSTELLATION_PAIRDIST);
+        std::vector<unsigned char> storage((size_t)count * rec + rec);
+        if (ost_constellation_index_init(&idx, &db->cdb, 2,
+                OST_CONSTELLATION_PAIRDIST,
+                storage.empty() ? NULL : &storage[0], (int)count) < 0 ||
+            ost_constellation_index_build(&idx, NULL, NULL, NULL, NULL) < 0)
+            return;
+        ost_constellation_index_kdsort(&idx);
         MatchWork work;
         for (;;) {
             ctx.prepare(n, candidate_cap, collision_cap);
@@ -508,7 +522,7 @@ private:
                                 (int)ctx.collision.size(), &ctx.fov_px[0],
                                 &ctx.fov_py[0], &ctx.scores[0], &ctx.match_map[0],
                                 &ctx.work_map[0]);
-            if (ost_db_match(&db->cdb, &img->cdb, &winner->c,
+            if (ost_db_match_constellations(&idx, &img->cdb, &winner->c,
                              &beast_compat_detail::cfg(), &work, &p_match) == 0)
                 break;
             if (db->cdb.results.kdsorted)
