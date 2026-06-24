@@ -21,8 +21,7 @@ __all__ = [
     "ConstellationDB",
     "ConstellationIndex",
     "OST_CONSTELLATION_PAIRDIST",
-    "OST_CONSTELLATION_CROSSRATIO4",
-    "OST_CONSTELLATION_CROSSRATIO5",
+    "OST_CONSTELLATION_CROSSRATIO",
     "MatchResult",
     "ImagePipeline",
     "Tracker",
@@ -110,17 +109,14 @@ class _ConstellationEdge(_ct.Structure):
     _fields_ = [("star", _ct.c_int)]
 
 OST_CONSTELLATION_PAIRDIST = 0
-OST_CONSTELLATION_CROSSRATIO4 = 1
-OST_CONSTELLATION_CROSSRATIO5 = 2
+OST_CONSTELLATION_CROSSRATIO = 1
 
 _DESCRIPTOR_KINDS = {
     None: OST_CONSTELLATION_PAIRDIST,
     "pairdist": OST_CONSTELLATION_PAIRDIST,
     b"pairdist": OST_CONSTELLATION_PAIRDIST,
-    "crossratio4": OST_CONSTELLATION_CROSSRATIO4,
-    b"crossratio4": OST_CONSTELLATION_CROSSRATIO4,
-    "crossratio5": OST_CONSTELLATION_CROSSRATIO5,
-    b"crossratio5": OST_CONSTELLATION_CROSSRATIO5,
+    "crossratio": OST_CONSTELLATION_CROSSRATIO,
+    b"crossratio": OST_CONSTELLATION_CROSSRATIO,
 }
 
 class _ConstellationIndex(_ct.Structure):

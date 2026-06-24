@@ -364,8 +364,7 @@ typedef struct OSTConstellationEdge {
 
 typedef enum OSTConstellationDescriptorKind {
     OST_CONSTELLATION_PAIRDIST = 0,
-    OST_CONSTELLATION_CROSSRATIO4 = 1,
-    OST_CONSTELLATION_CROSSRATIO5 = 2
+    OST_CONSTELLATION_CROSSRATIO = 1
 } OSTConstellationDescriptorKind;
 
 typedef struct OSTConstellationIndex {
@@ -2562,10 +2561,9 @@ static int ost_constellation_key(int descriptor_kind, const Star *stars,
     switch (descriptor_kind) {
     case OST_CONSTELLATION_PAIRDIST:
         return ost_constellation_pairdist_key(stars, ids, k, out, dims);
-    case OST_CONSTELLATION_CROSSRATIO4:
-        return ost_constellation_crossratio4_key(stars, ids, k, out, dims);
-    case OST_CONSTELLATION_CROSSRATIO5:
-        return ost_constellation_crossratio5_key(stars, ids, k, out, dims);
+    case OST_CONSTELLATION_CROSSRATIO:
+        return k == 4 ? ost_constellation_crossratio4_key(stars, ids, k, out, dims) :
+                        ost_constellation_crossratio5_key(stars, ids, k, out, dims);
     default:
         return -1;
     }
@@ -2578,10 +2576,8 @@ static int ost_constellation_dims(int k, int descriptor_kind)
     switch (descriptor_kind) {
     case OST_CONSTELLATION_PAIRDIST:
         return k * (k - 1) / 2;
-    case OST_CONSTELLATION_CROSSRATIO4:
-        return k == 4 ? 2 : 0;
-    case OST_CONSTELLATION_CROSSRATIO5:
-        return k == 5 ? 5 : 0;
+    case OST_CONSTELLATION_CROSSRATIO:
+        return k == 4 ? 2 : (k == 5 ? 5 : 0);
     default:
         return 0;
     }
@@ -2590,8 +2586,8 @@ static int ost_constellation_dims(int k, int descriptor_kind)
 static int ost_constellation_descriptor_symmetric(int k, int descriptor_kind)
 {
     return (descriptor_kind == OST_CONSTELLATION_PAIRDIST && k == 2) ||
-           (descriptor_kind == OST_CONSTELLATION_CROSSRATIO4 && k == 4) ||
-           (descriptor_kind == OST_CONSTELLATION_CROSSRATIO5 && k == 5);
+           (descriptor_kind == OST_CONSTELLATION_CROSSRATIO &&
+            (k == 4 || k == 5));
 }
 
 OST_DEF size_t ost_constellation_record_size(int k, int descriptor_kind)
