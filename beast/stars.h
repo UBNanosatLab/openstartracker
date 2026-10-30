@@ -359,8 +359,6 @@ public:
 		
 		float dx=px-s_px[id];
 		float dy=py-s_py[id];
-		if (dx<-0.5) dx+=1.0;/* use whichever corner of the pixel gives the best score */
-		if (dy<-0.5) dy+=1.0;
 		return (maxdist_sq-(dx*dx+dy*dy))/(2*sigma_sq);
 	}
 			
@@ -378,8 +376,6 @@ public:
 	float get_score(const int id,const float px,const float py,const float sigma_sq,const float maxdist_sq) {
 		float dx=px-s_px[id];
 		float dy=py-s_py[id];
-		if (dx<-0.5) dx+=1.0;/* use whichever corner of the pixel gives the best score */
-		if (dy<-0.5) dy+=1.0;
 		return (maxdist_sq-(dx*dx+dy*dy))/(2*sigma_sq);
 	}
 	
@@ -432,7 +428,9 @@ public:
 			if(ymin<-IMG_Y/2)ymin=-IMG_Y/2;
 			for(int i=xmin;i<xmax;i++) for (int j=ymin;j<ymax;j++) {
 
-				float score=get_score(id, i,j, sigma_sq, maxdist_sq);
+				float px=fmaxf(i, fminf(s_px[id], i+1.0f));
+				float py=fmaxf(j, fminf(s_py[id], j+1.0f));
+				float score=get_score(id, px,py, sigma_sq, maxdist_sq);
 				
 				int x=i+IMG_X/2;
 				int y=j+IMG_Y/2;
